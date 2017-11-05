@@ -1,0 +1,46 @@
+{
+  "apps": [
+    {
+      "name": "smtp",
+      "script": "index.js",
+      "exec_mode": "cluster",
+      "instances": "max",
+      "env_production": {
+        "NODE_ENV": "production"
+      }
+    },
+    {
+      "name": "smtps",
+      "script": "index.js",
+      "exec_mode": "cluster",
+      "instances": "max",
+      "env_production": {
+        "NODE_ENV": "production",
+        "SECURE": "true",
+        "PORT": "465"
+      }
+    },
+    {
+      "name": "msa",
+      "script": "index.js",
+      "exec_mode": "cluster",
+      "instances": "max",
+      "env_production": {
+        "NODE_ENV": "production",
+        "SECURE": "true",
+        "PORT": "587"
+      }
+    }
+  ],
+  "deploy": {
+    "production": {
+      "user": "deploy",
+      "host": ["forwardemailmx1-deploy"],
+      "ref": "origin/master",
+      "repo": "git@github.com:niftylettuce/forward-email.git",
+      "path": "/var/www/production",
+      "post-deploy":
+        "yarn && pm2 startOrGracefulReload ecosystem.json --env production"
+    }
+  }
+}
