@@ -1,0 +1,8 @@
+.DS_Store
+*.log
+.idea
+node_modules
+coverage
+.nyc_output
+dkim-public.key
+dkim-private.key
