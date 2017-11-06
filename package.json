@@ -1,6 +1,6 @@
 {
   "name": "forward-email",
-  "description": "ForwardEmail is a free, secure, private, and open-source email forwarding service at https://forwardemail.net",
+  "description": "ForwardEmail is a free, encrypted, and open-source email forwarding service at http://forwardemail.net",
   "version": "0.0.1",
   "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
   "bugs": {
@@ -16,9 +16,7 @@
     "disposable-email-domains": "^1.0.21",
     "dkim": "https://github.com/niftylettuce/node-dkim",
     "get-port": "^3.2.0",
-    "lodash.isobject": "^3.0.2",
-    "lodash.isstring": "^4.0.1",
-    "lodash.uniq": "^4.5.0",
+    "lodash": "^4.17.4",
     "mailin": "^3.0.4",
     "mailparser": "^2.0.5",
     "ms": "^2.0.0",
@@ -53,7 +51,7 @@
   "engines": {
     "node": ">=8.3"
   },
-  "homepage": "https://forwardemail.net",
+  "homepage": "http://forwardemail.net",
   "keywords": [
     "forward",
     "email",

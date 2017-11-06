@@ -10,17 +10,14 @@ const nodemailer = require('nodemailer');
 const redis = require('redis');
 const Limiter = require('ratelimiter');
 const ms = require('ms');
-// const sendmail = require('sendmail');
 const domains = require('disposable-email-domains');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const validator = require('validator');
 const bluebird = require('bluebird');
-const isObject = require('lodash.isobject');
-const isString = require('lodash.isstring');
-const uniq = require('lodash.uniq');
+const isObject = require('lodash/isObject');
+const isString = require('lodash/isString');
+const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
-// const SMTPConnection = require('nodemailer/lib/smtp-connection');
-// const dkim = require('dkim');
 let mailUtilities = require('mailin/lib/mailUtilities.js');
 
 mailUtilities = bluebird.promisifyAll(mailUtilities);
@@ -51,7 +48,6 @@ class ForwardEmail {
   constructor(config = {}) {
     config = Object.assign(
       {
-        // sendmail: {},
         smtp: {},
         limiter: {},
         exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net']
@@ -76,7 +72,6 @@ class ForwardEmail {
     this.ssl = ssl;
 
     this.config = {
-      // sendmail: Object.assign({}, config.sendmail),
       smtp: Object.assign(
         {
           size: bytes('25mb'),
@@ -94,10 +89,6 @@ class ForwardEmail {
       limiter: Object.assign({}, config.limiter),
       exchanges: config.exchanges
     };
-
-    // setup our method for proxying inbound email to outbound
-    // this.sendmail = sendmail(this.config.sendmail);
-    // this.sendmail = promisify(this.sendmail).bind(this.sendmail);
 
     // setup rate limiting with redis
     this.limiter = Object.assign(
@@ -266,18 +257,6 @@ class ForwardEmail {
         // (if spam errors occur, we need 550 error code)
         // and we also might want to add clamav
         // for attachment scanning to prevent those from going through as well
-        // const reply = await this.sendmail(obj);
-        // await this.sendmail(obj);
-
-        // <https://github.com/nodemailer/nodemailer/blob/940f6e9a2178ed4861757b389257a22e72885b1c/test/mail-composer/mail-composer-test.js#L281>
-        /*
-        let connection = new SMTPConnection({
-          port: 465, // TODO: use port 25 w/non-secure as backup
-          host: // TODO: try all mx servers
-          secure: true,
-          logger: log
-        });
-        */
 
         await Promise.all(
           session.envelope.to.map(to => {
@@ -409,6 +388,8 @@ class ForwardEmail {
 
   // TODO: eBay/PayPal/Google cannot be forwarded so we need alt. solution
   // or maybe there's a way we can get them to whitelist our server
+  //
+  // TODO: we need to add Google Structured Data and then submit whitelist req
 
   //
   // basically we have to check if the domain has an SPF record
