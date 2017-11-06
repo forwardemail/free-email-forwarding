@@ -345,7 +345,7 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 3. MX - through checking if the sender's from address domain has MX records (so it's actually coming from a mail exchange/SMTP server), otherwise it's rejected
 
-4. Disposable Email Addresses - we automatically block sender's that are from the [disposable-email-domains][] list
+4. Disposable Email Addresses - we automatically block senders that are from the [disposable-email-domains][] list
 
 5. FQDN - validates that senders SMTP connections are from FQDN (meaning no IP addresses, they must have a valid domain name resolved)
 
