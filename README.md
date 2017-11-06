@@ -85,7 +85,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
-* * *
+---
 
 _Optional Add-ons:_
 
