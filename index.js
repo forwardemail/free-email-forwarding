@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { promisify } = require('util');
+const path = require('path');
 const dns = require('dns');
 const autoBind = require('auto-bind');
 const { SMTPServer } = require('smtp-server');
@@ -307,6 +308,13 @@ class ForwardEmail {
                   dkim.keySelector = 'default';
                   dkim.privateKey = fs.readFileSync(
                     '/home/deploy/dkim-private.key',
+                    'utf8'
+                  );
+                } else if (process.env.NODE_ENV === 'test') {
+                  dkim.domainName = 'forwardemail.net';
+                  dkim.keySelector = 'default';
+                  dkim.privateKey = fs.readFileSync(
+                    path.join(__dirname, 'dkim-private.key'),
                     'utf8'
                   );
                 }
