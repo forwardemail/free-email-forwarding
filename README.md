@@ -20,22 +20,22 @@
   * [CLI](#cli-1)
   * [API](#api-1)
 * [Terms of Use](#terms-of-use)
-* [Background](#background)
-* [Why did I create this service](#why-did-i-create-this-service)
-* [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
-* [How is it free](#how-is-it-free)
-* [What is the max email size limit](#what-is-the-max-email-size-limit)
-* [Can I forward my emails from a well-known provider](#can-i-forward-my-emails-from-a-well-known-provider)
-* [Do you store emails and their contents](#do-you-store-emails-and-their-contents)
-* [Do you store logs of emails](#do-you-store-logs-of-emails)
-* [Can you read my forwarded emails](#can-you-read-my-forwarded-emails)
-* [Does it support the + symbol (e.g. for Gmail aliases)](#does-it-support-the--symbol-eg-for-gmail-aliases)
-* [Does this forward my email's headers](#does-this-forward-my-emails-headers)
-* [Is this well-tested](#is-this-well-tested)
-* [Do you pass along SMTP response messages and codes](#do-you-pass-along-smtp-response-messages-and-codes)
-* [How do you prevent spammers and ensure good email forwarding reputation](#how-do-you-prevent-spammers-and-ensure-good-email-forwarding-reputation)
-* [Can I "send mail as" with this](#can-i-send-mail-as-with-this)
-* [Can I forward unlimited emails with this](#can-i-forward-unlimited-emails-with-this)
+* [FAQ](#faq)
+  * [Why did I create this service](#why-did-i-create-this-service)
+  * [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
+  * [How is it free](#how-is-it-free)
+  * [What is the max email size limit](#what-is-the-max-email-size-limit)
+  * [Can I forward my emails from a well-known provider](#can-i-forward-my-emails-from-a-well-known-provider)
+  * [Do you store emails and their contents](#do-you-store-emails-and-their-contents)
+  * [Do you store logs of emails](#do-you-store-logs-of-emails)
+  * [Can you read my forwarded emails](#can-you-read-my-forwarded-emails)
+  * [Does it support the + symbol (e.g. for Gmail aliases)](#does-it-support-the--symbol-eg-for-gmail-aliases)
+  * [Does this forward my email's headers](#does-this-forward-my-emails-headers)
+  * [Is this well-tested](#is-this-well-tested)
+  * [Do you pass along SMTP response messages and codes](#do-you-pass-along-smtp-response-messages-and-codes)
+  * [How do you prevent spammers and ensure good email forwarding reputation](#how-do-you-prevent-spammers-and-ensure-good-email-forwarding-reputation)
+  * [Can I "send mail as" with this](#can-i-send-mail-as-with-this)
+  * [Can I forward unlimited emails with this](#can-i-forward-unlimited-emails-with-this)
 * [Contributors](#contributors)
 * [License](#license)
 
@@ -85,7 +85,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
----
+* * *
 
 _Optional Add-ons:_
 
@@ -260,7 +260,6 @@ Here's the relevant excerpt regarding its terms of use:
 
 ## FAQ
 
-
 ### Why did I create this service
 
 I created this service after realizing that the only email forwarding services that exist now that are "free" are also closed-source and proprietary.  This means they probably read your forwarded emails.
@@ -281,16 +280,13 @@ Put simply, there was no current email-forwarding service that was free, simple,
 
 This service solves all of these problems.
 
-
 ### Can people unregister or register my email forwarding without my permission
 
 We use MX and TXT record verification, therefore if you add this service's respective MX and TXT records, then you're registered.  If you remove them, then you're unregistered.  You have ownership of your domain and DNS management, so if someone has access to that then that's a problem.
 
-
 ### How is it free
 
 I built this for myself and use it regularly.  I feel bad that people are using free closed-source forwarding services and risking their privacy and security.  I also know that most of these services if not all of them don't offer all the features that come with mine.  If this thing really takes off I might ask for donations or do a pay-what-you-want model to cover server costs.
-
 
 ### What is the max email size limit
 
@@ -298,23 +294,19 @@ We default to a 25 MB size limit (the same as Gmail), which includes content, he
 
 An error with the proper response code is returned if the file size limit is exceeded.
 
-
 ### Can I forward my emails from a well-known provider
 
 No, we don't support forwarding from your Gmail to another Gmail (this is just an example).
 
 Most email service providers like Gmail, Yahoo, Hotmail, Zoho, etc. already have this feature built-in for you to use.
 
-
 ### Do you store emails and their contents
 
 No, absolutely not.
 
-
 ### Do you store logs of emails
 
 No, absolutely not.
-
 
 ### Can you read my forwarded emails
 
@@ -322,26 +314,21 @@ No, I cannot read your emails and I have no wish to.  Many other email forwardin
 
 The code that is deployed to the server is publicly visible on GitHub!
 
-
 ### Does it support the `+` symbol (e.g. for Gmail aliases)
 
 Yes, absolutely.
-
 
 ### Does this forward my email's headers
 
 Yes, absolutely.
 
-
 ### Is this well-tested
 
 Yes, it has tests written with ava and also has code coverage.
 
-
 ### Do you pass along SMTP response messages and codes
 
 Yes, absolutely.  For example if you're sending an email to `hello@niftylettuce.com` and it's registered to forward to `niftylettuce@gmail.com`, then the SMTP response message and code from the `gmail.com` SMTP server will be returned instead of the proxy server at `mx1.forwardemail.net` or `mx2.forwardemail.net`.
-
 
 ### How do you prevent spammers and ensure good email forwarding reputation
 
@@ -364,11 +351,9 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 6. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
 
-
 ### Can I "send mail as" with this
 
 Not yet, though that feature is almost done being added and should be available soon.
-
 
 ### Can I forward unlimited emails with this
 
