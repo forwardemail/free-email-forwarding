@@ -189,27 +189,39 @@ To put it bluntly, there's nothing simple, free, secure, and open-source.
 
    > If you just need to forward a single email address (e.g. `hello@niftylettuce.com` to `niftylettuce@gmail.com`; this will also forward `hello+test@niftylettuce.com` to `niftylettuce+test@gmail.com` automatically):
 
-   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                   |
-   | ------------------ | :--: | ----------- | ------------------------------------------ |
-   | _@ or leave blank_ | 3600 | TXT         | forward-email=hello:niftylettuce@gmail.com |
+   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                     |
+   | ------------------ | :--: | ----------- | -------------------------------------------- |
+   | _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce@gmail.com` |
 
    > If you are forwarding multiple emails, then you'll want to separate them with a comma:
 
-   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                                  |
-   | ------------------ | :--: | ----------- | ------------------------------------------------------------------------- |
-   | _@ or leave blank_ | 3600 | TXT         | forward-email=hello:niftylettuce@gmail.com,support:niftylettuce@gmail.com |
+   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                                    |
+   | ------------------ | :--: | ----------- | --------------------------------------------------------------------------- |
+   | _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce@gmail.com,support:niftylettuce@gmail.com` |
 
    > If you are forwarding all emails from your domain to a specific address, then you'll want to omit the username:
 
-   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination             |
-   | ------------------ | :--: | ----------- | ------------------------------------ |
-   | _@ or leave blank_ | 3600 | TXT         | forward-email=niftylettuce@gmail.com |
+   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination               |
+   | ------------------ | :--: | ----------- | -------------------------------------- |
+   | _@ or leave blank_ | 3600 | TXT         | `forward-email=niftylettuce@gmail.com` |
 
    > Please note that if you have multiple TXT record lines for `forward-email:` the service will only read the FIRST listed - please ensure you only have one line.
 
-3. Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
+3. Set (and customize) the following TXT record for SPF verification for your domain name (this will allow SPF verification to pass):
 
-4. If the email lands in your spam folder, you can whitelist it (e.g. here are instructions for Google <https://support.google.com/a/answer/60751?hl=en&ref_topic=1685627>)
+   > If you're using a service like AWS Route 53, then edit your existing TXT record and add the following as a new line:
+
+   | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                        |
+   | ------------------ | :--: | ----------- | ----------------------------------------------- |
+   | _@ or leave blank_ | 3600 | TXT         | `v=spf1 a mx include:spf.forwardemail.net ~all` |
+
+   > If you already have a similar line with `v=spf1`, then you'll need to append `include:spf.forwardemail.net` after any existing `include:host.com` records and before the `~all` in the same line.
+
+4. Add a DMARC record for your domain name by folowing the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass).
+
+5. Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
+
+6. If the email lands in your spam folder, you can whitelist it (e.g. here are instructions for Google <https://support.google.com/a/answer/60751?hl=en&ref_topic=1685627>)
 
 
 ## Can people unregister or register my email forwarding without my permission
