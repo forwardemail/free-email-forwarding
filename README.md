@@ -40,7 +40,7 @@
 * [License](#license)
 
 
-## How does it work
+## How it works
 
 > Replace `niftylettuce@gmail.com` with the email address you want to forward emails to below:
 
