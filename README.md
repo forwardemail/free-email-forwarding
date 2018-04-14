@@ -12,7 +12,7 @@
 
 ## Table of Contents
 
-* [How does it work](#how-does-it-work)
+* [How it works](#how-it-works)
 * [Self-Hosted Requirements](#self-hosted-requirements)
 * [CLI](#cli)
 * [API](#api)
@@ -199,7 +199,7 @@ You'll also need the following dependencies installed:
     "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCojharU7eJW+eaLulQygsc/AHx2A0gyLnSU2fPGs8mI3Fhs3EVIIRP01euHg+IljMmXz9YtU+XMfZuYdSCa9NY16XjoIgub2+lkeiHHNpURIpwQJSeHxviMOfMAZ5/xSTDDoaYY2vcKytheZeLAVK2V1SuTdTp+C6B9E6AUSu1TwIDAQAB"
     ```
 
-* DNS records - you'll need to setup and modify your DNS records with your own self-hosted version.  See [How does it work](#how-does-it-work) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
+* DNS records - you'll need to setup and modify your DNS records with your own self-hosted version.  See [How it works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
 
 
 ## CLI
