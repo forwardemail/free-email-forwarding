@@ -218,7 +218,8 @@ class ForwardEmail {
           // envelope: session.envelope
         };
 
-        console.dir(obj);
+        if (['test', 'development'].includes(process.env.NODE_ENV))
+          console.dir(obj);
 
         // TODO: not sure if we need to change this
         // obj.to = await this.getForwardingAddress(obj.to);
