@@ -73,10 +73,6 @@
     "*.{js,jsx,mjs,ts,tsx,css,less,scss,json,graphql}": [
       "prettier --write --single-quote --trailing-comma none",
       "git add"
-    ],
-    "*.md": [
-      "remark . -qfo",
-      "git add"
     ]
   },
   "main": "index.js",
