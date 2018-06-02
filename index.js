@@ -20,6 +20,8 @@ const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
 let mailUtilities = require('mailin/lib/mailUtilities.js');
 
+const blacklist = require('./blacklist');
+
 mailUtilities = bluebird.promisifyAll(mailUtilities);
 
 const invalidTXTError = new Error('Invalid forward-email TXT record');
@@ -122,6 +124,13 @@ class ForwardEmail {
 
   parseDomain(address) {
     const domain = addressParser(address)[0].address.split('@')[1];
+
+    // check against blacklist
+    if (this.isBlacklisted(domain)) {
+      const err = new Error('Blacklisted domains are not permitted');
+      err.responseCode = 550;
+      throw err;
+    }
 
     // ensure fully qualified domain name
     if (!validator.isFQDN(domain)) {
@@ -485,6 +494,10 @@ class ForwardEmail {
         reject(err);
       });
     });
+  }
+
+  isBlacklisted(domain) {
+    return blacklist.includes(domain);
   }
 
   isDisposable(domain) {
