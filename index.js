@@ -242,7 +242,6 @@ class ForwardEmail {
           throw err;
         }
 
-        /*
         // check against spamd if this message is spam
         // <https://github.com/humantech/node-spamd#usage>
         const spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
@@ -253,7 +252,6 @@ class ForwardEmail {
           err.responseCode = 554;
           throw err;
         }
-        */
 
         // TODO: implement spamassassin automatic learning
         // through bayes based off response from proxy (e.g. gmail response)
