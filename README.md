@@ -85,7 +85,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
----
+* * *
 
 _Optional Add-ons:_
 
@@ -374,7 +374,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
