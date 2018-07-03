@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { promisify } = require('util');
+const os = require('os');
 const path = require('path');
 const dns = require('dns');
 const parseDomain = require('parse-domain');
@@ -314,12 +315,15 @@ class ForwardEmail {
                   port: 25,
                   host: addresses[0].exchange,
                   ...this.ssl,
-                  name: 'mx1.forwardemail.net',
+                  name: os.hostname(),
                   tls: {
                     rejectUnauthorized: process.env.NODE_ENV !== 'test'
                   }
                   // <https://github.com/nodemailer/nodemailer/issues/625>
                 });
+
+                // verify transport
+                // await transporter.verify();
 
                 const dkim = {};
                 if (process.env.NODE_ENV === 'production') {
@@ -373,7 +377,7 @@ class ForwardEmail {
         }
         // add a note to email me for help
         err.message +=
-          '\n\n If you need help with email-forwarding setup or troubleshooting please email niftylettuce@gmail.com or visit https://forwardemail.net';
+          '\n\n If you need help with email-forwarding setup or troubleshooting please visit https://forwardemail.net';
         fn(err);
       }
     });
