@@ -122,7 +122,7 @@ You'll also need the following dependencies installed:
   * Ubuntu:
 
     ```sh
-    sudo apt-get -y install spamassassin spamc
+    sudo apt-get -y install spamassassin spamc python
     ```
 
     > If you are using a `jessie` based version of Debian (e.g. Ubuntu 16.04):
