@@ -808,10 +808,6 @@ balanced-match@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/balanced-match/-/balanced-match-1.0.0.tgz#89b4d199ab2bee49de164ea02b89ce462d71b767"
 
-base32.js@0.1.0:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/base32.js/-/base32.js-0.1.0.tgz#b582dec693c2f11e893cf064ee6ac5b6131a2202"
-
 base@^0.11.1:
   version "0.11.2"
   resolved "https://registry.yarnpkg.com/base/-/base-0.11.2.tgz#7bde5ced145b6d551a90db87f83c558b4eb48a8f"
@@ -2831,7 +2827,7 @@ invert-kv@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/invert-kv/-/invert-kv-1.0.0.tgz#104a8e4aaca6d3d8cd157a8ef8bfab2d7a3ffdb6"
 
-ipv6-normalize@1.0.1, ipv6-normalize@^1.0.1:
+ipv6-normalize@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/ipv6-normalize/-/ipv6-normalize-1.0.1.tgz#1b3258290d365fa83239e89907dde4592e7620a8"
 
@@ -4063,7 +4059,11 @@ nodemailer-shared@^1.1.0:
   dependencies:
     nodemailer-fetch "1.6.0"
 
-nodemailer@4.6.7, nodemailer@^4.6.7:
+nodemailer@4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-4.1.1.tgz#e84a65b423e5ca2b65b81ff39bb9aee71c3dc718"
+
+nodemailer@^4.1.1:
   version "4.6.7"
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-4.6.7.tgz#b68de7f36d65618bdeeeb76234e3547d51266373"
 
@@ -5870,20 +5870,19 @@ slide@^1.1.5:
   version "1.1.6"
   resolved "https://registry.yarnpkg.com/slide/-/slide-1.1.6.tgz#56eb027d65b4d2dce6cb2e2d32c4d4afc9e1d707"
 
+smtp-server@3.2.0:
+  version "3.2.0"
+  resolved "https://registry.yarnpkg.com/smtp-server/-/smtp-server-3.2.0.tgz#69831615ebdd19567c2ed89c87581b631ef9b399"
+  dependencies:
+    ipv6-normalize "^1.0.1"
+    nodemailer "^4.1.1"
+
 smtp-server@^1.4.0:
   version "1.17.0"
   resolved "https://registry.yarnpkg.com/smtp-server/-/smtp-server-1.17.0.tgz#4d5db137986bc8f276982e9adda0887fd527e2a2"
   dependencies:
     ipv6-normalize "^1.0.1"
     nodemailer-shared "^1.1.0"
-
-smtp-server@^3.4.6:
-  version "3.4.6"
-  resolved "https://registry.yarnpkg.com/smtp-server/-/smtp-server-3.4.6.tgz#0f2505158ae42846f55bf374cb1a3386cabcf700"
-  dependencies:
-    base32.js "0.1.0"
-    ipv6-normalize "1.0.1"
-    nodemailer "4.6.7"
 
 snapdragon-node@^2.0.1:
   version "2.1.1"
