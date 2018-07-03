@@ -18,6 +18,7 @@ const isObject = require('lodash/isObject');
 const isString = require('lodash/isString');
 const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
+const common = require('email-providers/common.json');
 let mailUtilities = require('mailin/lib/mailUtilities.js');
 
 const blacklist = require('./blacklist');
@@ -109,14 +110,14 @@ class ForwardEmail {
   }
 
   parseUsername(address) {
-    address = addressParser(address)[0].address;
+    ({ address } = addressParser(address)[0]);
     return address.indexOf('+') === -1
       ? address.split('@')[0]
       : address.split('+')[0];
   }
 
   parseFilter(address) {
-    address = addressParser(address)[0].address;
+    ({ address } = addressParser(address)[0]);
     return address.indexOf('+') === -1
       ? ''
       : address.split('+')[1].split('@')[0];
@@ -209,7 +210,7 @@ class ForwardEmail {
           to: uniq(session.envelope.rcptTo.map(to => to.address))
         };
 
-        mail.headers = Array.from(mail.headers).reduce((obj, [key, value]) => {
+        mail.headers = [...mail.headers].reduce((obj, [key, value]) => {
           if (isObject(value)) {
             if (isString(value.value)) obj[key] = value.value;
             if (isObject(value.params))
@@ -245,15 +246,41 @@ class ForwardEmail {
         // AND if there was no valid DKIM signature on the message
         // then we must refuse sending this email along because it
         // literally has on validation that it's from who it says its from
-        if (!spf && !dkim) {
-          const err = new Error('No passing DKIM signature found');
+        //
+        // but also check to see if it's from a well-known provider
+        // (e.g. from a top 30000 alexa ranked sites)
+        let alexa = false;
+        try {
+          alexa = common.includes(this.parseDomain(session.envelope.from));
+        } catch (err) {}
+
+        if (!alexa && !spf && !dkim) {
+          const err = new Error(
+            'No passing SPF/DKIM signature or Alexa top-ranked sender found'
+          );
           err.responseCode = 550;
           throw err;
         }
 
         // check against spamd if this message is spam
         // <https://github.com/humantech/node-spamd#usage>
-        const spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
+        //
+        // note that we wrap with a try/catch due to this error
+        /* eslint-disable max-len */
+        /*
+        0|smtp     | error: TypeError: Cannot read property '2' of null
+        0|smtp     |     at processResponse (/var/www/production/source/node_modules/spamc/index.js:381:43)
+        0|smtp     |     at /var/www/production/source/node_modules/spamc/index.js:99:28
+        0|smtp     |     at Socket.<anonymous> (/var/www/production/source/node_modules/spamc/index.js:327:28)
+        0|smtp     |     at Socket.emit (events.js:182:13)
+        0|smtp     |     at Socket.EventEmitter.emit (domain.js:442:20)
+        0|smtp     |     at TCP._handle.close (net.js:595:12)
+        */
+        /* eslint-enable max-len */
+        let spamScore = 0;
+        try {
+          spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
+        } catch (err) {}
 
         if (spamScore >= 5) {
           // TODO: blacklist IP address
@@ -341,6 +368,9 @@ class ForwardEmail {
           // to tell spam assassin that this email in particular failed
           // (IFF as it was sent to a gmail, yahoo, or other major provider)
         }
+        // add a note to email me for help
+        err.message +=
+          '\n\n If you need help with email-forwarding setup or troubleshooting please email niftylettuce@gmail.com or visit https://forwardemail.net';
         fn(err);
       }
     });

@@ -1,7 +1,7 @@
 const getPort = require('get-port');
 const redis = require('redis');
 
-const ForwardEmail = require('../../');
+const ForwardEmail = require('../..');
 
 const client = redis.createClient();
 

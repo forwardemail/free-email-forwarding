@@ -13,40 +13,41 @@
   "dependencies": {
     "bluebird": "^3.5.1",
     "bytes": "^3.0.0",
-    "disposable-email-domains": "^1.0.21",
-    "dkim": "https://github.com/niftylettuce/node-dkim",
+    "disposable-email-domains": "^1.0.34",
+    "dkim": "^0.4.1",
+    "email-providers": "^0.30.0",
     "get-port": "^3.2.0",
-    "lodash": "^4.17.4",
+    "lodash": "^4.17.10",
     "mailin": "^3.0.4",
-    "mailparser": "^2.0.5",
-    "ms": "^2.0.0",
-    "nodemailer": "^4.1.1",
-    "ratelimiter": "^3.0.3",
+    "mailparser": "^2.2.0",
+    "ms": "^2.1.1",
+    "nodemailer": "^4.6.7",
+    "ratelimiter": "^3.1.0",
     "redis": "^2.8.0",
-    "smtp-server": "^3.2.0",
-    "validator": "^9.1.1"
+    "smtp-server": "^3.4.6",
+    "validator": "^10.4.0"
   },
   "ava": {
     "verbose": true,
-    "failFast": true
+    "failFast": true,
+    "serial": true
   },
   "devDependencies": {
-    "auto-bind": "^1.1.0",
-    "ava": "^0.22.0",
-    "codecov": "^2.3.0",
-    "cross-env": "^5.0.5",
-    "eslint": "^4.5.0",
-    "eslint-config-prettier": "^2.3.0",
-    "eslint-plugin-prettier": "^2.2.0",
+    "auto-bind": "^1.2.1",
+    "ava": "^0.25.0",
+    "codecov": "^3.0.2",
+    "cross-env": "^5.2.0",
+    "eslint": "^5.0.1",
+    "eslint-config-prettier": "^2.9.0",
+    "eslint-plugin-prettier": "^2.6.1",
     "husky": "^0.14.3",
-    "lint-staged": "^4.0.4",
-    "nyc": "^11.1.0",
-    "prettier": "^1.6.1",
-    "remark-cli": "^4.0.0",
-    "remark-preset-github": "^0.0.7",
-    "shelljs": "^0.7.8",
-    "uuid": "^3.1.0",
-    "xo": "^0.19.0"
+    "nyc": "^12.0.2",
+    "prettier": "^1.13.7",
+    "remark-cli": "^5.0.0",
+    "remark-preset-github": "^0.0.8",
+    "shelljs": "^0.8.2",
+    "uuid": "^3.3.2",
+    "xo": "^0.21.1"
   },
   "engines": {
     "node": ">=8.3"
@@ -69,16 +70,6 @@
     "private"
   ],
   "license": "MIT",
-  "lint-staged": {
-    "*.{js,jsx,mjs,ts,tsx,css,less,scss,json,graphql}": [
-      "prettier --write --single-quote --trailing-comma none",
-      "git add"
-    ],
-    "*.md": [
-      "remark . -qfo",
-      "git add"
-    ]
-  },
   "main": "index.js",
   "remarkConfig": {
     "plugins": [
@@ -91,10 +82,10 @@
   },
   "scripts": {
     "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
-    "lint": "xo && remark . -qfo",
-    "precommit": "lint-staged && npm test",
+    "lint": "xo",
+    "precommit": "npm test",
     "test": "npm run lint && npm run test-coverage",
-    "test-coverage": "cross-env NODE_ENV=test nyc ava --serial"
+    "test-coverage": "cross-env NODE_ENV=test nyc ava"
   },
   "xo": {
     "extends": "prettier",
@@ -125,6 +116,8 @@
       "no-warning-comments": "off"
     },
     "space": true,
-    "ignores": ["config.js"]
+    "ignores": [
+      "config.js"
+    ]
   }
 }

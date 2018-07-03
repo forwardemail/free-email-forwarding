@@ -9,7 +9,7 @@ const nodemailer = require('nodemailer');
 const Client = require('nodemailer/lib/smtp-connection');
 const domains = require('disposable-email-domains');
 
-const ForwardEmail = require('../');
+const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
 
 const tls = { rejectUnauthorized: false };
@@ -26,7 +26,7 @@ test('binds context', t => {
 });
 
 test.cb('rejects auth connections', t => {
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   connection.on('end', t.end);
   connection.connect(() => {
@@ -38,7 +38,7 @@ test.cb('rejects auth connections', t => {
 });
 
 test('verifies connection', async t => {
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const transporter = nodemailer.createTransport({ port, tls });
   await transporter.verify();
   t.pass();
@@ -48,7 +48,7 @@ test('rejects forwarding a non-FQDN email', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: 'from@forwardemail.net',
@@ -78,7 +78,7 @@ test('rejects forwarding a non-registered email address', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: 'from@forwardemail.net',
@@ -104,7 +104,7 @@ test('rejects forwarding an email without dkim and spf', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: 'from@forwardemail.net',
@@ -120,7 +120,10 @@ test('rejects forwarding an email without dkim and spf', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(err.message, /No passing DKIM signature found/);
+        t.regex(
+          err.message,
+          /No passing SPF\/DKIM signature or Alexa top-ranked sender found/
+        );
         connection.quit();
       });
     });
@@ -131,7 +134,7 @@ test('forwards an email with dkim', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: 'from@forwardemail.net',
@@ -165,7 +168,7 @@ test('rejects a spam file', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: 'foo@forwardemail.net',
@@ -205,7 +208,7 @@ test('rejects a file over the limit', async t => {
   });
   const filePath = path.join(os.tmpdir(), uuid());
   const size = bytes('25mb');
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   fs.writeFileSync(filePath, Buffer.from(new Array(size).fill('0')));
   const info = await transporter.sendMail({
@@ -234,7 +237,7 @@ test('prevents spam through rate limiting', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
 
   let failed = 0;
 
@@ -280,7 +283,7 @@ test('rejects a disposable email sender', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const port = t.context.forwardEmail.server.address().port;
+  const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
     from: `disposable@${domains[0]}`,
@@ -301,8 +304,13 @@ test('rejects a disposable email sender', async t => {
   });
 });
 
+// eslint-disable-next-line ava/no-todo-test
 test.todo('rejects invalid dkim signature');
+// eslint-disable-next-line ava/no-todo-test
 test.todo('accepts valid dkim signature');
+// eslint-disable-next-line ava/no-todo-test
 test.todo('rejects invalid spf');
+// eslint-disable-next-line ava/no-todo-test
 test.todo('accepts valid spf');
+// eslint-disable-next-line ava/no-todo-test
 test.todo('supports + symbol aliased onRcptTo');
