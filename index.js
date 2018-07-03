@@ -2,6 +2,7 @@ const fs = require('fs');
 const { promisify } = require('util');
 const path = require('path');
 const dns = require('dns');
+const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
 const { SMTPServer } = require('smtp-server');
 const bytes = require('bytes');
@@ -251,7 +252,9 @@ class ForwardEmail {
         // (e.g. from a top 30000 alexa ranked sites)
         let alexa = false;
         try {
-          alexa = common.includes(this.parseDomain(session.envelope.from));
+          const domain = this.parseDomain(session.envelope.from);
+          const parsedDomain = parseDomain(domain);
+          alexa = common.includes(`${parsedDomain.domain}.${parsedDomain.tld}`);
         } catch (err) {}
 
         if (!alexa && !spf && !dkim) {
