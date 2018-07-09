@@ -286,9 +286,11 @@ class ForwardEmail {
           spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
         } catch (err) {}
 
-        if (spamScore >= 5) {
+        if (spamScore >= 5 && !alexa) {
           // TODO: blacklist IP address
-          const err = new Error('Message detected as spam');
+          const err = new Error(
+            `Message detected as spam (spam score was ${spamScore})`
+          );
           err.responseCode = 554;
           throw err;
         }
