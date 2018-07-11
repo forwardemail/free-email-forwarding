@@ -5,6 +5,7 @@ const path = require('path');
 const dns = require('dns');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
+const { oneLine } = require('common-tags');
 const { SMTPServer } = require('smtp-server');
 const bytes = require('bytes');
 const { MailParser } = require('mailparser');
@@ -260,7 +261,7 @@ class ForwardEmail {
 
         if (!alexa && !spf && !dkim) {
           const err = new Error(
-            'No passing SPF/DKIM signature or Alexa top-ranked sender found'
+            oneLine`Please ensure the email service you are sending from either has SPF, DKIM, or is a top-ranked <30K Alexa.com domain.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").\n\nIf you continue to have issues, please see https://forwardemail.net or file an issue on GitHub at https://github.com/niftylettuce/forward-email. We'd be glad to help out!\n\n--\n@niftylettuce`
           );
           err.responseCode = 550;
           throw err;
