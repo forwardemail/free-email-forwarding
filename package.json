@@ -13,6 +13,7 @@
   "dependencies": {
     "bluebird": "^3.5.1",
     "bytes": "^3.0.0",
+    "common-tags": "^1.8.0",
     "disposable-email-domains": "^1.0.34",
     "dkim": "^0.4.1",
     "email-providers": "^0.30.0",
