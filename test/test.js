@@ -8,6 +8,7 @@ const test = require('ava');
 const nodemailer = require('nodemailer');
 const Client = require('nodemailer/lib/smtp-connection');
 const domains = require('disposable-email-domains');
+const { oneLine } = require('common-tags');
 
 const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
@@ -120,9 +121,9 @@ test('rejects forwarding an email without dkim and spf', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(
+        t.is(
           err.message,
-          /No passing SPF\/DKIM signature or Alexa top-ranked sender found/
+          oneLine`Message failed: 550 Please ensure the email service you are sending from either has SPF, DKIM, or is a top-ranked <30K Alexa.com domain.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").\n\nIf you continue to have issues, please see https://forwardemail.net or file an issue on GitHub at https://github.com/niftylettuce/forward-email. We'd be glad to help out!\n\n--\n@niftylettuce`
         );
         connection.quit();
       });
