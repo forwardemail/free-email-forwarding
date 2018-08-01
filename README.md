@@ -7,7 +7,9 @@
 [![made with lass](https://img.shields.io/badge/made_with-lass-95CC28.svg)](https://lass.js.org)
 [![license](https://img.shields.io/github/license/niftylettuce/forward-email.svg)](<>)
 
-> [ForwardEmail](http://forwardemail.net) is a free, encrypted, and open-source email forwarding service at <http://forwardemail.net>
+> :heart: Love this project? Support <a href="https://github.com/niftylettuce" target="_blank">@niftylettuce's</a> [FOSS](https://en.wikipedia.org/wiki/Free_and_open-source_software) on <a href="https://patreon.com/niftylettuce" target="_blank">Patreon</a> or <a href="https://paypal.me/niftylettuce">PayPal</a> :unicorn:
+
+[ForwardEmail](http://forwardemail.net) is a free, encrypted, and open-source email forwarding service at <http://forwardemail.net>
 
 
 ## Table of Contents
@@ -85,7 +87,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
----
+* * *
 
 _Optional Add-ons:_
 
