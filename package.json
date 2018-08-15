@@ -24,6 +24,7 @@
     "ms": "^2.1.1",
     "nodemailer": "4.1.1",
     "parse-domain": "^2.1.2",
+    "punycode": "^2.1.1",
     "ratelimiter": "^3.1.0",
     "redis": "^2.8.0",
     "smtp-server": "3.2.0",

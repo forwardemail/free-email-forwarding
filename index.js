@@ -3,6 +3,7 @@ const { promisify } = require('util');
 const os = require('os');
 const path = require('path');
 const dns = require('dns');
+const punycode = require('punycode/');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
 const { oneLine } = require('common-tags');
@@ -127,7 +128,8 @@ class ForwardEmail {
   }
 
   parseDomain(address) {
-    const domain = addressParser(address)[0].address.split('@')[1];
+    let domain = addressParser(address)[0].address.split('@')[1];
+    domain = punycode.toASCII(domain);
 
     // check against blacklist
     if (this.isBlacklisted(domain)) {
