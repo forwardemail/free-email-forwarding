@@ -29,11 +29,14 @@ const blacklist = require('./blacklist');
 
 mailUtilities = bluebird.promisifyAll(mailUtilities);
 
-const invalidTXTError = new Error('Invalid forward-email TXT record');
+const invalidTXTError = new Error('Invalid email TXT record.');
 invalidTXTError.responseCode = 550;
 
-const invalidMXError = new Error('Sender has invalid MX records');
+const invalidMXError = new Error('Your domain has invalid MX records, please contact your host.');
 invalidMXError.responseCode = 550;
+
+const invalidUserError = new Error('Mailbox not found. Check your spelling?');
+invalidUserError.responseCode = 551;
 
 const headers = [
   'subject',
