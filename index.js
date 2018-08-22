@@ -29,11 +29,18 @@ const blacklist = require('./blacklist');
 
 mailUtilities = bluebird.promisifyAll(mailUtilities);
 
-const invalidTXTError = new Error('Invalid forward-email TXT record');
+const invalidTXTError = new Error(
+  'Host configuration error: Invalid TXT record.'
+);
 invalidTXTError.responseCode = 550;
 
-const invalidMXError = new Error('Sender has invalid MX records');
+const invalidMXError = new Error(
+  'Your domain has outdated MX records, please contact your host.'
+);
 invalidMXError.responseCode = 550;
+
+const invalidUserError = new Error('Mailbox not found. Check your spelling?');
+invalidUserError.responseCode = 551;
 
 const headers = [
   'subject',
@@ -590,6 +597,10 @@ class ForwardEmail {
         // record = "forward-email=niftylettuce@gmail.com"
         // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
         // record = "forward-email=niftylettuce@gmail.com"
+        // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
+        //      *@niftylettuce.com => hellolettuce@gmail.com
+        // record = "forward-email=
+        //      hello:niftylettuce@gmail.com,hellolettuce@gmail.com"
         record = record.replace('forward-email=', '');
 
         // remove trailing whitespaces from each address listed
@@ -600,38 +611,43 @@ class ForwardEmail {
         // store if we have a forwarding address or not
         let forwardingAddress;
 
-        // check if we have a global redirect
-        if (
-          addresses[0].indexOf(':') === -1 &&
-          validator.isFQDN(this.parseDomain(addresses[0])) &&
-          validator.isEmail(addresses[0])
-        )
-          forwardingAddress = addresses[0];
+        // get username from recipient email address
+        // (e.g. hello@niftylettuce.com => hello)
+        const username = this.parseUsername(address);
 
-        // check if we have a specific redirect
-        if (!forwardingAddress) {
-          // get username from recipient email address
-          // (e.g. hello@niftylettuce.com => hello)
-          const username = this.parseUsername(address);
+        for (let i = 0; i < addresses.length; i++) {
+          const address = addresses[i].split(':');
 
-          for (let i = 0; i < addresses.length; i++) {
-            const address = addresses[i].split(':');
+          // if we don't have a forwarding address then use this as a
+          // global redirect /  "catch-all"; don't waste time checking
+          // additional entries, the docs say that it should be the last
+          // entry and that everything else is ignored
+          if (address.length === 1) {
+            forwardingAddress = address[0];
+            break;
+          } else if (address.length > 2) throw invalidTXTError;
 
-            if (address.length !== 2) throw invalidTXTError;
+          // address[0] = hello (username)
+          // address[1] = niftylettuce@gmail.com (forwarding email)
 
-            // address[0] = hello (username)
-            // address[1] = niftylettuce@gmail.com (forwarding email)
-
-            // check if we have a match
-            if (username === address[0]) {
-              forwardingAddress = address[1];
-              break;
-            }
+          // check if we have a match
+          if (username === address[0]) {
+            forwardingAddress = address[1];
+            break;
           }
         }
 
         // if we don't have a forwarding address then throw an error
         if (!forwardingAddress) throw invalidTXTError;
+
+        // fixme check if this is done somewhere else...
+        if (
+          !(
+            validator.isFQDN(this.parseDomain(forwardingAddress)) &&
+            validator.isEmail(forwardingAddress)
+          )
+        )
+          throw invalidTXTError;
 
         // otherwise transform the + symbol filter if we had it
         // and then resolve with the newly formatted forwarding address
