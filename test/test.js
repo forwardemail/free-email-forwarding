@@ -94,7 +94,7 @@ test('rejects forwarding a non-registered email address', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(err.message, /Invalid forward-email TXT record/);
+        t.regex(err.message, /Host configuration error: Invalid TXT record./);
         connection.quit();
       });
     });
