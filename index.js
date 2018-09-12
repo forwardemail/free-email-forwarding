@@ -115,7 +115,7 @@ class ForwardEmail {
 
   parseUsername(address) {
     ({ address } = addressParser(address)[0]);
-    username = address.indexOf('+') === -1
+    let username = address.indexOf('+') === -1
       ? address.split('@')[0]
       : address.split('+')[0];
     
