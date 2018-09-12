@@ -115,9 +115,12 @@ class ForwardEmail {
 
   parseUsername(address) {
     ({ address } = addressParser(address)[0]);
-    return address.indexOf('+') === -1
+    username = address.indexOf('+') === -1
       ? address.split('@')[0]
       : address.split('+')[0];
+    
+    username = punycode.toASCII(username);
+    return username;
   }
 
   parseFilter(address) {
