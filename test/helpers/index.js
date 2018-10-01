@@ -15,18 +15,13 @@ const beforeEach = t => {
         client.del(...args);
       });
     }),
-    new Promise(async (resolve, reject) => {
-      try {
-        const forwardEmail = new ForwardEmail();
-        const port = await getPort();
-        forwardEmail.server = forwardEmail.server.listen(port, () => {
-          t.context.forwardEmail = forwardEmail;
-          resolve();
-        });
-      } catch (err) {
-        reject(err);
-      }
-    })
+    (async () => {
+      const forwardEmail = new ForwardEmail();
+      const port = await getPort();
+      forwardEmail.server = forwardEmail.server.listen(port, () => {
+        t.context.forwardEmail = forwardEmail;
+      });
+    })()
   ]);
 };
 
