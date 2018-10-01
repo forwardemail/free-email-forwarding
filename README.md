@@ -1,6 +1,6 @@
 # Forward Email
 
-[![build status](https://semaphoreci.com/api/v1/niftylettuce/forward-email/branches/master/shields_badge.svg)](https://semaphoreci.com/niftylettuce/forward-email)
+[![build status](https://img.shields.io/travis/niftylettuce/forward-email.svg)](https://travis-ci.org/niftylettuce/forward-email)
 [![code coverage](https://img.shields.io/codecov/c/github/niftylettuce/forward-email.svg)](https://codecov.io/gh/niftylettuce/forward-email)
 [![code style](https://img.shields.io/badge/code_style-XO-5ed9c7.svg)](https://github.com/sindresorhus/xo)
 [![styled with prettier](https://img.shields.io/badge/styled_with-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
@@ -87,7 +87,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
-* * *
+---
 
 _Optional Add-ons:_
 

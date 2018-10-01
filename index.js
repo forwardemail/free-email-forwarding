@@ -53,14 +53,12 @@ const log = process.env.NODE_ENV !== 'production';
 
 class ForwardEmail {
   constructor(config = {}) {
-    config = Object.assign(
-      {
-        smtp: {},
-        limiter: {},
-        exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net']
-      },
-      config
-    );
+    config = {
+      smtp: {},
+      limiter: {},
+      exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+      ...config
+    };
 
     const ssl = {};
     if (process.env.NODE_ENV === 'production') {
@@ -79,33 +77,29 @@ class ForwardEmail {
     this.ssl = ssl;
 
     this.config = {
-      smtp: Object.assign(
-        {
-          size: bytes('25mb'),
-          onConnect: this.onConnect.bind(this),
-          onData: this.onData.bind(this),
-          onMailFrom: this.onMailFrom.bind(this),
-          onRcptTo: this.onRcptTo.bind(this),
-          disabledCommands: ['AUTH'],
-          ...ssl,
-          logInfo: log,
-          logger: log
-        },
-        config.smtp
-      ),
-      limiter: Object.assign({}, config.limiter),
+      smtp: {
+        size: bytes('25mb'),
+        onConnect: this.onConnect.bind(this),
+        onData: this.onData.bind(this),
+        onMailFrom: this.onMailFrom.bind(this),
+        onRcptTo: this.onRcptTo.bind(this),
+        disabledCommands: ['AUTH'],
+        ...ssl,
+        logInfo: log,
+        logger: log,
+        ...config.smtp
+      },
+      limiter: { ...config.limiter },
       exchanges: config.exchanges
     };
 
     // setup rate limiting with redis
-    this.limiter = Object.assign(
-      {
-        db: redis.createClient(),
-        max: 100, // max requests within duration
-        duration: ms('1h')
-      },
-      this.config.limiter
-    );
+    this.limiter = {
+      db: redis.createClient(),
+      max: 100, // max requests within duration
+      duration: ms('1h'),
+      ...this.config.limiter
+    };
 
     // setup our smtp server which listens for incoming email
     this.server = new SMTPServer(this.config.smtp);
@@ -115,10 +109,11 @@ class ForwardEmail {
 
   parseUsername(address) {
     ({ address } = addressParser(address)[0]);
-    let username = address.indexOf('+') === -1
-      ? address.split('@')[0]
-      : address.split('+')[0];
-    
+    let username =
+      address.indexOf('+') === -1
+        ? address.split('@')[0]
+        : address.split('+')[0];
+
     username = punycode.toASCII(username);
     return username;
   }
@@ -168,7 +163,7 @@ class ForwardEmail {
     fn(err);
   }
 
-  async onData(stream, session, fn) {
+  onData(stream, session, fn) {
     // <https://github.com/nodemailer/mailparser/blob/master/examples/pipe.js>
     const parser = new MailParser();
     const mail = { attachments: [] };
@@ -196,21 +191,17 @@ class ForwardEmail {
           }
         });
 
-        session.envelope.rcptTo = await Promise.all(
-          session.envelope.rcptTo.map(to => {
-            return new Promise(async (resolve, reject) => {
-              try {
-                const address = await this.getForwardingAddress(to.address);
-                resolve({
-                  ...to,
-                  address
-                });
-              } catch (err) {
-                reject(err);
-              }
-            });
-          })
-        );
+        const rcptTo = session.envelope.rcptTo.map(to => {
+          return async () => {
+            const address = await this.getForwardingAddress(to.address);
+            return {
+              ...to,
+              address
+            };
+          };
+        });
+
+        session.envelope.rcptTo = await Promise.all(rcptTo.map(fn => fn()));
 
         session.envelope = {
           from: session.envelope.mailFrom.address,
@@ -309,67 +300,62 @@ class ForwardEmail {
 
         await Promise.all(
           session.envelope.to.map(to => {
-            return new Promise(async (resolve, reject) => {
-              try {
-                // TODO: pick lowest priority address found
-                const addresses = await this.validateMX(to);
-                const transporter = nodemailer.createTransport({
-                  debug: log,
-                  logger: log,
-                  direct: true,
-                  // secure: true,
-                  // requireTLS: true,
-                  opportunisticTLS: true,
-                  port: 25,
-                  host: addresses[0].exchange,
-                  ...this.ssl,
-                  name: os.hostname(),
-                  tls: {
-                    rejectUnauthorized: process.env.NODE_ENV !== 'test'
-                  }
-                  // <https://github.com/nodemailer/nodemailer/issues/625>
-                });
-
-                // verify transport
-                // await transporter.verify();
-
-                const dkim = {};
-                if (process.env.NODE_ENV === 'production') {
-                  dkim.domainName = 'forwardemail.net';
-                  dkim.keySelector = 'default';
-                  dkim.privateKey = fs.readFileSync(
-                    '/home/deploy/dkim-private.key',
-                    'utf8'
-                  );
-                } else if (process.env.NODE_ENV === 'test') {
-                  dkim.domainName = 'forwardemail.net';
-                  dkim.keySelector = 'default';
-                  dkim.privateKey = fs.readFileSync(
-                    path.join(__dirname, 'dkim-private.key'),
-                    'utf8'
-                  );
+            return (async () => {
+              // TODO: pick lowest priority address found
+              const addresses = await this.validateMX(to);
+              const transporter = nodemailer.createTransport({
+                debug: log,
+                logger: log,
+                direct: true,
+                // secure: true,
+                // requireTLS: true,
+                opportunisticTLS: true,
+                port: 25,
+                host: addresses[0].exchange,
+                ...this.ssl,
+                name: os.hostname(),
+                tls: {
+                  rejectUnauthorized: process.env.NODE_ENV !== 'test'
                 }
+                // <https://github.com/nodemailer/nodemailer/issues/625>
+              });
 
-                const email = {
-                  ...obj,
-                  envelope: session.envelope,
-                  dkim
-                };
-                delete email.messageId;
-                delete email.headers['mime-version'];
-                delete email.headers['content-type'];
-                delete email.headers['dkim-signature'];
-                delete email.headers['x-google-dkim-signature'];
-                delete email.headers['x-gm-message-state'];
-                delete email.headers['x-google-smtp-source'];
-                delete email.headers['x-received'];
-                const info = await transporter.sendMail(email);
+              // verify transport
+              // await transporter.verify();
 
-                resolve(info);
-              } catch (err) {
-                reject(err);
+              const dkim = {};
+              if (process.env.NODE_ENV === 'production') {
+                dkim.domainName = 'forwardemail.net';
+                dkim.keySelector = 'default';
+                dkim.privateKey = fs.readFileSync(
+                  '/home/deploy/dkim-private.key',
+                  'utf8'
+                );
+              } else if (process.env.NODE_ENV === 'test') {
+                dkim.domainName = 'forwardemail.net';
+                dkim.keySelector = 'default';
+                dkim.privateKey = fs.readFileSync(
+                  path.join(__dirname, 'dkim-private.key'),
+                  'utf8'
+                );
               }
-            });
+
+              const email = {
+                ...obj,
+                envelope: session.envelope,
+                dkim
+              };
+              delete email.messageId;
+              delete email.headers['mime-version'];
+              delete email.headers['content-type'];
+              delete email.headers['dkim-signature'];
+              delete email.headers['x-google-dkim-signature'];
+              delete email.headers['x-gm-message-state'];
+              delete email.headers['x-google-smtp-source'];
+              delete email.headers['x-received'];
+              const info = await transporter.sendMail(email);
+              return info;
+            })();
           })
         );
 
@@ -465,57 +451,51 @@ class ForwardEmail {
   // const isSpfSender = await hasSPFSender('foo.com', '_spf.google.com');
   // if (!isSetup)
   //
-  validateSPF(remoteAddress, from, clientHostname) {
+  async validateSPF(remoteAddress, from, clientHostname) {
     // <https://github.com/Flolagale/mailin/blob/master/lib/mailin.js#L265>
-    return new Promise(async (resolve, reject) => {
-      try {
-        const pass = await mailUtilities.validateSpfAsync(
-          remoteAddress,
-          from,
-          clientHostname
-        );
-        resolve(pass);
-      } catch (err) {
-        err.responseCode = 421;
-        reject(err);
-      }
-    });
+    try {
+      const pass = await mailUtilities.validateSpfAsync(
+        remoteAddress,
+        from,
+        clientHostname
+      );
+      return pass;
+    } catch (err) {
+      err.responseCode = 421;
+      throw err;
+    }
   }
 
-  validateMX(address) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const domain = this.parseDomain(address);
-        const addresses = await promisify(dns.resolveMx)(domain);
-        if (!addresses || addresses.length === 0) throw invalidMXError;
-        resolve(addresses);
-      } catch (err) {
-        if (/queryMx ENODATA/.test(err) || /queryTxt ENOTFOUND/.test(err)) {
-          err.message = invalidMXError.message;
-          err.responseCode = invalidMXError.responseCode;
-        } else if (!err.responseCode) {
-          err.responseCode = 421;
-        }
-        reject(err);
+  async validateMX(address) {
+    try {
+      const domain = this.parseDomain(address);
+      const addresses = await promisify(dns.resolveMx)(domain);
+      if (!addresses || addresses.length === 0) throw invalidMXError;
+      return addresses;
+    } catch (err) {
+      if (/queryMx ENODATA/.test(err) || /queryTxt ENOTFOUND/.test(err)) {
+        err.message = invalidMXError.message;
+        err.responseCode = invalidMXError.responseCode;
+      } else if (!err.responseCode) {
+        err.responseCode = 421;
       }
-    });
+      throw err;
+    }
   }
 
-  validateDKIM(rawEmail) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        // <https://github.com/jhermsmeier/node-dkim/blob/master/test/verify.js#L35>
-        // const records = await promisify(dkim.verify)(Buffer.from(rawEmail));
-        // const pass =
-        //   records.length > 0 && records.every(record => record.verified);
-        // resolve(pass);
-        const pass = await mailUtilities.validateDkimAsync(rawEmail);
-        resolve(pass);
-      } catch (err) {
-        err.responseCode = 421;
-        reject(err);
-      }
-    });
+  async validateDKIM(rawEmail) {
+    try {
+      // <https://github.com/jhermsmeier/node-dkim/blob/master/test/verify.js#L35>
+      // const records = await promisify(dkim.verify)(Buffer.from(rawEmail));
+      // const pass =
+      //   records.length > 0 && records.every(record => record.verified);
+      // return pass;
+      const pass = await mailUtilities.validateDkimAsync(rawEmail);
+      return pass;
+    } catch (err) {
+      err.responseCode = 421;
+      throw err;
+    }
   }
 
   validateRateLimit(email) {
@@ -566,89 +546,81 @@ class ForwardEmail {
   }
 
   // this returns the forwarding address for a given email address
-  getForwardingAddress(address) {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const domain = this.parseDomain(address);
-        const records = await promisify(dns.resolveTxt)(domain);
+  async getForwardingAddress(address) {
+    const domain = this.parseDomain(address);
+    const records = await promisify(dns.resolveTxt)(domain);
 
-        // dns TXT record must contain `forward-email=` prefix
-        let record;
+    // dns TXT record must contain `forward-email=` prefix
+    let record;
 
-        for (let i = 0; i < records.length; i++) {
-          records[i] = records[i].join(''); // join chunks together
-          if (records[i].startsWith('forward-email=')) {
-            record = records[i];
-            break;
-          }
-        }
-
-        if (!record) throw invalidTXTError;
-
-        // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=hello:niftylettuce@gmail.com"
-        // e.g. hello+test@niftylettuce.com => niftylettuce+test@gmail.com
-        // record = "forward-email=hello:niftylettuce@gmail.com"
-        // e.g. *@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=niftylettuce@gmail.com"
-        // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=niftylettuce@gmail.com"
-        record = record.replace('forward-email=', '');
-
-        // remove trailing whitespaces from each address listed
-        const addresses = record.split(',').map(a => a.trim());
-
-        if (addresses.length === 0) throw invalidTXTError;
-
-        // store if we have a forwarding address or not
-        let forwardingAddress;
-
-        // check if we have a global redirect
-        if (
-          addresses[0].indexOf(':') === -1 &&
-          validator.isFQDN(this.parseDomain(addresses[0])) &&
-          validator.isEmail(addresses[0])
-        )
-          forwardingAddress = addresses[0];
-
-        // check if we have a specific redirect
-        if (!forwardingAddress) {
-          // get username from recipient email address
-          // (e.g. hello@niftylettuce.com => hello)
-          const username = this.parseUsername(address);
-
-          for (let i = 0; i < addresses.length; i++) {
-            const address = addresses[i].split(':');
-
-            if (address.length !== 2) throw invalidTXTError;
-
-            // address[0] = hello (username)
-            // address[1] = niftylettuce@gmail.com (forwarding email)
-
-            // check if we have a match
-            if (username === address[0]) {
-              forwardingAddress = address[1];
-              break;
-            }
-          }
-        }
-
-        // if we don't have a forwarding address then throw an error
-        if (!forwardingAddress) throw invalidTXTError;
-
-        // otherwise transform the + symbol filter if we had it
-        // and then resolve with the newly formatted forwarding address
-        if (address.indexOf('+') === -1) return resolve(forwardingAddress);
-
-        resolve(
-          `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
-            address
-          )}@${this.parseDomain(forwardingAddress)}`
-        );
-      } catch (err) {
-        reject(err);
+    for (let i = 0; i < records.length; i++) {
+      records[i] = records[i].join(''); // join chunks together
+      if (records[i].startsWith('forward-email=')) {
+        record = records[i];
+        break;
       }
-    });
+    }
+
+    if (!record) throw invalidTXTError;
+
+    // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
+    // record = "forward-email=hello:niftylettuce@gmail.com"
+    // e.g. hello+test@niftylettuce.com => niftylettuce+test@gmail.com
+    // record = "forward-email=hello:niftylettuce@gmail.com"
+    // e.g. *@niftylettuce.com => niftylettuce@gmail.com
+    // record = "forward-email=niftylettuce@gmail.com"
+    // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
+    // record = "forward-email=niftylettuce@gmail.com"
+    record = record.replace('forward-email=', '');
+
+    // remove trailing whitespaces from each address listed
+    const addresses = record.split(',').map(a => a.trim());
+
+    if (addresses.length === 0) throw invalidTXTError;
+
+    // store if we have a forwarding address or not
+    let forwardingAddress;
+
+    // check if we have a global redirect
+    if (
+      addresses[0].indexOf(':') === -1 &&
+      validator.isFQDN(this.parseDomain(addresses[0])) &&
+      validator.isEmail(addresses[0])
+    )
+      forwardingAddress = addresses[0];
+
+    // check if we have a specific redirect
+    if (!forwardingAddress) {
+      // get username from recipient email address
+      // (e.g. hello@niftylettuce.com => hello)
+      const username = this.parseUsername(address);
+
+      for (let i = 0; i < addresses.length; i++) {
+        const address = addresses[i].split(':');
+
+        if (address.length !== 2) throw invalidTXTError;
+
+        // address[0] = hello (username)
+        // address[1] = niftylettuce@gmail.com (forwarding email)
+
+        // check if we have a match
+        if (username === address[0]) {
+          forwardingAddress = address[1];
+          break;
+        }
+      }
+    }
+
+    // if we don't have a forwarding address then throw an error
+    if (!forwardingAddress) throw invalidTXTError;
+
+    // otherwise transform the + symbol filter if we had it
+    // and then resolve with the newly formatted forwarding address
+    if (address.indexOf('+') === -1) return forwardingAddress;
+
+    return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
+      address
+    )}@${this.parseDomain(forwardingAddress)}`;
   }
 
   async onRcptTo(address, session, fn) {

@@ -3,77 +3,115 @@
   "description": "ForwardEmail is a free, encrypted, and open-source email forwarding service at http://forwardemail.net",
   "version": "0.0.1",
   "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
-  "bugs": {
-    "url": "https://github.com/niftylettuce/forward-email/issues",
-    "email": "niftylettuce@gmail.com"
-  },
-  "contributors": [
-    "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)"
-  ],
-  "dependencies": {
-    "bluebird": "^3.5.1",
-    "bytes": "^3.0.0",
-    "common-tags": "^1.8.0",
-    "disposable-email-domains": "^1.0.34",
-    "dkim": "^0.4.1",
-    "email-providers": "^0.30.0",
-    "get-port": "^3.2.0",
-    "lodash": "^4.17.10",
-    "mailin": "^3.0.4",
-    "mailparser": "^2.2.0",
-    "ms": "^2.1.1",
-    "nodemailer": "4.1.1",
-    "parse-domain": "^2.1.2",
-    "punycode": "^2.1.1",
-    "ratelimiter": "^3.1.0",
-    "redis": "^2.8.0",
-    "smtp-server": "3.2.0",
-    "validator": "^10.4.0"
-  },
   "ava": {
     "verbose": true,
     "failFast": true,
     "serial": true
   },
+  "bugs": {
+    "url": "https://github.com/niftylettuce/forward-email/issues",
+    "email": "niftylettuce@gmail.com"
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
+  },
+  "contributors": [
+    "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)"
+  ],
+  "dependencies": {
+    "bluebird": "^3.5.2",
+    "bytes": "^3.0.0",
+    "common-tags": "^1.8.0",
+    "disposable-email-domains": "^1.0.38",
+    "dkim": "^0.4.1",
+    "email-providers": "^0.30.0",
+    "get-port": "^4.0.0",
+    "lodash": "^4.17.11",
+    "mailin": "^3.0.4",
+    "mailparser": "^2.3.4",
+    "ms": "^2.1.1",
+    "nodemailer": "4.6.8",
+    "parse-domain": "^2.1.2",
+    "punycode": "^2.1.1",
+    "ratelimiter": "^3.2.0",
+    "redis": "^2.8.0",
+    "smtp-server": "3.4.7",
+    "validator": "^10.8.0"
+  },
   "devDependencies": {
+    "@commitlint/cli": "latest",
+    "@commitlint/config-conventional": "latest",
     "auto-bind": "^1.2.1",
-    "ava": "^0.25.0",
-    "codecov": "^3.0.2",
-    "cross-env": "^5.2.0",
-    "eslint": "4.19.1",
-    "eslint-config-prettier": "^2.9.0",
-    "eslint-plugin-prettier": "^2.6.1",
-    "husky": "^0.14.3",
-    "nyc": "^12.0.2",
-    "prettier": "^1.13.7",
-    "remark-cli": "^5.0.0",
-    "remark-preset-github": "^0.0.8",
+    "ava": "latest",
+    "codecov": "latest",
+    "cross-env": "latest",
+    "eslint": "latest",
+    "eslint-config-prettier": "latest",
+    "eslint-config-xo-lass": "latest",
+    "eslint-plugin-prettier": "latest",
+    "fixpack": "latest",
+    "husky": "latest",
+    "lint-staged": "latest",
+    "nyc": "latest",
+    "prettier": "latest",
+    "remark-cli": "latest",
+    "remark-preset-github": "latest",
     "shelljs": "^0.8.2",
     "uuid": "^3.3.2",
-    "xo": "^0.21.1"
+    "xo": "latest"
   },
   "engines": {
     "node": ">=8.3"
   },
   "homepage": "http://forwardemail.net",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged && npm test",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
   "keywords": [
-    "forward",
-    "email",
-    "forwarding",
     "e-mail",
+    "email",
+    "forward",
+    "forwarding",
+    "free",
     "mail",
-    "nodemailer",
     "mailer",
-    "smtp",
+    "nodemailer",
+    "open",
+    "private",
     "proxy",
     "service",
-    "free",
-    "open",
-    "source",
-    "private"
+    "smtp",
+    "source"
   ],
   "license": "MIT",
+  "lint-staged": {
+    "linters": {
+      "*.js": [
+        "prettier --write",
+        "xo --fix",
+        "git add"
+      ],
+      "*.md": [
+        "remark . -qfo",
+        "git add"
+      ],
+      "package.json": [
+        "fixpack",
+        "git add"
+      ]
+    }
+  },
   "main": "index.js",
+  "prettier": {
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "trailingComma": "none"
+  },
   "remarkConfig": {
     "plugins": [
       "preset-github"
@@ -84,41 +122,19 @@
     "url": "https://github.com/niftylettuce/forward-email"
   },
   "scripts": {
+    "ava": "cross-env NODE_ENV=test ava",
     "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
-    "lint": "xo",
-    "precommit": "npm test",
-    "test": "npm run lint && npm run test-coverage",
-    "test-coverage": "cross-env NODE_ENV=test nyc ava"
+    "lint": "xo && remark . -qfo",
+    "nyc": "cross-env NODE_ENV=test nyc ava",
+    "test": "npm run lint && npm run ava",
+    "test-coverage": "npm run lint && npm run nyc"
   },
   "xo": {
-    "extends": "prettier",
-    "plugins": [
-      "prettier"
-    ],
-    "parserOptions": {
-      "sourceType": "script"
-    },
-    "rules": {
-      "prettier/prettier": [
-        "error",
-        {
-          "singleQuote": true,
-          "bracketSpacing": true,
-          "trailingComma": "none"
-        }
-      ],
-      "max-len": [
-        "error",
-        {
-          "code": 80,
-          "ignoreUrls": true
-        }
-      ],
-      "capitalized-comments": "off",
-      "camelcase": "off",
-      "no-warning-comments": "off"
-    },
+    "prettier": true,
     "space": true,
+    "extends": [
+      "xo-lass"
+    ],
     "ignores": [
       "config.js"
     ]
