@@ -106,11 +106,9 @@ After you've followed the steps above in [How it works](#how-it-works) you can f
 
 1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.
 2. When prompted for `Select the app and device you want to generate the app password for`:
-
    * Select `Mail` under the drop-down for `Select app`
    * Select `Other` under the drop-down for `Select device`
    * When prompted for text input, enter your custom domain's email address you're forwarding from (e.g. `hello@niftylettuce.com` - this will help you keep track in case you use this service for multiple accounts)
-
 3. Copy the password to your clipboard that is automatically generated
 4. Go to [Gmail](https://gmail.com) and under [Settings > Accounts and Import > Send mail as](https://mail.google.com/mail/u/0/#settings/accounts), click `Add another email address`
 5. When prompted for `Name`, enter the name that you want your email to be seen as "From" (e.g. `Niftylettuce`)
