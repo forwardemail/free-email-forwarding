@@ -241,6 +241,9 @@ class ForwardEmail {
 
         const dkim = await this.validateDKIM(rawEmail);
 
+        // TODO: if we are sending mail as then we must enforce DKIM
+        // in order to prevent spoofing of messages
+
         // basically if there was no valid SPF record found for this sender
         // AND if there was no valid DKIM signature on the message
         // then we must refuse sending this email along because it
@@ -345,6 +348,29 @@ class ForwardEmail {
                 envelope: session.envelope,
                 dkim
               };
+
+              // allow Gmail "Send Mail As" by re-writing the FROM of the email
+              // (otherwise we receive the following error when connecting to Gmail)
+              //
+              // 550-5.7.1 Unauthenticated email from google.com is not accepted due
+              // to domain's DMARC policy. Please contact the administrator of
+              // google.com domain if this was a legitimate mail. Please visit
+              // https://support.google.com/mail/answer/2451690 to learn about the
+              // DMARC initiative
+              //
+              // Note that the email is from "gmail-noreply@google.com" therefore
+              // we can rewrite the "from" of the email if it matches this exactly
+              if (email.envelope.from === 'gmail-noreply@google.com') {
+                // validate clientHostname domain is gmail
+                const parsedDomain = parseDomain(session.clientHostname);
+                if (
+                  `${parsedDomain.domain}.${parsedDomain.tld}` === 'google.com'
+                ) {
+                  email.from = email.to;
+                  session.envelope.from = session.envelope.to;
+                }
+              }
+
               delete email.messageId;
               delete email.headers['mime-version'];
               delete email.headers['content-type'];
@@ -353,6 +379,7 @@ class ForwardEmail {
               delete email.headers['x-gm-message-state'];
               delete email.headers['x-google-smtp-source'];
               delete email.headers['x-received'];
+              delete email.headers['x-google-address-confirmation'];
               const info = await transporter.sendMail(email);
               return info;
             })();
