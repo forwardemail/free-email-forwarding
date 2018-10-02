@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const uuid = require('uuid');
+const isCI = require('is-ci');
 const shell = require('shelljs');
 const bytes = require('bytes');
 const test = require('ava');
@@ -131,77 +132,79 @@ test('rejects forwarding an email without dkim and spf', async t => {
   });
 });
 
-test('forwards an email with dkim', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: 'from@forwardemail.net',
-    to: 'Niftylettuce <hello@niftylettuce.com>',
-    cc: 'cc@niftylettuce.com',
-    subject: 'test',
-    text: 'test text',
-    html: '<strong>test html</strong>',
-    attachments: [],
-    dkim: {
-      domainName: 'forwardemail.net',
-      keySelector: 'default',
-      privateKey: fs.readFileSync(
-        path.join(__dirname, '..', 'dkim-private.key'),
-        'utf8'
-      )
-    }
-  });
-  return new Promise(resolve => {
-    connection.on('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
-        t.is(err, null);
-        connection.quit();
-      });
+if (!isCI)
+  test('forwards an email with dkim', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
     });
-  });
-});
-
-test('rejects a spam file', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: 'foo@forwardemail.net',
-    to: 'Baz <baz@forwardemail.net>',
-    // taken from:
-    // <https://github.com/humantech/node-spamd/blob/master/test/spamd-tests.js#L13-L14>
-    subject: 'Viagra, Cialis, Vicodin: buy medicines without prescription!',
-    html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
-    dkim: {
-      domainName: 'forwardemail.net',
-      keySelector: 'default',
-      privateKey: fs.readFileSync(
-        path.join(__dirname, '..', 'dkim-private.key'),
-        'utf8'
-      )
-    }
-  });
-  return new Promise(resolve => {
-    connection.on('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
-        if (!shell.which('spamassassin') || !shell.which('spamc')) {
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      from: 'from@forwardemail.net',
+      to: 'Niftylettuce <hello@niftylettuce.com>',
+      cc: 'cc@niftylettuce.com',
+      subject: 'test',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: [],
+      dkim: {
+        domainName: 'forwardemail.net',
+        keySelector: 'default',
+        privateKey: fs.readFileSync(
+          path.join(__dirname, '..', 'dkim-private.key'),
+          'utf8'
+        )
+      }
+    });
+    return new Promise(resolve => {
+      connection.on('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
           t.is(err, null);
-        } else {
-          t.is(err.responseCode, 551);
-          t.regex(err.message, /Message detected as spam/);
-        }
-        connection.quit();
+          connection.quit();
+        });
       });
     });
   });
-});
+
+if (!isCI)
+  test('rejects a spam file', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      from: 'foo@forwardemail.net',
+      to: 'Baz <baz@forwardemail.net>',
+      // taken from:
+      // <https://github.com/humantech/node-spamd/blob/master/test/spamd-tests.js#L13-L14>
+      subject: 'Viagra, Cialis, Vicodin: buy medicines without prescription!',
+      html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
+      dkim: {
+        domainName: 'forwardemail.net',
+        keySelector: 'default',
+        privateKey: fs.readFileSync(
+          path.join(__dirname, '..', 'dkim-private.key'),
+          'utf8'
+        )
+      }
+    });
+    return new Promise(resolve => {
+      connection.on('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          if (!shell.which('spamassassin') || !shell.which('spamc')) {
+            t.is(err, null);
+          } else {
+            t.is(err.responseCode, 551);
+            t.regex(err.message, /Message detected as spam/);
+          }
+          connection.quit();
+        });
+      });
+    });
+  });
 
 test('rejects a file over the limit', async t => {
   const transporter = nodemailer.createTransport({
@@ -234,50 +237,51 @@ test('rejects a file over the limit', async t => {
 });
 
 /*
-test('prevents spam through rate limiting', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
+if (!isCI)
+  test('prevents spam through rate limiting', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
 
-  let failed = 0;
+    let failed = 0;
 
-  await Promise.all(
-    Array.from(Array(200).keys()).map(() => {
-      return new Promise(async (resolve, reject) => {
-        try {
-          const info = await transporter.sendMail({
-            from: 'foo@forwardemail.net',
-            to: 'Baz <baz@forwardemail.net>',
-            subject: 'test',
-            text: 'test text',
-            html: '<strong>test html</strong>',
-            dkim: {
-              domainName: 'forwardemail.net',
-              keySelector: 'default',
-              privateKey: fs.readFileSync(
-                path.join(__dirname, '..', 'dkim-private.key'),
-                'utf8'
-              )
-            }
-          });
-          const connection = new Client({ port, tls });
-          connection.on('end', resolve);
-          connection.connect(() => {
-            connection.send(info.envelope, info.message, err => {
-              if (err && err.responseCode === 451) failed++;
-              connection.quit();
+    await Promise.all(
+      Array.from(Array(200).keys()).map(() => {
+        return new Promise(async (resolve, reject) => {
+          try {
+            const info = await transporter.sendMail({
+              from: 'foo@forwardemail.net',
+              to: 'Baz <baz@forwardemail.net>',
+              subject: 'test',
+              text: 'test text',
+              html: '<strong>test html</strong>',
+              dkim: {
+                domainName: 'forwardemail.net',
+                keySelector: 'default',
+                privateKey: fs.readFileSync(
+                  path.join(__dirname, '..', 'dkim-private.key'),
+                  'utf8'
+                )
+              }
             });
-          });
-        } catch (err) {
-          reject(err);
-        }
-      });
-    })
-  );
+            const connection = new Client({ port, tls });
+            connection.on('end', resolve);
+            connection.connect(() => {
+              connection.send(info.envelope, info.message, err => {
+                if (err && err.responseCode === 451) failed++;
+                connection.quit();
+              });
+            });
+          } catch (err) {
+            reject(err);
+          }
+        });
+      })
+    );
 
-  t.is(failed, 100);
-});
+    t.is(failed, 100);
+  });
 */
 
 test('rejects a disposable email sender', async t => {
