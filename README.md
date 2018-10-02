@@ -9,18 +9,20 @@
 
 > :heart: Love this project? Support <a href="https://github.com/niftylettuce" target="_blank">@niftylettuce's</a> [FOSS](https://en.wikipedia.org/wiki/Free_and_open-source_software) on <a href="https://patreon.com/niftylettuce" target="_blank">Patreon</a> or <a href="https://paypal.me/niftylettuce">PayPal</a> :unicorn:
 
-[ForwardEmail](http://forwardemail.net) is a free, encrypted, and open-source email forwarding service at <http://forwardemail.net>
+[ForwardEmail](http://forwardemail.net) is a free, encrypted, and open-source email forwarding service for custom domains at <http://forwardemail.net>
 
 
 ## Table of Contents
 
-* [How it works](#how-it-works)
+* [How It Works](#how-it-works)
+* [Send Mail As Using Gmail](#send-mail-as-using-gmail)
 * [Self-Hosted Requirements](#self-hosted-requirements)
 * [CLI](#cli)
 * [API](#api)
 * [Usage](#usage)
   * [CLI](#cli-1)
   * [API](#api-1)
+* [Service-Level Agreement](#service-level-agreement)
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
   * [Why did I create this service](#why-did-i-create-this-service)
@@ -42,7 +44,7 @@
 * [License](#license)
 
 
-## How it works
+## How It Works
 
 > Replace `niftylettuce@gmail.com` with the email address you want to forward emails to below:
 
@@ -87,12 +89,42 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
+**5.** If you wish to "Send Mail As" from Gmail, then you will need to follow the steps under [Send Mail As Using Gmail](#send-mail-as-using-gmail) below.
+
 ---
 
 _Optional Add-ons:_
 
-* Add a DMARC record for your domain name by folowing the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass).
+* Add a DMARC record for your domain name by folowing the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass)
 * If the email lands in your spam folder (which it should not), you can whitelist it (e.g. here are instructions for Google <https://support.google.com/a/answer/60751?hl=en&ref_topic=1685627>)
+* Add the ability to "Send Mail As" from Gmail by following [Send Mail As Using Gmail](#send-mail-as-using-gmail) below
+
+
+## Send Mail As Using Gmail
+
+After you've followed the steps above in [How it works](#how-it-works) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
+
+1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.
+2. When prompted for `Select the app and device you want to generate the app password for`:
+
+   * Select `Mail` under the drop-down for `Select app`
+   * Select `Other` under the drop-down for `Select device`
+   * When prompted for text input, enter your custom domain's email address you're forwarding from (e.g. `hello@niftylettuce.com` - this will help you keep track in case you use this service for multiple accounts)
+
+3. Copy the password to your clipboard that is automatically generated
+4. Go to [Gmail](https://gmail.com) and under [Settings > Accounts and Import > Send mail as](https://mail.google.com/mail/u/0/#settings/accounts), click `Add another email address`
+5. When prompted for `Name`, enter the name that you want your email to be seen as "From" (e.g. `Niftylettuce`)
+6. When prompted for `Email address`, enter the email address with the custom domain you used above (e.g. `hello@niftylettuce.com`)
+7. Leave the checkbox for `Treat as an alias` unchecked
+8. Click `Next Step` to proceed
+9. When prompted for `SMTP Server`, enter `smtp.gmail.com` and leave the port as `587`
+10. When prompted for `Username`, enter the portion of your Gmail address without the `@gmail.com` part (e.g. `niftylettuce` if my email is `niftylettuce@gmail.com`)
+11. When prompted for `Password`, paste from your clipboard the password you generated in step 2 above
+12. Leave the radio button checked to `Secured connection using TLS`
+13. Click `Add Account` to proceed
+14. Open a new tab to [Gmail](https://gmail.com) and wait for your verification email to arrive (you will receive a verification code that confirms you are the owner of the email address you are attempting to "Send Mail As")
+15. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
+16. Done!
 
 
 ## Self-Hosted Requirements
@@ -251,6 +283,11 @@ forwardEmail.listen();
 ```
 
 
+## Service-Level Agreement
+
+This project is currently a best-effort service, however note that the creators of this service also use it themselves – so you can expect reliability and security.  However this is not a binding nor enforceable SLA and again, this is a best-effort service.
+
+
 ## Terms of Use
 
 This software and service uses the MIT License (see [LICENSE](LICENSE)).
@@ -376,7 +413,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
@@ -401,3 +438,5 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [authbind]: https://en.wikipedia.org/wiki/Authbind
 
 [openssl]: https://www.openssl.org/
+
+[gmail-2fa]: https://myaccount.google.com/signinoptions/two-step-verification

@@ -1,6 +1,6 @@
 {
   "name": "forward-email",
-  "description": "ForwardEmail is a free, encrypted, and open-source email forwarding service at http://forwardemail.net",
+  "description": "ForwardEmail is a free, encrypted, and open-source email forwarding service for custom domains at http://forwardemail.net",
   "version": "0.0.1",
   "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
   "ava": {
