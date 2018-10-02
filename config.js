@@ -7,7 +7,7 @@ docute.init({
   nav: {
     default: [
       {
-        title: 'Free, Encrypted, and Open-Source Email Forwarding Service',
+        title: 'Free, Encrypted, and Open-Source Email Forwarding Service for Custom Domains',
         path: '/'
       }
     ]
