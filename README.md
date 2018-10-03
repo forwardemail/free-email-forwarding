@@ -102,7 +102,7 @@ _Optional Add-ons:_
 
 ## Send Mail As Using Gmail
 
-After you've followed the steps above in [How it works](#how-it-works) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
+After you've followed the steps above in [How It Works](#how-it-works) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
 
 1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.
 2. When prompted for `Select the app and device you want to generate the app password for`:
@@ -232,7 +232,7 @@ You'll also need the following dependencies installed:
     "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCojharU7eJW+eaLulQygsc/AHx2A0gyLnSU2fPGs8mI3Fhs3EVIIRP01euHg+IljMmXz9YtU+XMfZuYdSCa9NY16XjoIgub2+lkeiHHNpURIpwQJSeHxviMOfMAZ5/xSTDDoaYY2vcKytheZeLAVK2V1SuTdTp+C6B9E6AUSu1TwIDAQAB"
     ```
 
-* DNS records - you'll need to setup and modify your DNS records with your own self-hosted version.  See [How it works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
+* DNS records - you'll need to setup and modify your DNS records with your own self-hosted version.  See [How It Works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
 
 
 ## CLI
@@ -391,7 +391,7 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 ### Can I "send mail as" with this
 
-Not yet, though that feature is almost done being added and should be available soon.
+Yes! As of October 2, 2018 we have added this feature.  See [Send Mail As Using Gmail](#send-mail-as-using-gmail) above!
 
 ### Can I forward unlimited emails with this
 
