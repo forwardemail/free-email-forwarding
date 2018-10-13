@@ -617,8 +617,8 @@ class ForwardEmail {
     const username = this.parseUsername(address);
 
     for (let i = 0; i < addresses.length; i++) {
-      if (addresses[i]/indexOf(':') === -1) {
-      	if (
+      if (addresses[i].indexOf(':') === -1) {
+        if (
           validator.isFQDN(this.parseDomain(addresses[i])) &&
           validator.isEmail(addresses[i])
         )
@@ -633,16 +633,16 @@ class ForwardEmail {
 
         // check if we have a match
         if (username === address[0]) {
-	      forwardingAddress = address[1];
-	      break;
-	    }
-	  }
+          forwardingAddress = address[1];
+          break;
+        }
+      }
     }
     
     // if we don't have a specific forwarding address try the global redirect
-    if (!forwardingAddress && globalForwardingAddress) 
+    if (!forwardingAddress && globalForwardingAddress)
       forwardingAddress = globalForwardingAddress;
-    
+
     // if we don't have a forwarding address then throw an error
     if (!forwardingAddress) throw invalidTXTError;
 
