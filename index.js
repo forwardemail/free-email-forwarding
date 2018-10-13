@@ -638,7 +638,7 @@ class ForwardEmail {
         }
       }
     }
-   
+
     // if we don't have a specific forwarding address try the global redirect
     if (!forwardingAddress && globalForwardingAddress)
       forwardingAddress = globalForwardingAddress;
