@@ -608,21 +608,22 @@ class ForwardEmail {
     // store if we have a forwarding address or not
     let forwardingAddress;
 
-    // check if we have a global redirect
-    if (
-      addresses[0].indexOf(':') === -1 &&
-      validator.isFQDN(this.parseDomain(addresses[0])) &&
-      validator.isEmail(addresses[0])
-    )
-      forwardingAddress = addresses[0];
+    // store if we have a global redirect or not
+    let globalForwardingAddress;
 
-    // check if we have a specific redirect
-    if (!forwardingAddress) {
-      // get username from recipient email address
-      // (e.g. hello@niftylettuce.com => hello)
-      const username = this.parseUsername(address);
+    // check if we have a specific redirect and store global redirects (if any)
+    // get username from recipient email address
+    // (e.g. hello@niftylettuce.com => hello)
+    const username = this.parseUsername(address);
 
-      for (let i = 0; i < addresses.length; i++) {
+    for (let i = 0; i < addresses.length; i++) {
+      if (addresses[i]/indexOf(':') === -1) {
+      	if (
+          validator.isFQDN(this.parseDomain(addresses[i])) &&
+          validator.isEmail(addresses[i])
+        )
+          globalForwardingAddress = addresses[i];
+      } else {
         const address = addresses[i].split(':');
 
         if (address.length !== 2) throw invalidTXTError;
@@ -632,12 +633,16 @@ class ForwardEmail {
 
         // check if we have a match
         if (username === address[0]) {
-          forwardingAddress = address[1];
-          break;
-        }
-      }
+	      forwardingAddress = address[1];
+	      break;
+	    }
+	  }
     }
-
+    
+    // if we don't have a specific forwarding address try the global redirect
+    if (!forwardingAddress && globalForwardingAddress) 
+      forwardingAddress = globalForwardingAddress;
+    
     // if we don't have a forwarding address then throw an error
     if (!forwardingAddress) throw invalidTXTError;
 
