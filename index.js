@@ -56,7 +56,9 @@ class ForwardEmail {
     config = {
       smtp: {},
       limiter: {},
-      exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+      exchanges: [],
+      ssl: {},
+      dkim: {},
       ...config
     };
 
@@ -64,15 +66,9 @@ class ForwardEmail {
     if (process.env.NODE_ENV === 'production') {
       ssl.secure = process.env.SECURE === 'true';
       // ssl.needsUpgrade = true;
-      ssl.key = fs.readFileSync(
-        '/home/deploy/mx1.forwardemail.net.key',
-        'utf8'
-      );
-      ssl.cert = fs.readFileSync(
-        '/home/deploy/mx1.forwardemail.net.cert',
-        'utf8'
-      );
-      ssl.ca = fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8');
+      ssl.key = fs.readFileSync(config.ssl.key, 'utf8');
+      ssl.cert = fs.readFileSync(config.ssl.cert, 'utf8');
+      ssl.ca = fs.readFileSync(config.ssl.ca, 'utf8');
     }
     this.ssl = ssl;
 
@@ -90,7 +86,8 @@ class ForwardEmail {
         ...config.smtp
       },
       limiter: { ...config.limiter },
-      exchanges: config.exchanges
+      exchanges: config.exchanges,
+      dkim: config.dkim
     };
 
     // setup rate limiting with redis
@@ -327,21 +324,9 @@ class ForwardEmail {
               // await transporter.verify();
 
               const dkim = {};
-              if (process.env.NODE_ENV === 'production') {
-                dkim.domainName = 'forwardemail.net';
-                dkim.keySelector = 'default';
-                dkim.privateKey = fs.readFileSync(
-                  '/home/deploy/dkim-private.key',
-                  'utf8'
-                );
-              } else if (process.env.NODE_ENV === 'test') {
-                dkim.domainName = 'forwardemail.net';
-                dkim.keySelector = 'default';
-                dkim.privateKey = fs.readFileSync(
-                  path.join(__dirname, 'dkim-private.key'),
-                  'utf8'
-                );
-              }
+              dkim.domainName = this.config.dkim.domainName;
+              dkim.keySelector = 'default';
+              dkim.privateKey = fs.readFileSync(this.config.dkim.privateKey, 'utf8');
 
               const email = {
                 ...obj,
@@ -679,7 +664,20 @@ class ForwardEmail {
 }
 
 if (!module.parent) {
-  const forwardEmail = new ForwardEmail();
+  const forwardEmail = new ForwardEmail({
+    exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+    ssl: {
+      key: '/home/deploy/mx1.forwardemail.net.key',
+      cert: '/home/deploy/mx1.forwardemail.net.cert',
+      ca: '/home/deploy/mx1.forwardemail.net.ca'
+    },
+    dkim: {
+      domainName: 'forwardemail.net',
+      privateKey: process.env.NODE_ENV === 'production'
+        ? '/home/deploy/dkim-private.key'
+        : path.join(__dirname, 'dkim-private.key')
+    }
+  });
   forwardEmail.server.listen(process.env.PORT || 25);
 }
 
