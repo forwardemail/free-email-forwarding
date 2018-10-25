@@ -20,11 +20,13 @@
 * [CLI](#cli)
 * [API](#api)
 * [Usage](#usage)
+
   * [CLI](#cli-1)
   * [API](#api-1)
 * [Service-Level Agreement](#service-level-agreement)
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
+
   * [Why did I create this service](#why-did-i-create-this-service)
   * [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
   * [How is it free](#how-is-it-free)
@@ -288,7 +290,18 @@ Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the exa
 ```js
 const ForwardEmail = require('forward-email');
 
-const forwardEmail = new ForwardEmail();
+const forwardEmail = new ForwardEmail({
+    exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+    ssl: {
+      key: '/home/deploy/mx1.forwardemail.net.key',
+      cert: '/home/deploy/mx1.forwardemail.net.cert',
+      ca: '/home/deploy/mx1.forwardemail.net.ca'
+    },
+    dkim: {
+      domainName: 'forwardemail.net',
+      privateKey: '/home/deploy/dkim-private.key'
+    }
+  });
 
 forwardEmail.listen();
 ```

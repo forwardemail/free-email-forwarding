@@ -424,10 +424,11 @@ class ForwardEmail {
               // verify transport
               // await transporter.verify();
 
-              const dkim = {};
-              dkim.domainName = this.config.dkim.domainName;
-              dkim.keySelector = 'default';
-              dkim.privateKey = fs.readFileSync(this.config.dkim.privateKey, 'utf8');
+              const dkim = {
+                domainName: this.config.dkim.domainName,
+                keySelector: 'default',
+                privateKey: fs.readFileSync(this.config.dkim.privateKey, 'utf8')
+              };
 
               const email = {
                 ...obj,
@@ -817,9 +818,10 @@ if (!module.parent) {
     },
     dkim: {
       domainName: 'forwardemail.net',
-      privateKey: process.env.NODE_ENV === 'production'
-        ? '/home/deploy/dkim-private.key'
-        : path.join(__dirname, 'dkim-private.key')
+      privateKey:
+        process.env.NODE_ENV === 'production'
+          ? '/home/deploy/dkim-private.key'
+          : path.join(__dirname, 'dkim-private.key')
     }
   });
   forwardEmail.server.listen(process.env.PORT || 25);
