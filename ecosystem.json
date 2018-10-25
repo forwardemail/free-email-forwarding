@@ -5,6 +5,10 @@
       "script": "index.js",
       "exec_mode": "cluster",
       "instances": "max",
+      "env": {
+        "SECURE": "false",
+        "PORT": "25"
+      },
       "env_production": {
         "NODE_ENV": "production"
       }
@@ -14,10 +18,12 @@
       "script": "index.js",
       "exec_mode": "cluster",
       "instances": "max",
-      "env_production": {
-        "NODE_ENV": "production",
+      "env": {
         "SECURE": "true",
         "PORT": "465"
+      },
+      "env_production": {
+        "NODE_ENV": "production"
       }
     },
     {
@@ -25,10 +31,12 @@
       "script": "index.js",
       "exec_mode": "cluster",
       "instances": "max",
-      "env_production": {
-        "NODE_ENV": "production",
+      "env": {
         "SECURE": "true",
         "PORT": "587"
+      },
+      "env_production": {
+        "NODE_ENV": "production"
       }
     }
   ],
