@@ -53,7 +53,7 @@ test('rejects forwarding a non-FQDN email', async t => {
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
-    from: 'from@forwardemail.net',
+    from: 'ForwardEmail <from@forwardemail.net>',
     to: 'Niftylettuce <hello@127.0.0.1>',
     subject: 'test',
     text: 'test text',
@@ -64,6 +64,7 @@ test('rejects forwarding a non-FQDN email', async t => {
     connection.on('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
+        console.log('error', err);
         t.is(err.responseCode, 550);
         t.regex(err.message, /is not a FQDN/);
         connection.quit();
@@ -83,7 +84,7 @@ test('rejects forwarding a non-registered email address', async t => {
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
-    from: 'from@forwardemail.net',
+    from: 'ForwardEmail <from@forwardemail.net>',
     to: 'Niftylettuce <fail@test.niftylettuce.com>', // "pass" works
     subject: 'test',
     text: 'test text',
@@ -109,7 +110,7 @@ test('rejects forwarding an email without dkim and spf', async t => {
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const info = await transporter.sendMail({
-    from: 'from@forwardemail.net',
+    from: 'ForwardEmail <from@forwardemail.net>',
     to: 'Niftylettuce <hello@niftylettuce.com>',
     cc: 'cc@niftylettuce.com',
     subject: 'test',
@@ -124,7 +125,7 @@ test('rejects forwarding an email without dkim and spf', async t => {
         t.is(err.responseCode, 550);
         t.is(
           err.message,
-          oneLine`Message failed: 550 Please ensure the email service you are sending from either has SPF, DKIM, or is a top-ranked <30K Alexa.com domain.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").\n\nIf you continue to have issues, please see https://forwardemail.net or file an issue on GitHub at https://github.com/niftylettuce/forward-email. We'd be glad to help out!\n\n--\n@niftylettuce`
+          oneLine`Message failed: 550 Please ensure the email service you are sending from either has SPF or DKIM.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").`
         );
         connection.quit();
       });
@@ -140,7 +141,7 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: 'from@forwardemail.net',
+      from: 'ForwardEmail <from@forwardemail.net>',
       to: 'Niftylettuce <hello@niftylettuce.com>',
       cc: 'cc@niftylettuce.com',
       subject: 'test',
@@ -319,3 +320,5 @@ test.todo('rejects invalid spf');
 test.todo('accepts valid spf');
 // eslint-disable-next-line ava/no-todo-test
 test.todo('supports + symbol aliased onRcptTo');
+// eslint-disable-next-line ava/no-todo-test
+test.todo('rewrites with friendly-from for failed DMARC validation');
