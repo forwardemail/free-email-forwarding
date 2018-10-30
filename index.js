@@ -227,6 +227,7 @@ class ForwardEmail {
       parser.end();
     });
 
+    // eslint-disable-next-line complexity
     parser.on('end', async () => {
       try {
         headers.forEach(key => {
@@ -374,8 +375,11 @@ class ForwardEmail {
             ) {
               // preserve user's name
               const { name } = addressParser(mail.from)[0];
-              mail.replyTo = mail.from;
-              session.envelope.replyTo = mail.from;
+              // eslint-disable-next-line max-depth
+              if (!mail.replyTo) mail.replyTo = mail.from;
+              // eslint-disable-next-line max-depth
+              if (!session.envelope.replyTo)
+                session.envelope.replyTo = mail.from;
               mail.from = `${name} <${noReply}>`;
               session.envelope.from = mail.from;
             }
