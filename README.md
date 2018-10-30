@@ -46,7 +46,7 @@
 
 ## How It Works
 
-> Replace `niftylettuce@gmail.com` with the email address you want to forward emails to below:
+> <u>**IMPORTANT NOTE:**</u> Replace `niftylettuce@gmail.com` below with the email address you want to forward emails to:
 
 **1.** Set the following DNS MX records on your domain name:
 
@@ -418,7 +418,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
