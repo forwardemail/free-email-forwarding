@@ -6,7 +6,7 @@ let dns = require('dns');
 const punycode = require('punycode/');
 const dmarcParse = require('dmarc-parse');
 const DKIM = require('dkim');
-const dnsbl = require('dnsbl');
+// const dnsbl = require('dnsbl');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
 const { oneLine } = require('common-tags');
@@ -185,7 +185,9 @@ class ForwardEmail {
       err.responseCode = 550;
       return fn(err);
     }
-    // ensure that it's not on the DNS blacklist
+    fn();
+    // TODO: ensure that it's not on the DNS blacklist
+    /*
     dnsbl.lookup(
       session.remoteAddress,
       'zen.spamhaus.org',
@@ -209,6 +211,7 @@ class ForwardEmail {
         return fn(error);
       }
     );
+    */
   }
 
   onData(stream, session, fn) {
@@ -596,7 +599,6 @@ class ForwardEmail {
       // join together the record by space
       return records[0].join(' ');
     } catch (err) {
-      if (log) console.error(err);
       // recursively look up from subdomain to parent domain for record
       if (err.code === 'ENOTFOUND') {
         // no dmarc record exists so return `false`
@@ -604,6 +606,7 @@ class ForwardEmail {
         // otherwise attempt to lookup the parent domain's DMARC record instead
         return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
       }
+      if (log) console.error(err);
       // if there's an error then assume that we need to rewrite
       // with a friendly-from, for whatever reason
       return true;
