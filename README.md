@@ -393,6 +393,8 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 6. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
 
+7. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe <mailto:john@domain.com>").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
+
 ### Can I "send mail as" with this
 
 Yes! As of October 2, 2018 we have added this feature.  See [Send Mail As Using Gmail](#send-mail-as-using-gmail) above!
@@ -416,7 +418,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
