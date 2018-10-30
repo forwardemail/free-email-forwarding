@@ -600,7 +600,7 @@ class ForwardEmail {
       return records[0].join(' ');
     } catch (err) {
       // recursively look up from subdomain to parent domain for record
-      if (err.code === 'ENOTFOUND') {
+      if (_.isString(err.code) && err.code === 'ENOTFOUND') {
         // no dmarc record exists so return `false`
         if (!parsedDomain.subdomain) return false;
         // otherwise attempt to lookup the parent domain's DMARC record instead
@@ -630,6 +630,8 @@ class ForwardEmail {
         )
       );
     } catch (err) {
+      if (_.isString(err.code) && err.code === 'PERMFAIL') return false;
+      if (log) console.error(err);
       err.responseCode = 421;
       throw err;
     }
