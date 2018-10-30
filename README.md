@@ -91,7 +91,7 @@
 
 **4.** Send a test email to confirm it works.  Note that it might take some time for your DNS records to propagate.
 
-**5.** Add `no-reply@forwardemail.net` to your contacts.  In the event that someone is attempting to send you an email
+**5.** Add `no-reply@forwardemail.net` to your contacts.  In the event that someone is attempting to send you an email that has a strict DMARC record policy of `reject` or `quarantine`, we will rewrite the email's `From` header with a "friendly-from".  This means the `From` will look like `Sender's Name <no-reply@forwardemail.net>` and a `Reply-To` will be added with the original sender's `From` address.  In the event that there is already a `Reply-To` set, we will not overwrite it.
 
 **6.** If you wish to "Send Mail As" from Gmail, then you will need to follow the steps under [Send Mail As Using Gmail](#send-mail-as-using-gmail) below.
 
