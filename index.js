@@ -1,9 +1,12 @@
 const fs = require('fs');
-const { promisify } = require('util');
 const os = require('os');
 const path = require('path');
-const dns = require('dns');
+let dns = require('dns');
+// const { Resolver } = require('dns');
 const punycode = require('punycode/');
+const dmarcParse = require('dmarc-parse');
+const DKIM = require('dkim');
+const dnsbl = require('dnsbl');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
 const { oneLine } = require('common-tags');
@@ -17,23 +20,42 @@ const ms = require('ms');
 const domains = require('disposable-email-domains');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const validator = require('validator');
-const bluebird = require('bluebird');
-const isObject = require('lodash/isObject');
-const isString = require('lodash/isString');
+const Promise = require('bluebird');
+const _ = require('lodash');
 const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
-const common = require('email-providers/common.json');
 let mailUtilities = require('mailin/lib/mailUtilities.js');
+
+// TODO: eventually set 127.0.0.1 as DNS server
+// for both `dnsbl` and `dns` usage
+// https://gist.github.com/zhurui1008/48130439a079a3c23920
+// currently we use Open DNS instead
+// 208.67.222.222 and 208.67.220.220
+const servers = ['208.67.222.222', '208.67.220.220'];
+
+// currently running into this error when using this code:
+// `Error: Mail command failed: 421 Cannot read property '_handle' of undefined`
+// const resolver = new Resolver();
+// resolver.setServers(servers);
+// const resolveMx = Promise.promisify(resolver.resolveMx);
+// const resolveTxt = Promise.promisify(resolver.resolveTxt);
+
+const dkimVerify = Promise.promisify(DKIM.verify);
 
 const blacklist = require('./blacklist');
 
-mailUtilities = bluebird.promisifyAll(mailUtilities);
+mailUtilities = Promise.promisifyAll(mailUtilities);
+
+dns = Promise.promisifyAll(dns);
+dns.setServers(servers);
 
 const invalidTXTError = new Error('Invalid forward-email TXT record');
 invalidTXTError.responseCode = 550;
 
 const invalidMXError = new Error('Sender has invalid MX records');
 invalidMXError.responseCode = 550;
+
+const noReply = 'no-reply@forwardemail.net';
 
 const headers = [
   'subject',
@@ -114,7 +136,7 @@ class ForwardEmail {
         ? address.split('@')[0]
         : address.split('+')[0];
 
-    username = punycode.toASCII(username);
+    username = punycode.toASCII(username).toLowerCase();
     return username;
   }
 
@@ -157,10 +179,36 @@ class ForwardEmail {
     // TODO: this needs tested in production
     // or we need to come up with a better way to do this
     if (process.env.NODE_ENV === 'test') return fn();
-    if (validator.isFQDN(session.clientHostname)) return fn();
-    const err = new Error(`${session.clientHostname} is not a FQDN`);
-    err.responseCode = 550;
-    fn(err);
+    // ensure it's a fully qualififed domain name
+    if (!validator.isFQDN(session.clientHostname)) {
+      const err = new Error(`${session.clientHostname} is not a FQDN`);
+      err.responseCode = 550;
+      return fn(err);
+    }
+    // ensure that it's not on the DNS blacklist
+    dnsbl.lookup(
+      session.remoteAddress,
+      'zen.spamhaus.org',
+      {
+        servers
+      },
+      (err, result) => {
+        if (err) {
+          if (log) console.error(err);
+          return fn();
+        }
+        if (!result) return fn();
+        const error = new Error(
+          `Your IP address of ${
+            session.remoteAddress
+          } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
+            session.remoteAddress
+          } for more information.`
+        );
+        error.responseCode = 554;
+        return fn(error);
+      }
+    );
   }
 
   onData(stream, session, fn) {
@@ -210,9 +258,9 @@ class ForwardEmail {
         };
 
         mail.headers = [...mail.headers].reduce((obj, [key, value]) => {
-          if (isObject(value)) {
-            if (isString(value.value)) obj[key] = value.value;
-            if (isObject(value.params))
+          if (_.isObject(value)) {
+            if (_.isString(value.value)) obj[key] = value.value;
+            if (_.isObject(value.params))
               Object.keys(value.params).forEach(k => {
                 obj[key] += `; ${k}=${value.params[k]}`;
               });
@@ -241,26 +289,13 @@ class ForwardEmail {
 
         const dkim = await this.validateDKIM(rawEmail);
 
-        // TODO: if we are sending mail as then we must enforce DKIM
-        // in order to prevent spoofing of messages
-
-        // basically if there was no valid SPF record found for this sender
+        // if there was no valid SPF record found for this sender
         // AND if there was no valid DKIM signature on the message
         // then we must refuse sending this email along because it
         // literally has on validation that it's from who it says its from
-        //
-        // but also check to see if it's from a well-known provider
-        // (e.g. from a top 30000 alexa ranked sites)
-        let alexa = false;
-        try {
-          const domain = this.parseDomain(session.envelope.from);
-          const parsedDomain = parseDomain(domain);
-          alexa = common.includes(`${parsedDomain.domain}.${parsedDomain.tld}`);
-        } catch (err) {}
-
-        if (!alexa && !spf && !dkim) {
+        if (!spf && !dkim) {
           const err = new Error(
-            oneLine`Please ensure the email service you are sending from either has SPF, DKIM, or is a top-ranked <30K Alexa.com domain.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").\n\nIf you continue to have issues, please see https://forwardemail.net or file an issue on GitHub at https://github.com/niftylettuce/forward-email. We'd be glad to help out!\n\n--\n@niftylettuce`
+            oneLine`Please ensure the email service you are sending from either has SPF or DKIM.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").`
           );
           err.responseCode = 550;
           throw err;
@@ -284,9 +319,11 @@ class ForwardEmail {
         let spamScore = 0;
         try {
           spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
-        } catch (err) {}
+        } catch (err) {
+          if (log) console.error(err);
+        }
 
-        if (spamScore >= 5 && !alexa) {
+        if (spamScore >= 5) {
           // TODO: blacklist IP address
           const err = new Error(
             `Message detected as spam (spam score was ${spamScore})`
@@ -301,6 +338,59 @@ class ForwardEmail {
         // and we also might want to add clamav
         // for attachment scanning to prevent those from going through as well
 
+        // since we're signing our own DKIM signature
+        // we need to delete appropriate headers to prevent failure
+        delete mail.headers['mime-version'];
+        delete mail.headers['content-type'];
+        delete mail.headers['dkim-signature'];
+        delete mail.headers['x-google-dkim-signature'];
+
+        // TODO: auto response for no-reply
+
+        // added support for DMARC validation
+        // recursively lookup the DMARC policy for the `session.clientHostname` TLD
+        // and if it exists then we need to rewrite with a friendly-from
+        // so we need to resolve the TXT record for `_.dmarc.tld`
+        const dmarcRecord = await this.getDMARC(session.clientHostname);
+
+        if (dmarcRecord) {
+          try {
+            const result = dmarcParse(dmarcRecord);
+            if (
+              !_.isObject(result) ||
+              !_.isObject(result.tags) ||
+              !_.isObject(result.tags.p) ||
+              !_.isString(result.tags.p.value)
+            )
+              throw new Error('Invalid DMARC parsed result');
+            // if quarantine or reject then we need to rewrite w/friendly-from
+            if (
+              ['quarantine', 'reject'].includes(
+                result.tags.p.value.toLowerCase().trim()
+              )
+            ) {
+              // preserve user's name
+              const { name } = addressParser(mail.from)[0];
+              mail.replyTo = mail.from;
+              session.envelope.replyTo = mail.from;
+              mail.from = `${name} <${noReply}>`;
+              session.envelope.from = mail.from;
+            }
+          } catch (err) {
+            if (log) console.error(err);
+          }
+        }
+
+        // NOTE: we probably don't need to delete these
+        // but just keeping them here for future reference
+        // delete mail.messageId;
+        // delete mail.headers['x-gm-message-state'];
+        // delete mail.headers['x-google-smtp-source'];
+        // delete mail.headers['x-received'];
+        // delete mail.headers['x-google-address-confirmation'];
+
+        // TODO: note that if one email fails then all will fail right now
+        // send an email to each recipient
         await Promise.all(
           session.envelope.to.map(to => {
             return (async () => {
@@ -349,6 +439,7 @@ class ForwardEmail {
                 dkim
               };
 
+              /*
               // allow Gmail "Send Mail As" by re-writing the FROM of the email
               // (otherwise we receive the following error when connecting to Gmail)
               //
@@ -380,6 +471,7 @@ class ForwardEmail {
               delete email.headers['x-google-smtp-source'];
               delete email.headers['x-received'];
               delete email.headers['x-google-address-confirmation'];
+              */
               const info = await transporter.sendMail(email);
               return info;
             })();
@@ -399,6 +491,7 @@ class ForwardEmail {
         // add a note to email me for help
         err.message +=
           '\n\n If you need help with email-forwarding setup or troubleshooting please visit https://forwardemail.net';
+        if (log) console.error(err);
         fn(err);
       }
     });
@@ -454,9 +547,6 @@ class ForwardEmail {
     stream.pipe(parser);
   }
 
-  // TODO: eBay/PayPal/Google cannot be forwarded so we need alt. solution
-  // or maybe there's a way we can get them to whitelist our server
-  //
   // TODO: we need to add Google Structured Data and then submit whitelist req
 
   //
@@ -493,10 +583,59 @@ class ForwardEmail {
     }
   }
 
+  async getDMARC(hostname) {
+    if (process.env.NODE_ENV === 'test') hostname = 'forwardemail.net';
+    const parsedDomain = parseDomain(hostname);
+    if (!parsedDomain) return false;
+    const entry = `_dmarc.${hostname}`;
+    try {
+      const records = await dns.resolveTxtAsync(entry);
+      // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
+      if (!_.isArray(records) || _.isEmpty(records)) return false;
+      if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
+      // join together the record by space
+      return records[0].join(' ');
+    } catch (err) {
+      if (log) console.error(err);
+      // recursively look up from subdomain to parent domain for record
+      if (err.code === 'ENOTFOUND') {
+        // no dmarc record exists so return `false`
+        if (!parsedDomain.subdomain) return false;
+        // otherwise attempt to lookup the parent domain's DMARC record instead
+        return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
+      }
+      // if there's an error then assume that we need to rewrite
+      // with a friendly-from, for whatever reason
+      return true;
+    }
+  }
+
+  async validateDKIM(rawEmail) {
+    try {
+      const records = await dkimVerify(Buffer.from(rawEmail, 'utf8'));
+      return (
+        _.isArray(records) &&
+        !_.isEmpty(records) &&
+        _.every(
+          records,
+          record =>
+            _.isObject(record) &&
+            _.isBoolean(record.verified) &&
+            record.verified &&
+            _.isString(record.status) &&
+            record.status === DKIM.OK
+        )
+      );
+    } catch (err) {
+      err.responseCode = 421;
+      throw err;
+    }
+  }
+
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await promisify(dns.resolveMx)(domain);
+      const addresses = await dns.resolveMxAsync(domain);
       if (!addresses || addresses.length === 0) throw invalidMXError;
       return addresses;
     } catch (err) {
@@ -506,21 +645,6 @@ class ForwardEmail {
       } else if (!err.responseCode) {
         err.responseCode = 421;
       }
-      throw err;
-    }
-  }
-
-  async validateDKIM(rawEmail) {
-    try {
-      // <https://github.com/jhermsmeier/node-dkim/blob/master/test/verify.js#L35>
-      // const records = await promisify(dkim.verify)(Buffer.from(rawEmail));
-      // const pass =
-      //   records.length > 0 && records.every(record => record.verified);
-      // return pass;
-      const pass = await mailUtilities.validateDkimAsync(rawEmail);
-      return pass;
-    } catch (err) {
-      err.responseCode = 421;
       throw err;
     }
   }
@@ -575,11 +699,12 @@ class ForwardEmail {
   // this returns the forwarding address for a given email address
   async getForwardingAddress(address) {
     const domain = this.parseDomain(address);
-    const records = await promisify(dns.resolveTxt)(domain);
+    const records = await dns.resolveTxtAsync(domain);
 
     // dns TXT record must contain `forward-email=` prefix
     let record;
 
+    // TODO: add support for multi-line TXT records
     for (let i = 0; i < records.length; i++) {
       records[i] = records[i].join(''); // join chunks together
       if (records[i].startsWith('forward-email=')) {
@@ -617,6 +742,8 @@ class ForwardEmail {
     const username = this.parseUsername(address);
 
     for (let i = 0; i < addresses.length; i++) {
+      // convert addresses to lowercase
+      addresses[i] = addresses[i].toLowerCase();
       if (addresses[i].indexOf(':') === -1) {
         if (
           validator.isFQDN(this.parseDomain(addresses[i])) &&

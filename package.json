@@ -24,16 +24,17 @@
     "bluebird": "^3.5.2",
     "bytes": "^3.0.0",
     "common-tags": "^1.8.0",
-    "disposable-email-domains": "^1.0.38",
-    "dkim": "^0.4.1",
-    "email-providers": "^0.30.0",
+    "disposable-email-domains": "^1.0.39",
+    "dkim": "^0.4.4",
+    "dmarc-parse": "^1.0.2",
+    "dnsbl": "^3.1.1",
     "get-port": "^4.0.0",
     "lodash": "^4.17.11",
     "mailin": "^3.0.4",
-    "mailparser": "^2.3.4",
+    "mailparser": "^2.4.0",
     "ms": "^2.1.1",
     "nodemailer": "4.6.8",
-    "parse-domain": "^2.1.2",
+    "parse-domain": "^2.1.6",
     "punycode": "^2.1.1",
     "ratelimiter": "^3.2.0",
     "redis": "^2.8.0",
@@ -138,6 +139,9 @@
     ],
     "ignores": [
       "config.js"
-    ]
+    ],
+    "rules": {
+      "no-use-extend-native/no-use-extend-native": "off"
+    }
   }
 }
