@@ -378,9 +378,12 @@ class ForwardEmail {
               // eslint-disable-next-line max-depth
               if (!mail.replyTo) mail.replyTo = mail.from;
               // eslint-disable-next-line max-depth
+              if (!obj.replyTo) obj.replyTo = mail.from;
+              // eslint-disable-next-line max-depth
               if (!session.envelope.replyTo)
                 session.envelope.replyTo = mail.from;
               mail.from = `${name} <${noReply}>`;
+              obj.from = mail.from;
               session.envelope.from = mail.from;
             }
           } catch (err) {
