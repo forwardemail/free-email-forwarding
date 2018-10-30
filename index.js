@@ -287,7 +287,7 @@ class ForwardEmail {
 
         const spf = await this.validateSPF(
           session.remoteAddress,
-          mail.from,
+          addressParser(mail.from)[0].address,
           session.clientHostname
         );
 
