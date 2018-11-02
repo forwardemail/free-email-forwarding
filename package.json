@@ -39,6 +39,7 @@
     "ratelimiter": "^3.2.0",
     "redis": "^2.8.0",
     "smtp-server": "3.4.7",
+    "underscore.string": "^3.3.5",
     "validator": "^10.8.0"
   },
   "devDependencies": {

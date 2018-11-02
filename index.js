@@ -17,6 +17,7 @@ const nodemailer = require('nodemailer');
 const redis = require('redis');
 const Limiter = require('ratelimiter');
 const ms = require('ms');
+const s = require('underscore.string');
 const domains = require('disposable-email-domains');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const validator = require('validator');
@@ -714,18 +715,23 @@ class ForwardEmail {
     const records = await dns.resolveTxtAsync(domain);
 
     // dns TXT record must contain `forward-email=` prefix
-    let record;
+    const validRecords = [];
 
-    // TODO: add support for multi-line TXT records
+    // add support for multi-line TXT records
     for (let i = 0; i < records.length; i++) {
       records[i] = records[i].join(''); // join chunks together
-      if (records[i].startsWith('forward-email=')) {
-        record = records[i];
-        break;
-      }
+      if (records[i].startsWith('forward-email='))
+        validRecords.push(records[i].replace('forward-email=', ''));
     }
 
-    if (!record) throw invalidTXTError;
+    // join multi-line TXT records together and replace double w/single commas
+    const record = validRecords
+      .join(',')
+      .replace(/,+/g, ',')
+      .trim();
+
+    // if the record was blank then throw an error
+    if (s.isBlank(record)) throw invalidTXTError;
 
     // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
     // record = "forward-email=hello:niftylettuce@gmail.com"
@@ -735,7 +741,6 @@ class ForwardEmail {
     // record = "forward-email=niftylettuce@gmail.com"
     // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
     // record = "forward-email=niftylettuce@gmail.com"
-    record = record.replace('forward-email=', '');
 
     // remove trailing whitespaces from each address listed
     const addresses = record.split(',').map(a => a.trim());
