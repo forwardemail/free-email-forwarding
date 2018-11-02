@@ -6,7 +6,7 @@ let dns = require('dns');
 const punycode = require('punycode/');
 const dmarcParse = require('dmarc-parse');
 const DKIM = require('dkim');
-// const dnsbl = require('dnsbl');
+const dnsbl = require('dnsbl');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
 const { oneLine } = require('common-tags');
@@ -176,7 +176,7 @@ class ForwardEmail {
     return domain;
   }
 
-  onConnect(session, fn) {
+  async onConnect(session, fn) {
     // TODO: this needs tested in production
     // or we need to come up with a better way to do this
     if (process.env.NODE_ENV === 'test') return fn();
@@ -186,33 +186,29 @@ class ForwardEmail {
       err.responseCode = 550;
       return fn(err);
     }
-    fn();
-    // TODO: ensure that it's not on the DNS blacklist
-    /*
-    dnsbl.lookup(
-      session.remoteAddress,
-      'zen.spamhaus.org',
-      {
-        servers
-      },
-      (err, result) => {
-        if (err) {
-          if (log) console.error(err);
-          return fn();
+    // ensure that it's not on the DNS blacklist
+    try {
+      const result = await dnsbl.lookup(
+        session.remoteAddress,
+        'zen.spamhaus.org',
+        {
+          servers
         }
-        if (!result) return fn();
-        const error = new Error(
-          `Your IP address of ${
-            session.remoteAddress
-          } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
-            session.remoteAddress
-          } for more information.`
-        );
-        error.responseCode = 554;
-        return fn(error);
-      }
-    );
-    */
+      );
+      if (!result) return fn();
+      const error = new Error(
+        `Your IP address of ${
+          session.remoteAddress
+        } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
+          session.remoteAddress
+        } for more information.`
+      );
+      error.responseCode = 554;
+      fn(error);
+    } catch (err) {
+      if (log) console.error(err);
+      fn();
+    }
   }
 
   onData(stream, session, fn) {
