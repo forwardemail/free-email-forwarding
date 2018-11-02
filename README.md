@@ -75,7 +75,15 @@
 | ------------------ | :--: | ----------- | --------------------------------------------------------------------------- |
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce@gmail.com,support:niftylettuce@gmail.com` |
 
-> Please note that if you have multiple TXT record lines for `forward-email:` the service will only read the FIRST listed - please ensure you only have one line.
+> As of November 2, 2018 we now have added support for multi-line TXT records!  You can now have an infinite amount of forwarding emails setup – just make sure to not wrap over 255 characters in a single-line and start each line with `forward-email=`.  An example is provided below:
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                                    |
+| ------------------ | :--: | ----------- | --------------------------------------------------------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce@gmail.com,support:niftylettuce@gmail.com` |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=help:niftylettuce@gmail.com,foo:niftylettuce@gmail.com`      |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=orders:niftylettuce@gmail.com,baz:niftylettuce@gmail.com`    |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=info:niftylettuce@gmail.com,beep:niftylettuce@gmail.com`     |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=errors:niftylettuce@gmail.com,boop:niftylettuce@gmail.com`   |
 
 **3.** Set (and customize) the following TXT record for SPF verification for your domain name (this will allow SPF verification to pass):
 
@@ -418,7 +426,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
