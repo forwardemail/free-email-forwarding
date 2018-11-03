@@ -59,11 +59,11 @@
 
 > If you are forwarding all emails from your domain, (`all@niftylettuce.com`, `hello@niftylettuce.com`, etc) to a specific address `niftylettuce@gmail.com`:
 
-| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination               |
-| ------------------ | :--: | ----------- | -------------------------------------- |
-| niftylettuce.com | 3600 | MX          | 10       | mx1.forwardemail.net     |
-| niftylettuce.com | 3600 | MX          | 20       | mx2.forwardemail.net     |
-| niftylettuce.com | 3600 | TXT         | `forward-email=niftylettuce@gmail.com` |
+| Name/Host/Alias  |  TTL | Record Type | Value/Answer/Destination               |                      |
+| ---------------- | :--: | ----------- | -------------------------------------- | -------------------- |
+| niftylettuce.com | 3600 | MX          | 10                                     | mx1.forwardemail.net |
+| niftylettuce.com | 3600 | MX          | 20                                     | mx2.forwardemail.net |
+| niftylettuce.com | 3600 | TXT         | `forward-email=niftylettuce@gmail.com` |                      |
 
 > If you just need to forward a single email address (e.g. `hello@niftylettuce.com` to `niftylettuce@gmail.com`; this will also forward `hello+test@niftylettuce.com` to `niftylettuce+test@gmail.com` automatically):
 
