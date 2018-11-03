@@ -48,7 +48,7 @@
 
 > <u>**IMPORTANT NOTE:**</u> Replace `niftylettuce@gmail.com` below with the email address you want to forward emails to:
 
-**1.** Set the following DNS MX records on your domain name:
+**1.** Set the following DNS MX records on your domain name (having both is required):
 
 | Name/Host/Alias    |  TTL | Record Type | Priority | Value/Answer/Destination |
 | ------------------ | :--: | ----------- | -------- | ------------------------ |
@@ -57,11 +57,13 @@
 
 **2.** Set (and customize) the following DNS TXT records on your domain name:
 
-> If you are forwarding all emails from your domain to a specific address:
+> If you are forwarding all emails from your domain, (`all@niftylettuce.com`, `hello@niftylettuce.com`, etc) to a specific address `niftylettuce@gmail.com`:
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination               |
 | ------------------ | :--: | ----------- | -------------------------------------- |
-| _@ or leave blank_ | 3600 | TXT         | `forward-email=niftylettuce@gmail.com` |
+| niftylettuce.com | 3600 | MX          | 10       | mx1.forwardemail.net     |
+| niftylettuce.com | 3600 | MX          | 20       | mx2.forwardemail.net     |
+| niftylettuce.com | 3600 | TXT         | `forward-email=niftylettuce@gmail.com` |
 
 > If you just need to forward a single email address (e.g. `hello@niftylettuce.com` to `niftylettuce@gmail.com`; this will also forward `hello+test@niftylettuce.com` to `niftylettuce+test@gmail.com` automatically):
 
