@@ -137,7 +137,8 @@ After you've followed the steps above in [How It Works](#how-it-works) you can f
 13. Click `Add Account` to proceed
 14. Open a new tab to [Gmail](https://gmail.com) and wait for your verification email to arrive (you will receive a verification code that confirms you are the owner of the email address you are attempting to "Send Mail As")
 15. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
-16. Done!
+16. Once you've done that, go back to the email and click the link to "confirm the request". You need to do this step and the previous step for the email to be correctly configured.
+17. Done!
 
 
 ## Self-Hosted Requirements
