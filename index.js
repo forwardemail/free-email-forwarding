@@ -349,10 +349,12 @@ class ForwardEmail {
         // TODO: auto response for no-reply
 
         // added support for DMARC validation
-        // recursively lookup the DMARC policy for the `session.clientHostname` TLD
+        // recursively lookup the DMARC policy for the FROM address
         // and if it exists then we need to rewrite with a friendly-from
         // so we need to resolve the TXT record for `_.dmarc.tld`
-        const dmarcRecord = await this.getDMARC(session.clientHostname);
+        const dmarcRecord = await this.getDMARC(
+          addressParser(mail.from)[0].address.split('@')[1]
+        );
 
         if (dmarcRecord) {
           try {
