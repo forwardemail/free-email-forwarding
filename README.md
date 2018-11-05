@@ -284,7 +284,7 @@ yarn add forward-email
 
 ### CLI
 
-Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the example [ecosystem.json](<>) file as an example.  Basically instead of `index` in your `ecosystem.json` file, you will use the globally installed command `forward-email` instead.
+Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the example [ecosystem.json](ecosystem.json) file as an example.  Basically instead of `index` in your `ecosystem.json` file, you will use the globally installed command `forward-email` instead.
 
 ### API
 
