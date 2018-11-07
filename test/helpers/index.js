@@ -1,5 +1,5 @@
 const getPort = require('get-port');
-const redis = require('redis');
+const redis = require('redis-mock');
 
 const ForwardEmail = require('../..');
 
@@ -16,7 +16,9 @@ const beforeEach = t => {
       });
     }),
     (async () => {
-      const forwardEmail = new ForwardEmail();
+      const forwardEmail = new ForwardEmail({
+        limiter: { db: client }
+      });
       const port = await getPort();
       forwardEmail.server = forwardEmail.server.listen(port, () => {
         t.context.forwardEmail = forwardEmail;

@@ -57,6 +57,7 @@
     "lint-staged": "latest",
     "nyc": "latest",
     "prettier": "latest",
+    "redis-mock": "^0.37.0",
     "remark-cli": "latest",
     "remark-preset-github": "latest",
     "shelljs": "^0.8.2",
