@@ -114,8 +114,10 @@ class ForwardEmail {
     };
 
     // setup rate limiting with redis
+    if (!('db' in this.config.limiter)) {
+      this.config.limiter.db = redis.createClient();
+    }
     this.limiter = {
-      db: redis.createClient(),
       max: 100, // max requests within duration
       duration: ms('1h'),
       ...this.config.limiter

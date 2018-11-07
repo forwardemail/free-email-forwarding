@@ -10,6 +10,7 @@ const nodemailer = require('nodemailer');
 const Client = require('nodemailer/lib/smtp-connection');
 const domains = require('disposable-email-domains');
 const { oneLine } = require('common-tags');
+const redis = require('redis-mock');
 
 const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
@@ -20,7 +21,10 @@ test.beforeEach(beforeEach);
 test.afterEach(afterEach);
 
 test('returns itself', t => {
-  t.true(new ForwardEmail() instanceof ForwardEmail);
+  const forwardEmail = new ForwardEmail({
+    limiter: { db: redis.createClient() }
+  });
+  t.true(forwardEmail instanceof ForwardEmail);
 });
 
 test('binds context', t => {
