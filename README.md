@@ -20,13 +20,11 @@
 * [CLI](#cli)
 * [API](#api)
 * [Usage](#usage)
-
   * [CLI](#cli-1)
   * [API](#api-1)
 * [Service-Level Agreement](#service-level-agreement)
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
-
   * [Why did I create this service](#why-did-i-create-this-service)
   * [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
   * [How is it free](#how-is-it-free)
@@ -414,7 +412,7 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 6. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
 
-7. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe <mailto:john@domain.com>").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
+7. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe [john@domain.com](mailto:john@domain.com)").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
 
 ### Can I "send mail as" with this
 

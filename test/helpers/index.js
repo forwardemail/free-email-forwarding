@@ -20,8 +20,12 @@ const beforeEach = t => {
         limiter: { db: client }
       });
       const port = await getPort();
-      forwardEmail.server = forwardEmail.server.listen(port, () => {
-        t.context.forwardEmail = forwardEmail;
+
+      await new Promise(resolve => {
+        forwardEmail.server = forwardEmail.server.listen(port, () => {
+          t.context.forwardEmail = forwardEmail;
+          resolve();
+        });
       });
     })()
   ]);
