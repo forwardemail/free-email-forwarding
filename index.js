@@ -1,7 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-let dns = require('dns');
+const dns = require('dns');
 // const { Resolver } = require('dns');
 const punycode = require('punycode/');
 const dmarcParse = require('dmarc-parse');
@@ -27,13 +27,6 @@ const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
 let mailUtilities = require('mailin/lib/mailUtilities.js');
 
-// TODO: eventually set 127.0.0.1 as DNS server
-// for both `dnsbl` and `dns` usage
-// https://gist.github.com/zhurui1008/48130439a079a3c23920
-// currently we use Open DNS instead
-// 208.67.222.222 and 208.67.220.220
-const servers = ['208.67.222.222', '208.67.220.220'];
-
 // currently running into this error when using this code:
 // `Error: Mail command failed: 421 Cannot read property '_handle' of undefined`
 // const resolver = new Resolver();
@@ -47,16 +40,11 @@ const blacklist = require('./blacklist');
 
 mailUtilities = Promise.promisifyAll(mailUtilities);
 
-dns = Promise.promisifyAll(dns);
-dns.setServers(servers);
-
 const invalidTXTError = new Error('Invalid forward-email TXT record');
 invalidTXTError.responseCode = 550;
 
 const invalidMXError = new Error('Sender has invalid MX records');
 invalidMXError.responseCode = 550;
-
-const noReply = 'no-reply@forwardemail.net';
 
 const headers = [
   'subject',
@@ -76,30 +64,19 @@ const log = process.env.NODE_ENV !== 'production';
 
 class ForwardEmail {
   constructor(config = {}) {
-    config = {
-      smtp: {},
-      limiter: {},
-      exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
-      ...config
+    this.ssl = {
+      secure: false,
+      ...config.ssl
     };
 
-    const ssl = {};
-    if (process.env.NODE_ENV === 'production') {
-      ssl.secure = process.env.SECURE === 'true';
-      // ssl.needsUpgrade = true;
-      ssl.key = fs.readFileSync(
-        '/home/deploy/mx1.forwardemail.net.key',
-        'utf8'
-      );
-      ssl.cert = fs.readFileSync(
-        '/home/deploy/mx1.forwardemail.net.cert',
-        'utf8'
-      );
-      ssl.ca = fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8');
-    }
-    this.ssl = ssl;
-
     this.config = {
+      // TODO: eventually set 127.0.0.1 as DNS server
+      // for both `dnsbl` and `dns` usage
+      // https://gist.github.com/zhurui1008/48130439a079a3c23920
+      // currently we use Open DNS instead
+      // 208.67.222.222 and 208.67.220.220
+      dns: ['208.67.222.222', '208.67.220.220'],
+      noReply: 'no-reply@forwardemail.net',
       smtp: {
         size: bytes('25mb'),
         onConnect: this.onConnect.bind(this),
@@ -107,13 +84,16 @@ class ForwardEmail {
         onMailFrom: this.onMailFrom.bind(this),
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
-        ...ssl,
         logInfo: log,
         logger: log,
-        ...config.smtp
+        ...config.smtp,
+        ...this.ssl
       },
       limiter: { ...config.limiter },
-      exchanges: config.exchanges
+      ssl: this.ssl,
+      exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+      dkim: {},
+      ...config
     };
 
     // setup rate limiting with redis
@@ -126,6 +106,9 @@ class ForwardEmail {
 
     // setup our smtp server which listens for incoming email
     this.server = new SMTPServer(this.config.smtp);
+
+    this.dns = Promise.promisifyAll(dns);
+    this.dns.setServers(this.config.dns);
 
     autoBind(this);
   }
@@ -192,7 +175,7 @@ class ForwardEmail {
         session.remoteAddress,
         'zen.spamhaus.org',
         {
-          servers
+          servers: this.config.dns
         }
       );
       if (!result) return fn();
@@ -381,7 +364,7 @@ class ForwardEmail {
               // eslint-disable-next-line max-depth
               if (!session.envelope.replyTo)
                 session.envelope.replyTo = mail.from;
-              mail.from = `${name} <${noReply}>`;
+              mail.from = `${name} <${this.config.noReply}>`;
               obj.from = mail.from;
               session.envelope.from = mail.from;
             }
@@ -425,27 +408,10 @@ class ForwardEmail {
               // verify transport
               // await transporter.verify();
 
-              const dkim = {};
-              if (process.env.NODE_ENV === 'production') {
-                dkim.domainName = 'forwardemail.net';
-                dkim.keySelector = 'default';
-                dkim.privateKey = fs.readFileSync(
-                  '/home/deploy/dkim-private.key',
-                  'utf8'
-                );
-              } else if (process.env.NODE_ENV === 'test') {
-                dkim.domainName = 'forwardemail.net';
-                dkim.keySelector = 'default';
-                dkim.privateKey = fs.readFileSync(
-                  path.join(__dirname, 'dkim-private.key'),
-                  'utf8'
-                );
-              }
-
               const email = {
                 ...obj,
                 envelope: session.envelope,
-                dkim
+                dkim: this.config.dkim
               };
 
               /*
@@ -821,7 +787,41 @@ class ForwardEmail {
 }
 
 if (!module.parent) {
-  const forwardEmail = new ForwardEmail();
+  const config = {
+    noReply: 'no-reply@forwardemail.net',
+    exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+    ssl: {},
+    dkim: {}
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    // needsUpgrade = true;
+    config.ssl = {
+      secure: process.env.SECURE === 'true',
+      key: fs.readFileSync('/home/deploy/mx1.forwardemail.net.key', 'utf8'),
+      cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
+      ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
+    };
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    config.dkim = {
+      domainName: 'forwardemail.net',
+      keySelector: 'default',
+      privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8')
+    };
+  } else if (process.env.NODE_ENV === 'test') {
+    config.dkim = {
+      domainName: 'forwardemail.net',
+      keySelector: 'default',
+      privateKey: fs.readFileSync(
+        path.join(__dirname, 'dkim-private.key'),
+        'utf8'
+      )
+    };
+  }
+
+  const forwardEmail = new ForwardEmail(config);
   forwardEmail.server.listen(process.env.PORT || 25);
 }
 
