@@ -4,6 +4,7 @@ const path = require('path');
 const dns = require('dns');
 // const { Resolver } = require('dns');
 const punycode = require('punycode/');
+const isCI = require('is-ci');
 const dmarcParse = require('dmarc-parse');
 const DKIM = require('dkim');
 const dnsbl = require('dnsbl');
@@ -71,7 +72,7 @@ class ForwardEmail {
       ...config.ssl
     };
 
-    if (process.env.NODE_ENV === 'test')
+    if (process.env.NODE_ENV === 'test' && !isCI)
       config.dkim = {
         domainName: 'forwardemail.net',
         keySelector: 'default',
