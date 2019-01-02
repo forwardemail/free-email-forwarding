@@ -62,6 +62,8 @@ const headers = [
 
 const log = process.env.NODE_ENV !== 'production';
 
+if (log) Error.stackTraceLimit = Infinity;
+
 class ForwardEmail {
   constructor(config = {}) {
     this.ssl = {
@@ -69,12 +71,21 @@ class ForwardEmail {
       ...config.ssl
     };
 
+    if (process.env.NODE_ENV === 'test')
+      config.dkim = {
+        domainName: 'forwardemail.net',
+        keySelector: 'default',
+        privateKey: fs.readFileSync(
+          path.join(__dirname, 'dkim-private.key'),
+          'utf8'
+        )
+      };
+
     this.config = {
       // TODO: eventually set 127.0.0.1 as DNS server
       // for both `dnsbl` and `dns` usage
       // https://gist.github.com/zhurui1008/48130439a079a3c23920
       // currently we use Open DNS instead
-      // 208.67.222.222 and 208.67.220.220
       dns: ['208.67.222.222', '208.67.220.220'],
       noReply: 'no-reply@forwardemail.net',
       smtp: {
@@ -222,6 +233,21 @@ class ForwardEmail {
             }
           }
         });
+
+        if (
+          _.some(
+            session.envelope.rcptTo,
+            to => to.address === this.config.noReply
+          )
+        ) {
+          const err = new Error(
+            oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${
+              this.config.noReply
+            }>`
+          );
+          err.responseCode = 550;
+          throw err;
+        }
 
         const rcptTo = session.envelope.rcptTo.map(to => {
           return async () => {
@@ -414,39 +440,6 @@ class ForwardEmail {
                 dkim: this.config.dkim
               };
 
-              /*
-              // allow Gmail "Send Mail As" by re-writing the FROM of the email
-              // (otherwise we receive the following error when connecting to Gmail)
-              //
-              // 550-5.7.1 Unauthenticated email from google.com is not accepted due
-              // to domain's DMARC policy. Please contact the administrator of
-              // google.com domain if this was a legitimate mail. Please visit
-              // https://support.google.com/mail/answer/2451690 to learn about the
-              // DMARC initiative
-              //
-              // Note that the email is from "gmail-noreply@google.com" therefore
-              // we can rewrite the "from" of the email if it matches this exactly
-              if (email.envelope.from === 'gmail-noreply@google.com') {
-                // validate clientHostname domain is gmail
-                const parsedDomain = parseDomain(session.clientHostname);
-                if (
-                  `${parsedDomain.domain}.${parsedDomain.tld}` === 'google.com'
-                ) {
-                  email.from = email.to;
-                  session.envelope.from = session.envelope.to;
-                }
-              }
-
-              delete email.messageId;
-              delete email.headers['mime-version'];
-              delete email.headers['content-type'];
-              delete email.headers['dkim-signature'];
-              delete email.headers['x-google-dkim-signature'];
-              delete email.headers['x-gm-message-state'];
-              delete email.headers['x-google-smtp-source'];
-              delete email.headers['x-received'];
-              delete email.headers['x-google-address-confirmation'];
-              */
               const info = await transporter.sendMail(email);
               return info;
             })();
@@ -614,7 +607,7 @@ class ForwardEmail {
       const domain = this.parseDomain(address);
       const addresses = await dns.resolveMxAsync(domain);
       if (!addresses || addresses.length === 0) throw invalidMXError;
-      return addresses;
+      return _.sortBy(addresses, 'priority');
     } catch (err) {
       if (/queryMx ENODATA/.test(err) || /queryTxt ENOTFOUND/.test(err)) {
         err.message = invalidMXError.message;
@@ -802,22 +795,10 @@ if (!module.parent) {
       cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
       ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
     };
-  }
-
-  if (process.env.NODE_ENV === 'production') {
     config.dkim = {
       domainName: 'forwardemail.net',
       keySelector: 'default',
       privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8')
-    };
-  } else if (process.env.NODE_ENV === 'test') {
-    config.dkim = {
-      domainName: 'forwardemail.net',
-      keySelector: 'default',
-      privateKey: fs.readFileSync(
-        path.join(__dirname, 'dkim-private.key'),
-        'utf8'
-      )
     };
   }
 

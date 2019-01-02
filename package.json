@@ -33,7 +33,7 @@
     "mailin": "^3.0.4",
     "mailparser": "^2.4.3",
     "ms": "^2.1.1",
-    "nodemailer": "4.7.0",
+    "nodemailer": "5.0.0",
     "parse-domain": "^2.1.7",
     "punycode": "^2.1.1",
     "ratelimiter": "^3.2.0",
@@ -45,7 +45,7 @@
   "devDependencies": {
     "@commitlint/cli": "latest",
     "@commitlint/config-conventional": "latest",
-    "auto-bind": "^1.2.1",
+    "auto-bind": "^2.0.0",
     "ava": "latest",
     "codecov": "latest",
     "cross-env": "latest",

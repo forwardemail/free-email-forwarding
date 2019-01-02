@@ -310,6 +310,34 @@ test('rejects a disposable email sender', async t => {
   });
 });
 
+test('rejects an email to no-reply@forwardemail.net', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    from: 'foo@forwardemail.net',
+    to: 'Niftylettuce <no-reply@forwardemail.net>',
+    subject: 'test',
+    text: 'test text',
+    html: '<strong>test html</strong>'
+  });
+  return new Promise(resolve => {
+    connection.on('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err.responseCode, 550);
+        t.regex(
+          err.message,
+          /You need to reply to the "Reply-To" email address on the email; do not send messages to <no-reply@forwardemail.net>/
+        );
+        connection.quit();
+      });
+    });
+  });
+});
+
 // eslint-disable-next-line ava/no-todo-test
 test.todo('rejects invalid dkim signature');
 // eslint-disable-next-line ava/no-todo-test
