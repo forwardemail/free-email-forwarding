@@ -294,7 +294,8 @@ class ForwardEmail {
 
         const spf = await this.validateSPF(
           session.remoteAddress,
-          addressParser(mail.from)[0].address,
+          session.envelope.from,
+          // addressParser(mail.from)[0].address,
           session.clientHostname
         );
 
@@ -363,7 +364,8 @@ class ForwardEmail {
         // and if it exists then we need to rewrite with a friendly-from
         // so we need to resolve the TXT record for `_.dmarc.tld`
         const dmarcRecord = await this.getDMARC(
-          addressParser(mail.from)[0].address.split('@')[1]
+          session.envelope.from.split('@')[1]
+          // addressParser(mail.from)[0].address.split('@')[1]
         );
 
         if (dmarcRecord) {
