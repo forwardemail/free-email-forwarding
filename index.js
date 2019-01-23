@@ -105,6 +105,7 @@ class ForwardEmail {
       ssl: this.ssl,
       exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
       dkim: {},
+      maxForwardedAddresses: 10,
       ...config
     };
 
@@ -252,10 +253,20 @@ class ForwardEmail {
 
         const rcptTo = session.envelope.rcptTo.map(to => {
           return async () => {
-            const address = await this.getForwardingAddress(to.address);
+            let addresses = await this.getForwardingAddresses(to.address);
+            if (addresses.length > this.config.maxForwardedAddresses) {
+              if (this.config.maxForwardedAddresses > 0) {
+                addresses = addresses.slice(
+                  0,
+                  this.config.maxForwardedAddresses - 1
+                );
+              } else {
+                addresses = [];
+              }
+            }
             return {
               ...to,
-              address
+              ...addresses
             };
           };
         });
@@ -669,8 +680,7 @@ class ForwardEmail {
     }
   }
 
-  // this returns the forwarding address for a given email address
-  async getForwardingAddress(address) {
+  async parseDNSRecords(address) {
     const domain = this.parseDomain(address);
     const records = await dns.resolveTxtAsync(domain);
 
@@ -703,12 +713,28 @@ class ForwardEmail {
     // record = "forward-email=niftylettuce@gmail.com"
 
     // remove trailing whitespaces from each address listed
-    const addresses = record.split(',').map(a => a.trim());
+    return record.split(',').map(a => a.trim());
+  }
+
+  // check if the forwarded address will itself be forwarded somewhere
+  async isAlsoForwarded(forwardedAddress) {
+    let addresses;
+    try {
+      addresses = await this.parseDNSRecords(forwardedAddress);
+    } catch (err) {
+      return false;
+    }
+    return addresses.len > 0;
+  }
+
+  // this returns the forwarding addresses for a given email address
+  async getForwardingAddresses(address) {
+    const addresses = await this.parseDNSRecords(address);
 
     if (addresses.length === 0) throw invalidTXTError;
 
-    // store if we have a forwarding address or not
-    let forwardingAddress;
+    // store if we have forwarding addresses or not
+    let forwardingAddresses;
 
     // store if we have a global redirect or not
     let globalForwardingAddress;
@@ -737,32 +763,41 @@ class ForwardEmail {
 
         // check if we have a match
         if (username === address[0]) {
-          forwardingAddress = address[1];
-          break;
+          // make sure that the forwarding address is not itself forwarded somewhere, to avoid
+          // cascading forwarding
+          if (!this.isAlsoForwarded(address[1])) {
+            forwardingAddresses.push(address[1]);
+          }
         }
       }
     }
 
     // if we don't have a specific forwarding address try the global redirect
-    if (!forwardingAddress && globalForwardingAddress)
-      forwardingAddress = globalForwardingAddress;
+    if (!forwardingAddresses && globalForwardingAddress)
+      forwardingAddresses.push(globalForwardingAddress);
 
     // if we don't have a forwarding address then throw an error
-    if (!forwardingAddress) throw invalidTXTError;
+    if (!forwardingAddresses) throw invalidTXTError;
+
+    // if there are too many forwarding addresses then throw an error
+    if (forwardingAddresses.length > this.config.maxForwardedAddresses)
+      throw invalidTXTError;
 
     // otherwise transform the + symbol filter if we had it
     // and then resolve with the newly formatted forwarding address
-    if (address.indexOf('+') === -1) return forwardingAddress;
+    if (address.indexOf('+') === -1) return forwardingAddresses;
 
-    return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
-      address
-    )}@${this.parseDomain(forwardingAddress)}`;
+    return forwardingAddresses.map(faddr => {
+      return `${this.parseUsername(faddr)}+${this.parseFilter(
+        address
+      )}@${this.parseDomain(faddr)}`;
+    });
   }
 
   async onRcptTo(address, session, fn) {
     try {
       // validate forwarding address by looking up TXT record `forward-email=`
-      await this.getForwardingAddress(address.address);
+      await this.getForwardingAddresses(address.address);
 
       // validate MX records exist and contain ours
       const addresses = await this.validateMX(address.address);
