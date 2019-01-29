@@ -384,24 +384,26 @@ Yes, absolutely.  For example if you're sending an email to `hello@niftylettuce.
 
 Per documentation and suggestions from Google at <https://support.google.com/a/answer/175365?hl=en>, along with best practice, including:
 
-1. SpamAssassin - using `spamc` client to check emails and automatically reject them if they're marked as spam
+1. DNSBL - we test senders IP's against the `zen.spamhaus.org` DNS blacklist
+
+2. SpamAssassin - using `spamc` client to check emails and automatically reject them if they're marked as spam
 
    * Checks daily for updated rules
    * Spam score threshold of `5.0`
    * Uses bayes theorem and auto learning
    * Uses [other improvements](https://wiki.apache.org/spamassassin/ImproveAccuracy)
 
-2. SPF/DKIM - through checking if an SPF record exists for a sender, and if so, we reverse-lookup the SMTP connection's remote address to validate it matches the SPF record, otherwise it's rejected.  If an SPF record does not exist, then we require DKIM verification.  If DKIM headers are passed and fail, then it is rejected as well.
+3. SPF/DKIM - through checking if an SPF record exists for a sender, and if so, we reverse-lookup the SMTP connection's remote address to validate it matches the SPF record, otherwise it's rejected.  If an SPF record does not exist, then we require DKIM verification.  If DKIM headers are passed and fail, then it is rejected as well.
 
-3. MX - through checking if the sender's from address domain has MX records (so it's actually coming from a mail exchange/SMTP server), otherwise it's rejected
+4. MX - through checking if the sender's from address domain has MX records (so it's actually coming from a mail exchange/SMTP server), otherwise it's rejected
 
-4. Disposable Email Addresses - we automatically block senders that are from the [disposable-email-domains][] list
+5. Disposable Email Addresses - we automatically block senders that are from the [disposable-email-domains][] list
 
-5. FQDN - validates that senders SMTP connections are from FQDN (meaning no IP addresses, they must have a valid domain name resolved)
+6. FQDN - validates that senders SMTP connections are from FQDN (meaning no IP addresses, they must have a valid domain name resolved)
 
-6. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
+7. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
 
-7. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe [john@domain.com](mailto:john@domain.com)").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
+8. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe [john@domain.com](mailto:john@domain.com)").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
 
 ### Can I "send mail as" with this
 
