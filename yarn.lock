@@ -1094,10 +1094,10 @@ builtin-modules@^1.0.0:
   resolved "https://registry.yarnpkg.com/builtin-modules/-/builtin-modules-1.1.1.tgz#270f076c5a72c02f5b65a47df94c5fe3a278892f"
   integrity sha1-Jw8HbFpywC9bZaR9+Uxf46J4iS8=
 
-bytes@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/bytes/-/bytes-3.0.0.tgz#d32815404d689699f85a4ea4fa8755dd13a96048"
-  integrity sha1-0ygVQE1olpn4Wk6k+odV3ROpYEg=
+bytes@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/bytes/-/bytes-3.1.0.tgz#f6cf7933a360e0588fa9fde85651cdc7f805d1f6"
+  integrity sha512-zauLjrfCG+xvoyaqLoV8bLVXXNGC4JqlxFCutSDWA6fJrTo2ZuvLYTqZ7aHBLZSMOopbzwv8f+wZcVzfVTI2Dg==
 
 cache-base@^1.0.1:
   version "1.0.1"
@@ -1980,10 +1980,10 @@ dir-glob@^2.0.0:
     arrify "^1.0.1"
     path-type "^3.0.0"
 
-disposable-email-domains@^1.0.41:
-  version "1.0.41"
-  resolved "https://registry.yarnpkg.com/disposable-email-domains/-/disposable-email-domains-1.0.41.tgz#743645da773f2ce33869421280bdc9bfc605d1e2"
-  integrity sha512-+ix6IQfuxaChmqLW0ahKlw1ArHL2lYsygfqnVlfadXiyFimMuCu+A+wkKQ0bEMBc7b34+DcuITeRy8cpJ9mvGw==
+disposable-email-domains@^1.0.42:
+  version "1.0.42"
+  resolved "https://registry.yarnpkg.com/disposable-email-domains/-/disposable-email-domains-1.0.42.tgz#dff45aabcb80060f78ebb8968684fb5025c8ec9c"
+  integrity sha512-PaBTL1gKud47GS4r/3V5v82DMfbjbOQRP8DfBzCmaAyvDmIaa/+D3ZQcGU1wKCRJY4zVWLQ/uPVWq5n1lt6ikw==
 
 dkim-key@^1.2.0:
   version "1.2.0"
@@ -2921,7 +2921,7 @@ get-own-enumerable-property-symbols@^3.0.0:
   resolved "https://registry.yarnpkg.com/get-own-enumerable-property-symbols/-/get-own-enumerable-property-symbols-3.0.0.tgz#b877b49a5c16aefac3655f2ed2ea5b684df8d203"
   integrity sha512-CIJYJC4GGF06TakLg8z4GQKvDsx9EMspVxOYih7LerEL/WosUnFIww45CGfxfeKHqlg3twgUrYRT1O3WQqjGCg==
 
-get-port@^4.0.0:
+get-port@^4.0.0, get-port@^4.1.0:
   version "4.1.0"
   resolved "https://registry.yarnpkg.com/get-port/-/get-port-4.1.0.tgz#93eb3d5552c197497d76e9c389a6ac9920e20192"
   integrity sha512-4/fqAYrzrzOiqDrdeZRKXGdTGgbkfTEumGlNQPeP6Jy8w0PzN9mzeNQ3XgHaTNie8pQ3hOUkrwlZt2Fzk5H9mA==
@@ -5026,6 +5026,11 @@ nodemailer@5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.0.0.tgz#bcb409eca613114e85de42646d0ce7f1fa70b716"
   integrity sha512-XI4PI5L7GYcJyHkPcHlvPyRrYohNYBNRNbt1tU8PXNU3E1ADJC84a13V0vbL9AM431OP+ETacaGXAF8fGn1JvA==
+
+nodemailer@5.1.1:
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.1.1.tgz#0c48d1ecab02e86d9ff6c620ee75ed944b763505"
+  integrity sha512-hKGCoeNdFL2W7S76J/Oucbw0/qRlfG815tENdhzcqTpSjKgAN91mFOqU2lQUflRRxFM7iZvCyaFcAR9noc/CqQ==
 
 nopt@^4.0.1:
   version "4.0.1"
@@ -7144,14 +7149,14 @@ slide@^1.1.5:
   resolved "https://registry.yarnpkg.com/slide/-/slide-1.1.6.tgz#56eb027d65b4d2dce6cb2e2d32c4d4afc9e1d707"
   integrity sha1-VusCfWW00tzmyy4tMsTUr8nh1wc=
 
-smtp-server@3.4.7:
-  version "3.4.7"
-  resolved "https://registry.yarnpkg.com/smtp-server/-/smtp-server-3.4.7.tgz#61e049523a1148ff772525af81388bb6203905cd"
-  integrity sha512-d/r/Y8LBJKQ6DEPtAWA9mJoLvCZ5lWK+t/i2wHGJdBIKks8AkVoLwTqoZ6YubgRxayR/A4UcAqmabUu0WMuX4A==
+smtp-server@3.5.0:
+  version "3.5.0"
+  resolved "https://registry.yarnpkg.com/smtp-server/-/smtp-server-3.5.0.tgz#eb2e7bd52f26b4136b9dfc2c9fa0ba70e18cdc81"
+  integrity sha512-7FUg09H1VmqMRlUq/QdkPxn/NK8VCFw7GMU5rdWWDbS00wbLhjRBe3Lme+AamjDSmVoP6e/WqFqsa7jVI+69pg==
   dependencies:
     base32.js "0.1.0"
     ipv6-normalize "1.0.1"
-    nodemailer "4.6.8"
+    nodemailer "5.0.0"
 
 smtp-server@^1.4.0:
   version "1.17.0"
@@ -8071,10 +8076,10 @@ validate-npm-package-license@^3.0.1:
     spdx-correct "^3.0.0"
     spdx-expression-parse "^3.0.0"
 
-validator@^10.9.0:
-  version "10.10.0"
-  resolved "https://registry.yarnpkg.com/validator/-/validator-10.10.0.tgz#a69ac298149f063a44361cb52182edb52dab59a4"
-  integrity sha512-DyZyLJlMXM3CGdVaVHE/EDzCagMRoPI3mmGdxxNQbqkGqh56+M3d1i0ZAWd69En8U21DHbPTn12aOdhO+hfm5w==
+validator@^10.11.0:
+  version "10.11.0"
+  resolved "https://registry.yarnpkg.com/validator/-/validator-10.11.0.tgz#003108ea6e9a9874d31ccc9e5006856ccd76b228"
+  integrity sha512-X/p3UZerAIsbBfN/IwahhYaBbY68EN/UQBWHtsbXGT5bfrH/p4NQzUCG1kF/rtKaNpnJ7jAu6NGTdSNtyNIXMw==
 
 verror@1.10.0:
   version "1.10.0"
