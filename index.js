@@ -352,8 +352,8 @@ class ForwardEmail {
 
         // since we're signing our own DKIM signature
         // we need to delete appropriate headers to prevent failure
-        // delete mail.headers['mime-version'];
-        // delete mail.headers['content-type'];
+        delete mail.headers['mime-version'];
+        delete mail.headers['content-type'];
         delete mail.headers['dkim-signature'];
         delete mail.headers['x-google-dkim-signature'];
 
