@@ -9,7 +9,6 @@ const test = require('ava');
 const nodemailer = require('nodemailer');
 const Client = require('nodemailer/lib/smtp-connection');
 const domains = require('disposable-email-domains');
-const { oneLine } = require('common-tags');
 
 const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
@@ -103,7 +102,7 @@ test('rejects forwarding a non-registered email address', async t => {
   });
 });
 
-test('rejects forwarding an email without dkim and spf', async t => {
+test('allows forwarding an email without dkim and spf', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -122,11 +121,7 @@ test('rejects forwarding an email without dkim and spf', async t => {
     connection.on('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
-        t.is(err.responseCode, 550);
-        t.is(
-          err.message,
-          oneLine`Message failed: 550 Please ensure the email service you are sending from either has SPF or DKIM.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").`
-        );
+        t.is(err, null);
         connection.quit();
       });
     });
