@@ -102,31 +102,32 @@ test('rejects forwarding a non-registered email address', async t => {
   });
 });
 
-test('allows forwarding an email without dkim and spf', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: 'ForwardEmail <from@forwardemail.net>',
-    to: 'Niftylettuce <hello@niftylettuce.com>',
-    cc: 'cc@niftylettuce.com',
-    subject: 'test',
-    text: 'test text',
-    html: '<strong>test html</strong>',
-    attachments: []
-  });
-  return new Promise(resolve => {
-    connection.on('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
-        t.is(err, null);
-        connection.quit();
+if (!isCI)
+  test('allows forwarding an email without dkim and spf', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      from: 'ForwardEmail <from@forwardemail.net>',
+      to: 'Niftylettuce <hello@niftylettuce.com>',
+      cc: 'cc@niftylettuce.com',
+      subject: 'test',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: []
+    });
+    return new Promise(resolve => {
+      connection.on('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          t.is(err, null);
+          connection.quit();
+        });
       });
     });
   });
-});
 
 if (!isCI)
   test('forwards an email with dkim', async t => {
