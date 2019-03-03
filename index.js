@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const dns = require('dns');
 // const { Resolver } = require('dns');
 const punycode = require('punycode/');
@@ -65,6 +66,23 @@ const log = process.env.NODE_ENV !== 'production';
 
 if (log) Error.stackTraceLimit = Infinity;
 
+// taken from:
+// node_modules/nodemailer/lib/mime-node/index.js
+function createMessageID(session) {
+  return (
+    '<' +
+    [2, 2, 2, 6].reduce(
+      // crux to generate UUID-like random strings
+      (prev, len) => prev + '-' + crypto.randomBytes(len).toString('hex'),
+      crypto.randomBytes(4).toString('hex')
+    ) +
+    '@' +
+    // try to use the domain of the FROM address
+    session.envelope.mailFrom.address.split('@').pop() +
+    '>'
+  );
+}
+
 class ForwardEmail {
   constructor(config = {}) {
     this.ssl = {
@@ -123,6 +141,17 @@ class ForwardEmail {
     this.dns.setServers(this.config.dns);
 
     autoBind(this);
+  }
+
+  rewriteFriendlyFrom(mail, obj, session) {
+    // preserve user's name
+    const { name } = addressParser(mail.from)[0];
+    if (!mail.replyTo) mail.replyTo = mail.from;
+    if (!obj.replyTo) obj.replyTo = mail.from;
+    if (!session.envelope.replyTo) session.envelope.replyTo = mail.from;
+    mail.from = `${name} <${this.config.noReply}>`;
+    obj.from = mail.from;
+    session.envelope.from = mail.from;
   }
 
   parseUsername(address) {
@@ -253,6 +282,14 @@ class ForwardEmail {
         const rcptTo = session.envelope.rcptTo.map(to => {
           return async () => {
             const address = await this.getForwardingAddress(to.address);
+            // Gmail won't show the message in the inbox if it's sending FROM
+            // the same address that gets forwarded TO using our service
+            // (we can assume that other mail providers do the same)
+            const fromAddress = addressParser(mail.from)[0].address;
+            if (address === fromAddress) {
+              if (mail.messageId) mail.inReplyTo = mail.messageId;
+              mail.messageId = createMessageID(session);
+            }
             return {
               ...to,
               address
@@ -357,8 +394,6 @@ class ForwardEmail {
         delete mail.headers['dkim-signature'];
         delete mail.headers['x-google-dkim-signature'];
 
-        // TODO: auto response for no-reply
-
         // added support for DMARC validation
         // recursively lookup the DMARC policy for the FROM address
         // and if it exists then we need to rewrite with a friendly-from
@@ -383,20 +418,8 @@ class ForwardEmail {
               ['quarantine', 'reject'].includes(
                 result.tags.p.value.toLowerCase().trim()
               )
-            ) {
-              // preserve user's name
-              const { name } = addressParser(mail.from)[0];
-              // eslint-disable-next-line max-depth
-              if (!mail.replyTo) mail.replyTo = mail.from;
-              // eslint-disable-next-line max-depth
-              if (!obj.replyTo) obj.replyTo = mail.from;
-              // eslint-disable-next-line max-depth
-              if (!session.envelope.replyTo)
-                session.envelope.replyTo = mail.from;
-              mail.from = `${name} <${this.config.noReply}>`;
-              obj.from = mail.from;
-              session.envelope.from = mail.from;
-            }
+            )
+              this.rewriteFriendlyFrom(mail, obj, session);
           } catch (err) {
             if (log) console.error(err);
           }
