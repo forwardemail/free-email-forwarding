@@ -30,7 +30,7 @@
     "dnsbl": "^3.1.1",
     "get-port": "^4.1.0",
     "lodash": "^4.17.11",
-    "mailin": "^3.0.4",
+    "mailin": "https://github.com/niftylettuce/mailin.git",
     "mailparser": "^2.4.3",
     "ms": "^2.1.1",
     "nodemailer": "5.1.1",
