@@ -608,8 +608,9 @@ class ForwardEmail {
     try {
       const records = await dkimVerify(Buffer.from(rawEmail, 'utf8'));
       return (
-        _.isArray(records) &&
-        !_.isEmpty(records) &&
+        // if there's no DKIM on the email to begin with this should pass
+        !_.isArray(records) ||
+        _.isEmpty(records) ||
         _.every(
           records,
           record =>
