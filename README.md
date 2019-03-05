@@ -85,13 +85,13 @@
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=info:niftylettuce@gmail.com,beep:niftylettuce@gmail.com`     |
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=errors:niftylettuce@gmail.com,boop:niftylettuce@gmail.com`   |
 
-**3.** Set (and customize) the following TXT record for SPF verification for your domain name (this will allow SPF verification to pass):
+**3.** Set (and customize) the following SPF record for SPF verification for your domain name (this will allow SPF verification to pass, note that you may need to enclose this value in quotes if you are using Amazon Route53):
 
 > If you're using a service like AWS Route 53, then edit your existing TXT record and add the following as a new line:
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                        |
 | ------------------ | :--: | ----------- | ----------------------------------------------- |
-| _@ or leave blank_ | 3600 | TXT         | `v=spf1 a mx include:spf.forwardemail.net -all` |
+| _@ or leave blank_ | 3600 | SPF         | `v=spf1 a mx include:spf.forwardemail.net -all` |
 
 > If you already have a similar line with `v=spf1`, then you'll need to append `include:spf.forwardemail.net` right before any existing `include:host.com` records and before the `-all` in the same line (e.g. `v=spf1 a mx include:spf.forwardemail.net include:host.com -all`).
 >
@@ -243,6 +243,8 @@ You'll also need the following dependencies installed:
     ```log
     "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCojharU7eJW+eaLulQygsc/AHx2A0gyLnSU2fPGs8mI3Fhs3EVIIRP01euHg+IljMmXz9YtU+XMfZuYdSCa9NY16XjoIgub2+lkeiHHNpURIpwQJSeHxviMOfMAZ5/xSTDDoaYY2vcKytheZeLAVK2V1SuTdTp+C6B9E6AUSu1TwIDAQAB"
     ```
+
+* [python-spfcheck2][] - for validation SPF records, see [its requirements][python-spfcheck2] for more information
 
 * DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How It Works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
 
@@ -457,3 +459,5 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [openssl]: https://www.openssl.org/
 
 [gmail-2fa]: https://myaccount.google.com/signinoptions/two-step-verification
+
+[python-spfcheck2]: https://github.com/niftylettuce/python-spfcheck2#requirements
