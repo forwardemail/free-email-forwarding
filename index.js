@@ -29,6 +29,10 @@ const _ = require('lodash');
 const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
 
+let mailUtilities = require('mailin/lib/mailUtilities.js');
+
+mailUtilities = Promise.promisifyAll(mailUtilities);
+
 // currently running into this error when using this code:
 // `Error: Mail command failed: 421 Cannot read property '_handle' of undefined`
 // const resolver = new Resolver();
@@ -392,6 +396,7 @@ class ForwardEmail {
         0|smtp     |     at Socket.emit (events.js:182:13)
         0|smtp     |     at Socket.EventEmitter.emit (domain.js:442:20)
         0|smtp     |     at TCP._handle.close (net.js:595:12)
+        */
         let spamScore = 0;
         try {
           spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
@@ -407,7 +412,6 @@ class ForwardEmail {
           err.responseCode = 554;
           throw err;
         }
-        */
 
         // TODO: implement spamassassin automatic learning
         // through bayes based off response from proxy (e.g. gmail response)
