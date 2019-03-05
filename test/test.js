@@ -197,6 +197,7 @@ if (!isCI)
             t.is(err.responseCode, 551);
             t.regex(err.message, /Message detected as spam/);
           }
+
           connection.quit();
         });
       });
@@ -334,15 +335,9 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
   });
 });
 
-// eslint-disable-next-line ava/no-todo-test
 test.todo('rejects invalid dkim signature');
-// eslint-disable-next-line ava/no-todo-test
 test.todo('accepts valid dkim signature');
-// eslint-disable-next-line ava/no-todo-test
 test.todo('rejects invalid spf');
-// eslint-disable-next-line ava/no-todo-test
 test.todo('accepts valid spf');
-// eslint-disable-next-line ava/no-todo-test
 test.todo('supports + symbol aliased onRcptTo');
-// eslint-disable-next-line ava/no-todo-test
 test.todo('rewrites with friendly-from for failed DMARC validation');

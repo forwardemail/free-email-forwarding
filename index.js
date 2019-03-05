@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const dns = require('dns');
 // const { Resolver } = require('dns');
 const punycode = require('punycode/');
+const spfCheck2 = require('python-spfcheck2');
 const isCI = require('is-ci');
 const dmarcParse = require('dmarc-parse');
 const DKIM = require('dkim');
@@ -27,7 +28,6 @@ const Promise = require('bluebird');
 const _ = require('lodash');
 const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
-let mailUtilities = require('mailin/lib/mailUtilities.js');
 
 // currently running into this error when using this code:
 // `Error: Mail command failed: 421 Cannot read property '_handle' of undefined`
@@ -39,8 +39,6 @@ let mailUtilities = require('mailin/lib/mailUtilities.js');
 const dkimVerify = Promise.promisify(DKIM.verify);
 
 const blacklist = require('./blacklist');
-
-mailUtilities = Promise.promisifyAll(mailUtilities);
 
 const invalidTXTError = new Error('Invalid forward-email TXT record');
 invalidTXTError.responseCode = 550;
@@ -210,6 +208,7 @@ class ForwardEmail {
       err.responseCode = 550;
       return fn(err);
     }
+
     // ensure that it's not on the DNS blacklist
     try {
       const result = await dnsbl.lookup(
@@ -248,7 +247,6 @@ class ForwardEmail {
       parser.end();
     });
 
-    // eslint-disable-next-line complexity
     parser.on('end', async () => {
       try {
         headers.forEach(key => {
@@ -290,6 +288,7 @@ class ForwardEmail {
               if (mail.messageId) mail.inReplyTo = mail.messageId;
               mail.messageId = createMessageID(session);
             }
+
             return {
               ...to,
               address
@@ -315,6 +314,7 @@ class ForwardEmail {
           } else {
             obj[key] = value;
           }
+
           return obj;
         }, {});
 
@@ -336,25 +336,54 @@ class ForwardEmail {
           session.clientHostname
         );
 
+        // if it didn't have a valid SPF record
+        // then we need to rewrite with a friendly-from
+        // (so we do not land in the spam folder)
+        if (!['pass', 'neutral'].includes(spf))
+          this.rewriteFriendlyFrom(mail, obj, session);
+
         const dkim = await this.validateDKIM(rawEmail);
 
         // if there was no valid SPF record found for this sender
         // AND if there was no valid DKIM signature on the message
         // then we must refuse sending this email along because it
         // literally has on validation that it's from who it says its from
-        if (!spf && !dkim) {
+        if (!dkim) {
           const err = new Error(
-            oneLine`Please ensure the email service you are sending from either has SPF or DKIM.\n\nYou can most likely resolve this problem by searching on Google for "$serviceName SPF DKIM setup" (be sure to replace $serviceName with your email service provider, e.g. "Zoho").`
+            oneLine`
+              The email you sent has an invalid DKIM signature, please try again or check your email service's DKIM configuration.\n
+              If you believe this is an error, please forward this email to: support@forwardemail.net
+            `
           );
           err.responseCode = 550;
           throw err;
         }
 
+        //
+        // if SPF failed that means the sender did not designate
+        // us as a proxy/middleman (e.g. Amazon.com or Twitch.com)
+        // and so we need to rewrite the FROM with friendly-from
+        // and make the reply to be the original FROM address
+        //
+        // (so we don't want it to land in the user's inbox with failed SPF)
+        //
+        // TODO: here is where we'd implement ARC (but still SPF would fail)
+        //
+
+        //
+        // TODO: we need to replace the spam block below with implementation
+        // of `pdf-spamc-stream` from https://github.com/streamtOtO/spamc-stream
+        // note that this package name is published with several key updates
+        //
+
+        // https://www.npmjs.com/package/pdf-spamc-stream
+        // (vs)
+        // https://www.npmjs.com/package/spamc-stream
+        //
         // check against spamd if this message is spam
         // <https://github.com/humantech/node-spamd#usage>
         //
         // note that we wrap with a try/catch due to this error
-        /* eslint-disable max-len */
         /*
         0|smtp     | error: TypeError: Cannot read property '2' of null
         0|smtp     |     at processResponse (/var/www/production/source/node_modules/spamc/index.js:381:43)
@@ -363,8 +392,6 @@ class ForwardEmail {
         0|smtp     |     at Socket.emit (events.js:182:13)
         0|smtp     |     at Socket.EventEmitter.emit (domain.js:442:20)
         0|smtp     |     at TCP._handle.close (net.js:595:12)
-        */
-        /* eslint-enable max-len */
         let spamScore = 0;
         try {
           spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
@@ -380,6 +407,7 @@ class ForwardEmail {
           err.responseCode = 554;
           throw err;
         }
+        */
 
         // TODO: implement spamassassin automatic learning
         // through bayes based off response from proxy (e.g. gmail response)
@@ -482,9 +510,10 @@ class ForwardEmail {
           // to tell spam assassin that this email in particular failed
           // (IFF as it was sent to a gmail, yahoo, or other major provider)
         }
+
         // add a note to email me for help
         err.message +=
-          '\n\n If you need help with email-forwarding setup or troubleshooting please visit https://forwardemail.net';
+          '\n\n If you need help please forward this email to support@forwardemail.net or visit https://forwardemail.net';
         if (log) console.error(err);
         fn(err);
       }
@@ -554,23 +583,18 @@ class ForwardEmail {
   // however if it's something like a network error
   // we should respond with a `421` code as we do below
   //
-  // here's some code for reference, not sure if it's useful
-  // <https://github.com/mixmaxhq/spf-validator/blob/master/index.js>
-  // <https://github.com/Flolagale/mailin/blob/fac7dcf59404691e551568f987caaaa464303b6b/lib/mailUtilities.js#L49>
-  // const { spfSetup, hasSPFSender } = require('email-setup');
-  // const isSpfSetup = await spfSetup(domain);
-  // const isSpfSender = await hasSPFSender('foo.com', '_spf.google.com');
-  // if (!isSetup)
-  //
   async validateSPF(remoteAddress, from, clientHostname) {
-    // <https://github.com/Flolagale/mailin/blob/master/lib/mailin.js#L265>
     try {
-      const pass = await mailUtilities.validateSpfAsync(
+      const [result, explanation] = await spfCheck2(
         remoteAddress,
         from,
         clientHostname
       );
-      return pass;
+      if (['permerror', 'temperror'].includes(result))
+        throw new Error(
+          `SPF validation failed with result "${result}" and explanation "${explanation}"`
+        );
+      return result;
     } catch (err) {
       err.responseCode = 421;
       throw err;
@@ -597,6 +621,7 @@ class ForwardEmail {
         // otherwise attempt to lookup the parent domain's DMARC record instead
         return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
       }
+
       if (log) console.error(err);
       // if there's an error then assume that we need to rewrite
       // with a friendly-from, for whatever reason
@@ -642,6 +667,7 @@ class ForwardEmail {
       } else if (!err.responseCode) {
         err.responseCode = 421;
       }
+
       throw err;
     }
   }
@@ -658,6 +684,7 @@ class ForwardEmail {
           err.responseCode = 421;
           return reject(err);
         }
+
         if (limit.remaining) return resolve();
         const delta = (limit.reset * 1000 - Date.now()) | 0;
         err = new Error(
@@ -677,9 +704,11 @@ class ForwardEmail {
     for (const d of domains) {
       if (d === domain) return true;
     }
+
     for (const w of wildcards) {
       if (w === domain || domain.endsWith(`.${w}`)) return true;
     }
+
     return false;
   }
 
