@@ -5665,10 +5665,18 @@ punycode@^2.1.0, punycode@^2.1.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
 
-python-spfcheck2@^0.0.2:
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.2.tgz#278fed810c6df41a13fb826956d6fa9cd1821bfd"
-  integrity sha512-mDFm1laOPzdf9+sjXJod99jYcnHi+0Ecq8vmJ1kBqvaZ0UshzeH3IvoFBeSXT3xlF+p8hoVvI7GqyHGGT0ViAg==
+python-dkim-verify@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/python-dkim-verify/-/python-dkim-verify-0.0.1.tgz#9bee9868c760d376b0f5b1ce104bea7005f919ac"
+  integrity sha512-Oazt0fxoZ2kr1QJz6jeAf4Gt5iFuGLeoSEb3YguczoflXqJAN5MK8LCfwVYofdXlKgiTDpR95abpsfanamWK7w==
+  dependencies:
+    semver "^5.6.0"
+    shelljs "^0.8.3"
+
+python-spfcheck2@^0.0.3:
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.3.tgz#fd33df29d4fedc00e9a3b97f900baa92f6550009"
+  integrity sha512-jaD5OCnChA4yT57SJb2psZ4YO16OQF4Mkp9tHNysvTVwuQhSvIj3kPZvUbdt+9xYKAsapMSz84+lCwONWaI3qw==
   dependencies:
     semver "^5.6.0"
     shelljs "^0.8.3"

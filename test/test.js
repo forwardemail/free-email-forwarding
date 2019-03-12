@@ -63,7 +63,6 @@ test('rejects forwarding a non-FQDN email', async t => {
     connection.on('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
-        console.log('error', err);
         t.is(err.responseCode, 550);
         t.regex(err.message, /is not a FQDN/);
         connection.quit();
@@ -103,7 +102,9 @@ test('rejects forwarding a non-registered email address', async t => {
 });
 
 if (!isCI)
-  test('allows forwarding an email without dkim and spf', async t => {
+  test('rewrites with friendly-from for failed DMARC validation', async t => {
+    // note that we have SPF but not DKIM on this email
+    // and DMARC for forwardemail.net requires BOTH to pass
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -130,7 +131,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with dkim', async t => {
+  test('forwards an email with DKIM and SPF', async t => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -335,9 +336,8 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
   });
 });
 
-test.todo('rejects invalid dkim signature');
-test.todo('accepts valid dkim signature');
-test.todo('rejects invalid spf');
-test.todo('accepts valid spf');
+test.todo('rejects invalid DKIM signature');
+test.todo('accepts valid DKIM signature');
+test.todo('rejects invalid SPF');
+test.todo('accepts valid SPF');
 test.todo('supports + symbol aliased onRcptTo');
-test.todo('rewrites with friendly-from for failed DMARC validation');
