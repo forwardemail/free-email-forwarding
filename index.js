@@ -330,9 +330,6 @@ class ForwardEmail {
         if (['test', 'development'].includes(process.env.NODE_ENV))
           console.dir(obj);
 
-        // TODO: not sure if we need to change this
-        // obj.to = await this.getForwardingAddress(obj.to);
-
         const spf = await this.validateSPF(
           session.remoteAddress,
           session.envelope.from,
@@ -343,8 +340,18 @@ class ForwardEmail {
         // if it didn't have a valid SPF record
         // then we need to rewrite with a friendly-from
         // (so we do not land in the spam folder)
-        if (!['pass', 'neutral'].includes(spf))
-          this.rewriteFriendlyFrom(mail, obj, session);
+        if (!['pass', 'neutral'].includes(spf)) {
+          const err = new Error(
+            oneLine`
+              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
+              If you believe this is an error, please forward this email to: support@forwardemail.net
+            `
+          );
+          err.responseCode = 550;
+          throw err;
+        }
+
+        // this.rewriteFriendlyFrom(mail, obj, session);
 
         const dkim = await this.validateDKIM(rawEmail);
 
@@ -644,10 +651,8 @@ class ForwardEmail {
           records,
           record =>
             _.isObject(record) &&
-            _.isBoolean(record.verified) &&
-            record.verified &&
-            _.isString(record.status) &&
-            record.status === DKIM.OK
+            ((record.verified && record.status === DKIM.OK) ||
+              record.status === DKIM.NONE)
         )
       );
     } catch (err) {
