@@ -3,8 +3,9 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const dns = require('dns');
-// const { Resolver } = require('dns');
 const punycode = require('punycode/');
+const ip = require('ip');
+// const { Resolver } = require('dns');
 const spfCheck2 = require('python-spfcheck2');
 const isCI = require('is-ci');
 const dmarcParse = require('dmarc-parse');
@@ -251,6 +252,7 @@ class ForwardEmail {
       parser.end();
     });
 
+    // eslint-disable-next-line complexity
     parser.on('end', async () => {
       try {
         headers.forEach(key => {
@@ -351,7 +353,21 @@ class ForwardEmail {
           throw err;
         }
 
-        // this.rewriteFriendlyFrom(mail, obj, session);
+        // now we need to do a reverse-SPF lookup
+        // so we prevent emails from Amazon/Twitch going to spam
+        // since Amazon/Twitch for example obviously don't allow us
+        // as a sender within their SPF records
+        // but note that this must come before DMARC validation
+        const reverseSpf = await this.validateSPF(
+          ip.address(), // our server's current IP address
+          session.envelope.from, // the original FROM address
+          // TODO: eventually we need a way to map which IP
+          // is to which exchange/FQDN without assuming it's the first
+          this.config.exchanges[0] // our server's FQDN (pick the first)
+        );
+
+        if (!['pass', 'neutral'].includes(reverseSpf))
+          this.rewriteFriendlyFrom(mail, obj, session);
 
         const dkim = await this.validateDKIM(rawEmail);
 
