@@ -9,7 +9,7 @@ const ip = require('ip');
 const spfCheck2 = require('python-spfcheck2');
 const isCI = require('is-ci');
 const dmarcParse = require('dmarc-parse');
-const DKIM = require('dkim');
+const dkimVerify = require('python-dkim-verify');
 const dnsbl = require('dnsbl');
 const parseDomain = require('parse-domain');
 const autoBind = require('auto-bind');
@@ -40,8 +40,6 @@ mailUtilities = Promise.promisifyAll(mailUtilities);
 // resolver.setServers(servers);
 // const resolveMx = Promise.promisify(resolver.resolveMx);
 // const resolveTxt = Promise.promisify(resolver.resolveTxt);
-
-const dkimVerify = Promise.promisify(DKIM.verify);
 
 const blacklist = require('./blacklist');
 
@@ -243,6 +241,7 @@ class ForwardEmail {
     // <https://github.com/nodemailer/mailparser/blob/master/examples/pipe.js>
     const parser = new MailParser();
     const mail = { attachments: [] };
+    let hasDKIMSignature = false;
     let rawEmail = '';
 
     stream.on('error', fn);
@@ -255,6 +254,9 @@ class ForwardEmail {
     // eslint-disable-next-line complexity
     parser.on('end', async () => {
       try {
+        // check if we had a DKIM signature on the email
+        hasDKIMSignature = mail.headers.has('dkim-signature');
+
         headers.forEach(key => {
           if (mail.headers.has(key)) {
             const formatted = key.replace(/-([a-z])/g, (m, c) =>
@@ -369,7 +371,9 @@ class ForwardEmail {
         if (!['pass', 'neutral', 'none'].includes(reverseSpf))
           this.rewriteFriendlyFrom(mail, obj, session);
 
-        const dkim = await this.validateDKIM(rawEmail);
+        const dkim = hasDKIMSignature
+          ? await this.validateDKIM(rawEmail)
+          : true;
 
         // if there was no valid SPF record found for this sender
         // AND if there was no valid DKIM signature on the message
@@ -611,6 +615,11 @@ class ForwardEmail {
   // we should respond with a `421` code as we do below
   //
   async validateSPF(remoteAddress, from, clientHostname) {
+    if (process.env.NODE_ENV === 'test') {
+      remoteAddress = '178.128.149.101';
+      clientHostname = 'mx1.forwardemail.net';
+    }
+
     try {
       const [result, explanation] = await spfCheck2(
         remoteAddress,
@@ -658,21 +667,9 @@ class ForwardEmail {
 
   async validateDKIM(rawEmail) {
     try {
-      const records = await dkimVerify(Buffer.from(rawEmail, 'utf8'));
-      return (
-        // if there's no DKIM on the email to begin with this should pass
-        !_.isArray(records) ||
-        _.isEmpty(records) ||
-        _.every(
-          records,
-          record =>
-            _.isObject(record) &&
-            ((record.verified && record.status === DKIM.OK) ||
-              record.status === DKIM.NONE)
-        )
-      );
+      const result = await dkimVerify(Buffer.from(rawEmail, 'utf8'));
+      return result;
     } catch (err) {
-      if (_.isString(err.code) && err.code === 'PERMFAIL') return false;
       if (log) console.error(err);
       err.responseCode = 421;
       throw err;

@@ -244,7 +244,9 @@ You'll also need the following dependencies installed:
     "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCojharU7eJW+eaLulQygsc/AHx2A0gyLnSU2fPGs8mI3Fhs3EVIIRP01euHg+IljMmXz9YtU+XMfZuYdSCa9NY16XjoIgub2+lkeiHHNpURIpwQJSeHxviMOfMAZ5/xSTDDoaYY2vcKytheZeLAVK2V1SuTdTp+C6B9E6AUSu1TwIDAQAB"
     ```
 
-* [python-spfcheck2][] - for validation SPF records, see [its requirements][python-spfcheck2] for more information
+* [python-spfcheck2][] - for validation of SPF records, see [its requirements][python-spfcheck2] for more information
+
+* [python-dkim-verify][] - for validation of DKIM signatures, see [its requirements][python-dkim-verify] for more information
 
 * DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How It Works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
 
@@ -461,3 +463,5 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [gmail-2fa]: https://myaccount.google.com/signinoptions/two-step-verification
 
 [python-spfcheck2]: https://github.com/niftylettuce/python-spfcheck2#requirements
+
+[python-dkim-verify]: https://github.com/niftylettuce/python-dkim-verify#requirements
