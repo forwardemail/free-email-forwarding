@@ -29,6 +29,7 @@
     "dmarc-parse": "^1.0.2",
     "dnsbl": "^3.1.1",
     "get-port": "^4.2.0",
+    "ip": "^1.1.5",
     "lodash": "^4.17.11",
     "mailin": "^3.0.4",
     "mailparser": "^2.4.3",
