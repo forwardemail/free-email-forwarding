@@ -344,7 +344,7 @@ class ForwardEmail {
         // if it didn't have a valid SPF record
         // then we need to rewrite with a friendly-from
         // (so we do not land in the spam folder)
-        if (!['pass', 'neutral', 'none'].includes(spf)) {
+        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf)) {
           const err = new Error(
             oneLine`
               The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
