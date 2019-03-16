@@ -252,6 +252,24 @@ You'll also need the following dependencies installed:
 
 * Reverse DNS ("rDNS") with PTR Record- - the PTR record for your server's IP address is controlled by your server provider, and therefore you need to contact your server provider to set the PTR record for you.  Services such as DigitalOcean will set a PTR record for you automatically as long as you use a fully-qualified domain name ("FQDN").
 
+* FQDN - you'll need to set your server up to have a FQDN, you can do this by:
+
+    ```sh
+    sudo vim /etc/hosts
+    ```
+
+    ```diff
+    -127.0.1.1 current-hostname
+    +127.0.1.1 domain.com
+    ```
+
+    ```sh
+    sudo vim /etc/hostname
+    ```
+
+    ```diff
+    +domain.com
+    ```
 
 ## CLI
 
@@ -434,7 +452,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
