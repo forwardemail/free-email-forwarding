@@ -285,26 +285,23 @@ class ForwardEmail {
           throw err;
         }
 
-        const rcptTo = session.envelope.rcptTo.map(to => {
-          return async () => {
-            const address = await this.getForwardingAddress(to.address);
-            // Gmail won't show the message in the inbox if it's sending FROM
-            // the same address that gets forwarded TO using our service
-            // (we can assume that other mail providers do the same)
-            const fromAddress = addressParser(mail.from)[0].address;
-            if (address === fromAddress) {
-              if (mail.messageId) mail.inReplyTo = mail.messageId;
-              mail.messageId = createMessageID(session);
-            }
+        const { rcptTo } = session.envelope;
+        session.envelope.rcptTo = await Promise.each(rcptTo, async to => {
+          const address = await this.getForwardingAddress(to.address);
+          // Gmail won't show the message in the inbox if it's sending FROM
+          // the same address that gets forwarded TO using our service
+          // (we can assume that other mail providers do the same)
+          const fromAddress = addressParser(mail.from)[0].address;
+          if (address === fromAddress) {
+            if (mail.messageId) mail.inReplyTo = mail.messageId;
+            mail.messageId = createMessageID(session);
+          }
 
-            return {
-              ...to,
-              address
-            };
+          return {
+            ...to,
+            address
           };
         });
-
-        session.envelope.rcptTo = await Promise.all(rcptTo.map(fn => fn()));
 
         session.envelope = {
           from: session.envelope.mailFrom.address,
@@ -494,42 +491,38 @@ class ForwardEmail {
 
         // TODO: note that if one email fails then all will fail right now
         // send an email to each recipient
-        await Promise.all(
-          session.envelope.to.map(to => {
-            return (async () => {
-              // TODO: pick lowest priority address found
-              const addresses = await this.validateMX(to);
-              const transporter = nodemailer.createTransport({
-                debug: log,
-                logger: log,
-                direct: true,
-                // secure: true,
-                // requireTLS: true,
-                opportunisticTLS: true,
-                port: 25,
-                host: addresses[0].exchange,
-                ...this.ssl,
-                name: os.hostname(),
-                tls: {
-                  rejectUnauthorized: process.env.NODE_ENV !== 'test'
-                }
-                // <https://github.com/nodemailer/nodemailer/issues/625>
-              });
+        await Promise.each(session.envelope.to, async to => {
+          // TODO: pick lowest priority address found
+          const addresses = await this.validateMX(to);
+          const transporter = nodemailer.createTransport({
+            debug: log,
+            logger: log,
+            direct: true,
+            // secure: true,
+            // requireTLS: true,
+            opportunisticTLS: true,
+            port: 25,
+            host: addresses[0].exchange,
+            ...this.ssl,
+            name: os.hostname(),
+            tls: {
+              rejectUnauthorized: process.env.NODE_ENV !== 'test'
+            }
+            // <https://github.com/nodemailer/nodemailer/issues/625>
+          });
 
-              // verify transport
-              // await transporter.verify();
+          // verify transport
+          // await transporter.verify();
 
-              const email = {
-                ...obj,
-                envelope: session.envelope,
-                dkim: this.config.dkim
-              };
+          const email = {
+            ...obj,
+            envelope: session.envelope,
+            dkim: this.config.dkim
+          };
 
-              const info = await transporter.sendMail(email);
-              return info;
-            })();
-          })
-        );
+          const info = await transporter.sendMail(email);
+          return info;
+        });
 
         fn();
       } catch (err) {
