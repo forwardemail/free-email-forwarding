@@ -88,7 +88,7 @@
 **3.** Set (and customize) the following SPF record for SPF verification for your domain name (this will allow SPF verification to pass, note that you may need to enclose this value in quotes if you are using Amazon Route53):
 
 > Note that if you are using a service such as GoDaddy, you will need to use a TXT record type instead of a SPF record for this step.
-
+>
 > If you're using a service like AWS Route 53, then edit your existing TXT record and add the following as a new line:
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                        |
@@ -256,22 +256,23 @@ You'll also need the following dependencies installed:
 
 * FQDN - you'll need to set your server up to have a FQDN, you can do this by:
 
-    ```sh
-    sudo vim /etc/hosts
-    ```
+  ```sh
+  sudo vim /etc/hosts
+  ```
 
-    ```diff
-    -127.0.1.1 current-hostname
-    +127.0.1.1 domain.com
-    ```
+  ```diff
+  -127.0.1.1 current-hostname
+  +127.0.1.1 domain.com
+  ```
 
-    ```sh
-    sudo vim /etc/hostname
-    ```
+  ```sh
+  sudo vim /etc/hostname
+  ```
 
-    ```diff
-    +domain.com
-    ```
+  ```diff
+  +domain.com
+  ```
+
 
 ## CLI
 
@@ -454,7 +455,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
