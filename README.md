@@ -87,7 +87,7 @@
 
 **3.** Set (and customize) the following SPF record for SPF verification for your domain name (this will allow SPF verification to pass, note that you may need to enclose this value in quotes if you are using Amazon Route53):
 
-> Note that if you are using a service such as GoDaddy, you will need to use a TXT record type instead of a SPF record for this step.
+> Note that if you are using a service such as GoDaddy, you will need to use a TXT record type instead of an SPF record for this step.
 >
 > If you're using a service like AWS Route 53, then edit your existing TXT record and add the following as a new line:
 
@@ -455,7 +455,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
