@@ -130,7 +130,7 @@ class ForwardEmail {
     // setup rate limiting with redis
     this.limiter = {
       db: redis.createClient(),
-      max: 100, // max requests within duration
+      max: 200, // max requests within duration
       duration: ms('1h'),
       ...this.config.limiter
     };
@@ -144,15 +144,31 @@ class ForwardEmail {
     autoBind(this);
   }
 
-  rewriteFriendlyFrom(mail, obj, session) {
+  rewriteFriendlyFrom(mail) {
     // preserve user's name
     const { name } = addressParser(mail.from)[0];
-    if (!mail.replyTo) mail.replyTo = mail.from;
-    if (!obj.replyTo) obj.replyTo = mail.from;
-    if (!session.envelope.replyTo) session.envelope.replyTo = mail.from;
-    mail.from = `${name} <${this.config.noReply}>`;
-    obj.from = mail.from;
-    session.envelope.from = mail.from;
+    let replyTo = mail.from;
+    // do not overwrite existing reply-to
+    if (
+      _.isObject(mail.replyTo) &&
+      _.isArray(mail.replyTo.value) &&
+      _.isObject(mail.replyTo.value[0]) &&
+      _.isString(mail.replyTo.value[0].address) &&
+      _.isString(mail.replyTo.value[0].name)
+    ) {
+      // if no name then don't use `<> format`
+      if (mail.replyTo.value[0].name === '')
+        replyTo = mail.replyTo.value[0].address;
+      else
+        replyTo = `${mail.replyTo.value[0].name} <${
+          mail.replyTo.value[0].address
+        }>`;
+    }
+
+    return {
+      replyTo,
+      from: `${name} <${this.config.noReply}>`
+    };
   }
 
   parseUsername(address) {
@@ -286,7 +302,7 @@ class ForwardEmail {
         }
 
         const { rcptTo } = session.envelope;
-        session.envelope.rcptTo = await Promise.each(rcptTo, async to => {
+        session.envelope.rcptTo = await Promise.map(rcptTo, async to => {
           const address = await this.getForwardingAddress(to.address);
           // Gmail won't show the message in the inbox if it's sending FROM
           // the same address that gets forwarded TO using our service
@@ -365,8 +381,13 @@ class ForwardEmail {
           this.config.exchanges[0] // our server's FQDN (pick the first)
         );
 
-        if (!['pass', 'neutral', 'none'].includes(reverseSpf))
-          this.rewriteFriendlyFrom(mail, obj, session);
+        if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
+          const { replyTo, from } = this.rewriteFriendlyFrom(mail);
+          obj.replyTo = replyTo;
+          obj.from = from;
+          mail.from = from;
+          session.envelope.from = from;
+        }
 
         const dkim = hasDKIMSignature
           ? await this.validateDKIM(rawEmail)
@@ -474,8 +495,13 @@ class ForwardEmail {
               ['quarantine', 'reject'].includes(
                 result.tags.p.value.toLowerCase().trim()
               )
-            )
-              this.rewriteFriendlyFrom(mail, obj, session);
+            ) {
+              const { replyTo, from } = this.rewriteFriendlyFrom(mail);
+              obj.replyTo = replyTo;
+              obj.from = from;
+              mail.from = from;
+              session.envelope.from = from;
+            }
           } catch (err) {
             if (log) console.error(err);
           }
@@ -692,6 +718,7 @@ class ForwardEmail {
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
     return new Promise((resolve, reject) => {
+      if (email === this.config.noReply) return resolve();
       const id = email;
       const limit = new Limiter({ id, ...this.limiter });
       limit.get((err, limit) => {

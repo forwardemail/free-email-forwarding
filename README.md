@@ -438,7 +438,7 @@ Yes! As of October 2, 2018 we have added this feature.  See [Send Mail As Using 
 
 ### Can I forward unlimited emails with this
 
-Practically yes - the only current restriction is that senders are limited to sending you `200` emails per hour.
+Practically yes - the only current restriction is that senders are limited to sending `200` emails per hour through the system.
 
 If this limit is exceeded we send a `451` response code which tells the senders mail server to retry later.
 
@@ -455,7 +455,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
