@@ -55,6 +55,8 @@
 | _@ or leave blank_ | 3600 | MX          | 10       | mx1.forwardemail.net     |
 | _@ or leave blank_ | 3600 | MX          | 20       | mx2.forwardemail.net     |
 
+> Note that there should be NO other MX records set on your domain name.  If there were already MX records that existed, please delete them completely.
+
 **2.** Set (and customize) the following DNS TXT records on your domain name:
 
 > If you are forwarding all emails from your domain, (`all@niftylettuce.com`, `hello@niftylettuce.com`, etc) to a specific address `niftylettuce@gmail.com`:
@@ -455,7 +457,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
