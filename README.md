@@ -317,9 +317,9 @@ Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the exa
 ```js
 const ForwardEmail = require('forward-email');
 
-const forwardEmail = new ForwardEmail();
+const forwardEmail = new ForwardEmail(config);
 
-forwardEmail.listen();
+forwardEmail.server.listen(25);
 ```
 
 
