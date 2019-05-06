@@ -328,10 +328,32 @@ Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the exa
 
 ```js
 const ForwardEmail = require('forward-email');
+const os = require('os');
 
-const forwardEmail = new ForwardEmail();
+const config = {
+  noReply: 'no-reply@forwardemail.net',
+  exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+  ssl: {},
+  dkim: {}
+};
 
-forwardEmail.listen();
+if (process.env.NODE_ENV === 'production') {
+  config.ssl = {
+    secure: process.env.SECURE === 'true',
+    key: fs.readFileSync('/home/deploy/mx1.forwardemail.net.key', 'utf8'),
+    cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
+    ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
+  };
+  config.dkim = {
+    domainName: 'forwardemail.net',
+    keySelector: 'default',
+    privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8'),
+    cacheDir: os.tmpdir()
+  };
+}
+
+const forwardEmail = new ForwardEmail(config);
+forwardEmail.server.listen(process.env.PORT || 25);
 ```
 
 
