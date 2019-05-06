@@ -16,6 +16,7 @@
 
 * [How It Works](#how-it-works)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
+* [Timeline](#timeline)
 * [Self-Hosted Requirements](#self-hosted-requirements)
 * [CLI](#cli)
 * [API](#api)
@@ -40,6 +41,8 @@
   * [How do you prevent spammers and ensure good email forwarding reputation](#how-do-you-prevent-spammers-and-ensure-good-email-forwarding-reputation)
   * [Can I "send mail as" with this](#can-i-send-mail-as-with-this)
   * [Can I forward unlimited emails with this](#can-i-forward-unlimited-emails-with-this)
+  * [How do you perform DNS lookups on domain names](#how-do-you-perform-dns-lookups-on-domain-names)
+  * [How fast is this service](#how-fast-is-this-service)
 * [Contributors](#contributors)
 * [License](#license)
 
@@ -140,6 +143,13 @@ After you've followed the steps above in [How It Works](#how-it-works) you can f
 14. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
 15. Once you've done that, go back to the email and click the link to "confirm the request". You need to do this step and the previous step for the email to be correctly configured.
 16. Done!
+
+
+## Timeline
+
+* May 6, 2019: [**@niftylettuce**](https://github.com/niftylettuce) refactored the project thanks to [**@andris9**](https://github.com/andris9) and released [v2 with major performance gains](#how-fast-is-this-service)
+* November 5, 2017: [**@niftylettuce**](https://github.com/niftylettuce) released v1 of the project, with a focus to always be completely open source, transparent, private, secure, and free
+* 2010-2017: [**@niftylettuce**](https://github.com/niftylettuce) grew weary from the headache of setting of mail servers for every domain or the hassle and costs of using services Google Business and Zoho
 
 
 ## Self-Hosted Requirements
@@ -274,6 +284,8 @@ You'll also need the following dependencies installed:
   ```diff
   +domain.com
   ```
+
+* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
 
 
 ## CLI
@@ -444,6 +456,18 @@ Practically yes - the only current restriction is that senders are limited to se
 
 If this limit is exceeded we send a `451` response code which tells the senders mail server to retry later.
 
+### How do you perform DNS lookups on domain names
+
+We use CloudFlare's privacy-first consumer DNS service (see [announcement here][cloudflare-dns]).  Note that the Python packages we use (`python-spfcheck2` and `python-dkim-verify`) do not have the means like Node.js does with `dns` and its method `dns.setServers` – therefore we set the server DNS to `1.1.1.1` which it will use as a fallback in this case.
+
+### How fast is this service
+
+The latest version, v2 (released on May 6, 2019) was a major rewrite from v1 and focuses on performance through streams.  [Nodemailer's][nodemailer] prolific author Andris Reinman ([@andris9](https://github.com/andris9)) helped us switch off using the `mailparser` library and use `mailsplit` instead with some custom transform logic to split the header and the body of the message without affecting the body.  This allows us to perform operations on headers very fast (such as security checks and for SPF/DKIM/DMARC compliance).
+
+**In other words, the latest version of this service services uses streams purely now and is lightning fast.**  The older version v1 also had some logic not in the most optimal order of operations – but now v2 does less memory/network intense operations first (and returns early if possible to send a response as quickly as possible to the SMTP client).
+
+At no point in time do we write to disk or store emails – everything is done in-memory thanks to Node.js's streams and transforms! :tada:
+
 
 ## Contributors
 
@@ -457,7 +481,7 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
@@ -488,3 +512,9 @@ If this limit is exceeded we send a `451` response code which tells the senders 
 [python-spfcheck2]: https://github.com/niftylettuce/python-spfcheck2#requirements
 
 [python-dkim-verify]: https://github.com/niftylettuce/python-dkim-verify#requirements
+
+[cloudflare-dns]: https://blog.cloudflare.com/announcing-1111/
+
+[do-guide]: https://www.digitalocean.com/community/questions/how-do-i-switch-my-dns-resolvers-away-from-google
+
+[nodemailer]: https://github.com/nodemailer/nodemailer

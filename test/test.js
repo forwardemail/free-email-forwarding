@@ -29,11 +29,11 @@ test('binds context', t => {
 test.cb('rejects auth connections', t => {
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
-  connection.on('end', t.end);
+  connection.once('end', t.end);
   connection.connect(() => {
     connection.login({ user: 'user', pass: 'pass' }, err => {
       t.is(err.responseCode, 500);
-      connection.quit();
+      connection.close();
     });
   });
 });
@@ -60,12 +60,12 @@ test('rejects forwarding a non-FQDN email', async t => {
     attachments: []
   });
   return new Promise(resolve => {
-    connection.on('end', resolve);
+    connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
         t.regex(err.message, /is not a FQDN/);
-        connection.quit();
+        connection.close();
       });
     });
   });
@@ -90,12 +90,12 @@ test('rejects forwarding a non-registered email address', async t => {
     attachments: []
   });
   return new Promise(resolve => {
-    connection.on('end', resolve);
+    connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
         t.regex(err.message, /Invalid forward-email TXT record/);
-        connection.quit();
+        connection.close();
       });
     });
   });
@@ -120,11 +120,11 @@ if (!isCI)
       attachments: []
     });
     return new Promise(resolve => {
-      connection.on('end', resolve);
+      connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, err => {
           t.is(err, null);
-          connection.quit();
+          connection.close();
         });
       });
     });
@@ -155,17 +155,17 @@ if (!isCI)
       }
     });
     return new Promise(resolve => {
-      connection.on('end', resolve);
+      connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, err => {
           t.is(err, null);
-          connection.quit();
+          connection.close();
         });
       });
     });
   });
 
-if (!isCI)
+if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
   test('rejects a spam file', async t => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
@@ -189,17 +189,13 @@ if (!isCI)
       }
     });
     return new Promise(resolve => {
-      connection.on('end', resolve);
+      connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, err => {
-          if (!shell.which('spamassassin') || !shell.which('spamc')) {
-            t.is(err, null);
-          } else {
-            t.is(err.responseCode, 551);
-            t.regex(err.message, /Message detected as spam/);
-          }
+          t.is(err.responseCode, 551);
+          t.regex(err.message, /Message detected as spam/);
 
-          connection.quit();
+          connection.close();
         });
       });
     });
@@ -223,19 +219,79 @@ test('rejects a file over the limit', async t => {
     attachments: [{ path: filePath }]
   });
   return new Promise(resolve => {
-    connection.on('end', resolve);
+    connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 450);
         t.regex(err.message, /Message size exceeds maximum/);
         fs.unlinkSync(filePath);
-        connection.quit();
+        connection.close();
+      });
+    });
+  });
+});
+
+test('rejects a disposable email sender', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    from: `disposable@${domains[0]}`,
+    to: 'Niftylettuce <hello@niftylettuce.com>',
+    subject: 'test',
+    text: 'test text',
+    html: '<strong>test html</strong>'
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err.responseCode, 550);
+        t.regex(err.message, /Disposable email addresses are not permitted/);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('rejects an email to no-reply@forwardemail.net', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    from: 'foo@forwardemail.net',
+    to: 'Niftylettuce <no-reply@forwardemail.net>',
+    subject: 'test',
+    text: 'test text',
+    html: '<strong>test html</strong>'
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err.responseCode, 550);
+        t.regex(
+          err.message,
+          /You need to reply to the "Reply-To" email address on the email; do not send messages to <no-reply@forwardemail.net>/
+        );
+        connection.close();
       });
     });
   });
 });
 
 /*
+test.todo('rejects invalid DKIM signature');
+test.todo('accepts valid DKIM signature');
+test.todo('rejects invalid SPF');
+test.todo('accepts valid SPF');
+test.todo('supports + symbol aliased onRcptTo');
+test.todo('preserves charset');
+
 if (!isCI)
   test('prevents spam through rate limiting', async t => {
     const transporter = nodemailer.createTransport({
@@ -265,11 +321,11 @@ if (!isCI)
               }
             });
             const connection = new Client({ port, tls });
-            connection.on('end', resolve);
+            connection.once('end', resolve);
             connection.connect(() => {
               connection.send(info.envelope, info.message, err => {
                 if (err && err.responseCode === 451) failed++;
-                connection.quit();
+                connection.close();
               });
             });
           } catch (err) {
@@ -282,62 +338,3 @@ if (!isCI)
     t.is(failed, 100);
   });
 */
-
-test('rejects a disposable email sender', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: `disposable@${domains[0]}`,
-    to: 'Niftylettuce <hello@niftylettuce.com>',
-    subject: 'test',
-    text: 'test text',
-    html: '<strong>test html</strong>'
-  });
-  return new Promise(resolve => {
-    connection.on('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
-        t.is(err.responseCode, 550);
-        t.regex(err.message, /Disposable email addresses are not permitted/);
-        connection.quit();
-      });
-    });
-  });
-});
-
-test('rejects an email to no-reply@forwardemail.net', async t => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: 'foo@forwardemail.net',
-    to: 'Niftylettuce <no-reply@forwardemail.net>',
-    subject: 'test',
-    text: 'test text',
-    html: '<strong>test html</strong>'
-  });
-  return new Promise(resolve => {
-    connection.on('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
-        t.is(err.responseCode, 550);
-        t.regex(
-          err.message,
-          /You need to reply to the "Reply-To" email address on the email; do not send messages to <no-reply@forwardemail.net>/
-        );
-        connection.quit();
-      });
-    });
-  });
-});
-
-test.todo('rejects invalid DKIM signature');
-test.todo('accepts valid DKIM signature');
-test.todo('rejects invalid SPF');
-test.todo('accepts valid SPF');
-test.todo('supports + symbol aliased onRcptTo');

@@ -1,36 +1,36 @@
+const crypto = require('crypto');
+const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const crypto = require('crypto');
-const dns = require('dns');
-const punycode = require('punycode/');
-const ip = require('ip');
 // const { Resolver } = require('dns');
-const spfCheck2 = require('python-spfcheck2');
-const isCI = require('is-ci');
-const dmarcParse = require('dmarc-parse');
-const dkimVerify = require('python-dkim-verify');
-const dnsbl = require('dnsbl');
-const parseDomain = require('parse-domain');
-const autoBind = require('auto-bind');
-const { oneLine } = require('common-tags');
-const { SMTPServer } = require('smtp-server');
-const bytes = require('bytes');
-const { MailParser } = require('mailparser');
-const nodemailer = require('nodemailer');
-const redis = require('redis');
 const Limiter = require('ratelimiter');
-const ms = require('ms');
-const s = require('underscore.string');
-const domains = require('disposable-email-domains');
-const wildcards = require('disposable-email-domains/wildcard.json');
-const validator = require('validator');
 const Promise = require('bluebird');
 const _ = require('lodash');
-const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
+const DKIM = require('nodemailer/lib/dkim');
+const autoBind = require('auto-bind');
+const bytes = require('bytes');
+const dkimVerify = require('python-dkim-verify');
+const dmarcParse = require('dmarc-parse');
+const dnsbl = require('dnsbl');
+const domains = require('disposable-email-domains');
+const ip = require('ip');
+const isCI = require('is-ci');
+const ms = require('ms');
+const nodemailer = require('nodemailer');
+const parseDomain = require('parse-domain');
+const punycode = require('punycode/');
+const redis = require('redis');
+const s = require('underscore.string');
+const spfCheck2 = require('python-spfcheck2');
+const validator = require('validator');
+const wildcards = require('disposable-email-domains/wildcard.json');
+const { SMTPServer } = require('smtp-server');
+const { oneLine } = require('common-tags');
 
 let mailUtilities = require('mailin/lib/mailUtilities.js');
+const MessageSplitter = require('./message-splitter');
 
 mailUtilities = Promise.promisifyAll(mailUtilities);
 
@@ -49,19 +49,8 @@ invalidTXTError.responseCode = 550;
 const invalidMXError = new Error('Sender has invalid MX records');
 invalidMXError.responseCode = 550;
 
-const headers = [
-  'subject',
-  'references',
-  'date',
-  'to',
-  'from',
-  'to',
-  'cc',
-  'bcc',
-  'message-id',
-  'in-reply-to',
-  'reply-to'
-];
+// our server's current IP address
+const IP_ADDRESS = ip.address();
 
 const log = process.env.NODE_ENV !== 'production';
 
@@ -98,15 +87,17 @@ class ForwardEmail {
         privateKey: fs.readFileSync(
           path.join(__dirname, 'dkim-private.key'),
           'utf8'
-        )
+        ),
+        cacheDir: os.tmpdir()
       };
 
     this.config = {
       // TODO: eventually set 127.0.0.1 as DNS server
       // for both `dnsbl` and `dns` usage
       // https://gist.github.com/zhurui1008/48130439a079a3c23920
-      // currently we use Open DNS instead
-      dns: ['208.67.222.222', '208.67.220.220'],
+      //
+      // <https://blog.cloudflare.com/announcing-1111/>
+      dns: ['1.1.1.1'],
       noReply: 'no-reply@forwardemail.net',
       smtp: {
         size: bytes('25mb'),
@@ -127,6 +118,9 @@ class ForwardEmail {
       ...config
     };
 
+    // set up DKIM instance for signing messages
+    this.dkim = new DKIM(this.config.dkim);
+
     // setup rate limiting with redis
     this.limiter = {
       db: redis.createClient(),
@@ -144,31 +138,10 @@ class ForwardEmail {
     autoBind(this);
   }
 
-  rewriteFriendlyFrom(mail) {
+  rewriteFriendlyFrom(from) {
     // preserve user's name
-    const { name } = addressParser(mail.from)[0];
-    let replyTo = mail.from;
-    // do not overwrite existing reply-to
-    if (
-      _.isObject(mail.replyTo) &&
-      _.isArray(mail.replyTo.value) &&
-      _.isObject(mail.replyTo.value[0]) &&
-      _.isString(mail.replyTo.value[0].address) &&
-      _.isString(mail.replyTo.value[0].name)
-    ) {
-      // if no name then don't use `<> format`
-      if (mail.replyTo.value[0].name === '')
-        replyTo = mail.replyTo.value[0].address;
-      else
-        replyTo = `${mail.replyTo.value[0].name} <${
-          mail.replyTo.value[0].address
-        }>`;
-    }
-
-    return {
-      replyTo,
-      from: `${name} <${this.config.noReply}>`
-    };
+    const { name } = addressParser(from)[0];
+    return `${name} <${this.config.noReply}>`;
   }
 
   parseUsername(address) {
@@ -254,38 +227,55 @@ class ForwardEmail {
   }
 
   onData(stream, session, fn) {
-    // <https://github.com/nodemailer/mailparser/blob/master/examples/pipe.js>
-    const parser = new MailParser();
-    const mail = { attachments: [] };
-    let hasDKIMSignature = false;
-    let rawEmail = '';
+    const messageSplitter = new MessageSplitter();
+    const chunks = [];
 
-    stream.on('error', fn);
-
-    parser.on('error', err => {
-      stream.emit('error', err);
-      parser.end();
+    messageSplitter.on('readable', () => {
+      let chunk;
+      while ((chunk = messageSplitter.read()) !== null) {
+        // TODO: it would be nice if we could exit early
+        // rather than continuing to read the entire stream
+        if (stream.sizeExceeded) return;
+        chunks.push(chunk);
+      }
     });
 
     // eslint-disable-next-line complexity
-    parser.on('end', async () => {
+    messageSplitter.once('end', async () => {
+      //
+      // we need to check the following:
+      //
+      // 1) X if email file size exceeds the limit (no bottleneck)
+      // 2) X prevent replies to no-reply@forwardemail.net (no bottleneck)
+      // 3) X ensure all email headers were parsed
+      // 4) X check for spam (score must be < 5) (child process spam daemon)
+      // 5) X if DKIM signature passed and was valid (child process python)
+      // 6) X if SPF is valid (child process python)
+      // 7) X check for DMARC compliance (DNS lookup)
+      // 8) X reverse SPF check and rewrite with friendly-from (DNS lookup)
+      // 9) X rewrite message ID
+      // 10) X add our own DKIM signature and remove DKIM header (no bottleneck)
+      // 11) X send email
+      //
+      // future:
+      // 10) verify and sign with ARC
+      // <https://datatracker.ietf.org/doc/draft-ietf-dmarc-arc-usage/?include_text=1>
+      //
       try {
-        // check if we had a DKIM signature on the email
-        hasDKIMSignature = mail.headers.has('dkim-signature');
+        //
+        // 1) if email file size exceeds the limit
+        //
+        if (stream.sizeExceeded) {
+          const err = new Error(
+            `Message size exceeds maximum of ${bytes(this.config.smtp.size)}`
+          );
+          err.responseCode = 450;
+          throw err;
+        }
 
-        headers.forEach(key => {
-          if (mail.headers.has(key)) {
-            const formatted = key.replace(/-([a-z])/g, (m, c) =>
-              c.toUpperCase()
-            );
-            mail[formatted] = mail.headers.get(key);
-            mail.headers.delete(key);
-            if (['to', 'from', 'cc', 'bcc'].includes(key)) {
-              mail[formatted] = mail[formatted].text;
-            }
-          }
-        });
-
+        //
+        // 2) prevent replies to no-reply@forwardemail.net
+        //
         if (
           _.some(
             session.envelope.rcptTo,
@@ -301,102 +291,59 @@ class ForwardEmail {
           throw err;
         }
 
-        const { rcptTo } = session.envelope;
-        session.envelope.rcptTo = await Promise.map(rcptTo, async to => {
-          const address = await this.getForwardingAddress(to.address);
-          // Gmail won't show the message in the inbox if it's sending FROM
-          // the same address that gets forwarded TO using our service
-          // (we can assume that other mail providers do the same)
-          const fromAddress = addressParser(mail.from)[0].address;
-          if (address === fromAddress) {
-            if (mail.messageId) mail.inReplyTo = mail.messageId;
-            mail.messageId = createMessageID(session);
-          }
-
-          return {
-            ...to,
-            address
-          };
-        });
-
-        session.envelope = {
-          from: session.envelope.mailFrom.address,
-          // make sure it's unique so we don't send dups
-          to: uniq(session.envelope.rcptTo.map(to => to.address))
-        };
-
-        mail.headers = [...mail.headers].reduce((obj, [key, value]) => {
-          if (_.isObject(value)) {
-            if (_.isString(value.value)) obj[key] = value.value;
-            if (_.isObject(value.params))
-              Object.keys(value.params).forEach(k => {
-                obj[key] += `; ${k}=${value.params[k]}`;
-              });
-          } else {
-            obj[key] = value;
-          }
-
-          return obj;
-        }, {});
-
-        const obj = {
-          ...mail
-          // envelope: session.envelope
-        };
-
-        if (['test', 'development'].includes(process.env.NODE_ENV))
-          console.dir(obj);
-
-        const spf = await this.validateSPF(
-          session.remoteAddress,
-          session.envelope.from,
-          // addressParser(mail.from)[0].address,
-          session.clientHostname
-        );
-
-        // if it didn't have a valid SPF record
-        // then we need to rewrite with a friendly-from
-        // (so we do not land in the spam folder)
-        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf)) {
+        //
+        // 3) ensure all email headers were parsed
+        //
+        if (!messageSplitter.headersParsed) {
           const err = new Error(
-            oneLine`
-              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
-              If you believe this is an error, please forward this email to: support@forwardemail.net
-            `
+            'Headers were unable to be parsed, please try again'
           );
-          err.responseCode = 550;
+          err.responseCode = 421;
+          throw new Error(err);
+        }
+
+        //
+        // store variables for use later
+        //
+        let rewriteFriendlyFrom = false;
+        // headers object (includes the \r\n\r\n header and body separator)
+        const { headers } = messageSplitter;
+        const from = headers.getFirst('from');
+        // message body as a single Buffer (everything after the \r\n\r\n separator)
+        const body = Buffer.concat(chunks);
+
+        const originalRaw = Buffer.concat([headers.build(), body]);
+
+        //
+        // 4) check for spam (score must be < 5)
+        //
+        // TODO: we need to replace the spam block below with implementation
+        // // of `pdf-spamc-stream` from https://github.com/streamtOtO/spamc-stream
+        // // note that this package name is published with several key updates
+        //
+        // TODO: we may also want to add clamav for attachment scanning
+        let spamScore = 0;
+        try {
+          spamScore = await mailUtilities.computeSpamScoreAsync(originalRaw);
+        } catch (err) {
+          if (log) console.error(err);
+        }
+
+        if (spamScore >= 5) {
+          const err = new Error(
+            `Message detected as spam (spam score was ${spamScore})`
+          );
+          err.responseCode = 554;
           throw err;
         }
 
-        // now we need to do a reverse-SPF lookup
-        // so we prevent emails from Amazon/Twitch going to spam
-        // since Amazon/Twitch for example obviously don't allow us
-        // as a sender within their SPF records
-        // but note that this must come before DMARC validation
-        const reverseSpf = await this.validateSPF(
-          ip.address(), // our server's current IP address
-          session.envelope.from, // the original FROM address
-          // TODO: eventually we need a way to map which IP
-          // is to which exchange/FQDN without assuming it's the first
-          this.config.exchanges[0] // our server's FQDN (pick the first)
-        );
-
-        if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
-          const { replyTo, from } = this.rewriteFriendlyFrom(mail);
-          obj.replyTo = replyTo;
-          obj.from = from;
-          mail.from = from;
-          session.envelope.from = from;
-        }
-
-        const dkim = hasDKIMSignature
-          ? await this.validateDKIM(rawEmail)
-          : true;
-
-        // if there was no valid SPF record found for this sender
-        // AND if there was no valid DKIM signature on the message
-        // then we must refuse sending this email along because it
-        // literally has on validation that it's from who it says its from
+        //
+        // 5) if DKIM signature passed and was valid
+        //
+        const dkim =
+          headers.getFirst('dkim-signature') === ''
+            ? true
+            : await this.validateDKIM(originalRaw);
         if (!dkim) {
           const err = new Error(
             oneLine`
@@ -409,77 +356,30 @@ class ForwardEmail {
         }
 
         //
-        // if SPF failed that means the sender did not designate
-        // us as a proxy/middleman (e.g. Amazon.com or Twitch.com)
-        // and so we need to rewrite the FROM with friendly-from
-        // and make the reply to be the original FROM address
+        // 6) if SPF is valid
         //
-        // (so we don't want it to land in the user's inbox with failed SPF)
-        //
-        // TODO: here is where we'd implement ARC (but still SPF would fail)
-        //
-
-        //
-        // TODO: we need to replace the spam block below with implementation
-        // of `pdf-spamc-stream` from https://github.com/streamtOtO/spamc-stream
-        // note that this package name is published with several key updates
-        //
-
-        // https://www.npmjs.com/package/pdf-spamc-stream
-        // (vs)
-        // https://www.npmjs.com/package/spamc-stream
-        //
-        // check against spamd if this message is spam
-        // <https://github.com/humantech/node-spamd#usage>
-        //
-        // note that we wrap with a try/catch due to this error
-        /*
-        0|smtp     | error: TypeError: Cannot read property '2' of null
-        0|smtp     |     at processResponse (/var/www/production/source/node_modules/spamc/index.js:381:43)
-        0|smtp     |     at /var/www/production/source/node_modules/spamc/index.js:99:28
-        0|smtp     |     at Socket.<anonymous> (/var/www/production/source/node_modules/spamc/index.js:327:28)
-        0|smtp     |     at Socket.emit (events.js:182:13)
-        0|smtp     |     at Socket.EventEmitter.emit (domain.js:442:20)
-        0|smtp     |     at TCP._handle.close (net.js:595:12)
-        */
-        let spamScore = 0;
-        try {
-          spamScore = await mailUtilities.computeSpamScoreAsync(rawEmail);
-        } catch (err) {
-          if (log) console.error(err);
-        }
-
-        if (spamScore >= 5) {
-          // TODO: blacklist IP address
+        const spf = await this.validateSPF(
+          session.remoteAddress,
+          session.envelope.mailFrom.address,
+          session.clientHostname
+        );
+        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf)) {
           const err = new Error(
-            `Message detected as spam (spam score was ${spamScore})`
+            oneLine`
+              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
+              If you believe this is an error, please forward this email to: support@forwardemail.net
+            `
           );
-          err.responseCode = 554;
+          err.responseCode = 550;
           throw err;
         }
 
-        // TODO: implement spamassassin automatic learning
-        // through bayes based off response from proxy (e.g. gmail response)
-        // (if spam errors occur, we need 550 error code)
-        // and we also might want to add clamav
-        // for attachment scanning to prevent those from going through as well
-
-        // since we're signing our own DKIM signature
-        // we need to delete appropriate headers to prevent failure
-        delete mail.headers['mime-version'];
-        delete mail.headers['content-type'];
-        delete mail.headers['dkim-signature'];
-        delete mail.headers['x-google-dkim-signature'];
-
-        // added support for DMARC validation
-        // recursively lookup the DMARC policy for the FROM address
-        // and if it exists then we need to rewrite with a friendly-from
-        // so we need to resolve the TXT record for `_.dmarc.tld`
+        //
+        // 7) check for DMARC compliance
+        //
         const dmarcRecord = await this.getDMARC(
-          session.envelope.from.split('@')[1]
-          // addressParser(mail.from)[0].address.split('@')[1]
+          session.envelope.mailFrom.address.split('@')[1]
         );
-
         if (dmarcRecord) {
           try {
             const result = dmarcParse(dmarcRecord);
@@ -496,131 +396,140 @@ class ForwardEmail {
                 result.tags.p.value.toLowerCase().trim()
               )
             ) {
-              const { replyTo, from } = this.rewriteFriendlyFrom(mail);
-              obj.replyTo = replyTo;
-              obj.from = from;
-              mail.from = from;
-              session.envelope.from = from;
+              rewriteFriendlyFrom = true;
+              // eslint-disable-next-line max-depth
+              if (headers.getFirst('reply-to') === '')
+                headers.update('Reply-To', from);
+              headers.update('From', this.rewriteFriendlyFrom(from));
             }
           } catch (err) {
             if (log) console.error(err);
           }
         }
 
-        // NOTE: we probably don't need to delete these
-        // but just keeping them here for future reference
-        // delete mail.messageId;
-        // delete mail.headers['x-gm-message-state'];
-        // delete mail.headers['x-google-smtp-source'];
-        // delete mail.headers['x-received'];
-        // delete mail.headers['x-google-address-confirmation'];
+        //
+        // 8) reverse SPF check and rewrite with friendly-from (DNS lookup)
+        //
+        if (!rewriteFriendlyFrom) {
+          const reverseSpf = await this.validateSPF(
+            IP_ADDRESS,
+            session.envelope.mailFrom.address,
+            // TODO: eventually we need a way to map which IP
+            // is to which exchange/FQDN without assuming it's the first
+            this.config.exchanges[0] // our server's FQDN (pick the first)
+          );
 
-        // TODO: note that if one email fails then all will fail right now
-        // send an email to each recipient
-        await Promise.each(session.envelope.to, async to => {
-          // TODO: pick lowest priority address found
-          const addresses = await this.validateMX(to);
-          const transporter = nodemailer.createTransport({
-            debug: log,
-            logger: log,
-            direct: true,
-            // secure: true,
-            // requireTLS: true,
-            opportunisticTLS: true,
-            port: 25,
-            host: addresses[0].exchange,
-            ...this.ssl,
-            name: os.hostname(),
-            tls: {
-              rejectUnauthorized: process.env.NODE_ENV !== 'test'
-            }
-            // <https://github.com/nodemailer/nodemailer/issues/625>
-          });
-
-          // verify transport
-          // await transporter.verify();
-
-          const email = {
-            ...obj,
-            envelope: session.envelope,
-            dkim: this.config.dkim
-          };
-
-          const info = await transporter.sendMail(email);
-          return info;
-        });
-
-        fn();
-      } catch (err) {
-        // parse SMTP code and message
-        if (err.message && err.message.startsWith('SMTP code:')) {
-          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
-          err.message = err.message.split('msg:')[1];
-          // TODO: we need to use bayes auto learning here
-          // to tell spam assassin that this email in particular failed
-          // (IFF as it was sent to a gmail, yahoo, or other major provider)
+          if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
+            rewriteFriendlyFrom = true;
+            if (headers.getFirst('reply-to') === '')
+              headers.update('Reply-To', from);
+            headers.update('From', this.rewriteFriendlyFrom(from));
+          }
         }
 
-        // add a note to email me for help
-        err.message +=
-          '\n\n If you need help please forward this email to support@forwardemail.net or visit https://forwardemail.net';
-        if (log) console.error(err);
-        fn(err);
-      }
-    });
+        //
+        // 9) rewrite message ID
+        //
+        let rewritten = false;
+        const recipients = await Promise.all(
+          session.envelope.rcptTo.map(async to => {
+            const address = await this.getForwardingAddress(to.address);
+            if (rewritten) return address;
+            // Gmail won't show the message in the inbox if it's sending FROM
+            // the same address that gets forwarded TO using our service
+            // (we can assume that other mail providers do the same)
+            const fromAddress = addressParser(from)[0].address;
+            if (address === fromAddress) {
+              rewritten = true;
+              if (headers.getFirst('message-id') !== '')
+                headers.update('In-Reply-To', headers.getFirst('message-id'));
+              headers.update('Message-ID', createMessageID(session));
+            }
 
-    stream.on('data', chunk => {
-      rawEmail += chunk;
-    });
-
-    stream.on('end', () => {
-      if (stream.sizeExceeded) {
-        const err = new Error(
-          `Message size exceeds maximum of ${bytes(this.config.smtp.size)}`
+            return address;
+          })
         );
-        err.responseCode = 450;
-        parser.emit('error', err);
-      }
-    });
 
-    parser.on('headers', headers => {
-      mail.headers = headers;
-    });
+        //
+        // 10) add our own DKIM signature and remove DKIM header (no bottleneck)
+        //
 
-    parser.on('data', data => {
-      if (data.type === 'text') {
-        Object.keys(data).forEach(key => {
-          if (['text', 'html', 'textAsHtml'].includes(key)) {
-            mail[key] = data[key];
-          }
-        });
-      }
+        // remove existing signatures
+        headers.remove('dkim-signature');
+        headers.remove('x-google-dkim-signature');
 
-      if (data.type === 'attachment') {
-        const chunks = [];
-        let chunklen = 0;
-
-        mail.attachments.push(data);
-
-        data.content.on('readable', () => {
+        // sign new message
+        const signedChunks = [];
+        const output = this.dkim.sign(
+          // join headers object and body into a full rfc822 formatted email
+          // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
+          Buffer.concat([headers.build(), body])
+        );
+        output.once('error', err => stream.destroy(err));
+        output.on('readable', () => {
           let chunk;
-          while ((chunk = data.content.read()) !== null) {
-            chunks.push(chunk);
-            chunklen += chunk.length;
+          while ((chunk = output.read()) !== null) {
+            signedChunks.push(chunk);
           }
         });
-
-        data.content.on('end', () => {
-          data.content = Buffer.concat(chunks, chunklen);
-          data.release();
+        output.once('end', async () => {
+          //
+          // 11) send email
+          //
+          const raw = Buffer.concat(signedChunks);
+          try {
+            await Promise.each(_.uniq(recipients), async to => {
+              const addresses = await this.validateMX(to);
+              const transporter = nodemailer.createTransport({
+                debug: log,
+                logger: log,
+                direct: true,
+                opportunisticTLS: true,
+                port: 25,
+                host: addresses[0].exchange,
+                ...this.ssl,
+                name: os.hostname(),
+                tls: {
+                  rejectUnauthorized: process.env.NODE_ENV !== 'test'
+                }
+              });
+              await transporter.sendMail({
+                envelope: {
+                  from: rewriteFriendlyFrom
+                    ? this.config.noReply
+                    : session.envelope.mailFrom.address,
+                  to
+                },
+                raw
+              });
+            });
+            fn();
+          } catch (err) {
+            stream.destroy(err);
+          }
         });
+      } catch (err) {
+        stream.destroy(err);
       }
     });
 
-    stream.pipe(parser);
-  }
+    messageSplitter.once('error', err => {
+      // parse SMTP code and message
+      if (err.message && err.message.startsWith('SMTP code:')) {
+        err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+        err.message = err.message.split('msg:')[1];
+      }
 
-  // TODO: we need to add Google Structured Data and then submit whitelist req
+      err.message +=
+        '\n\n If you need help please forward this email to support@forwardemail.net or visit https://forwardemail.net';
+      if (log) console.error(err);
+      fn(err);
+    });
+
+    stream.once('error', err => messageSplitter.destroy(err));
+
+    stream.pipe(messageSplitter);
+  }
 
   //
   // basically we have to check if the domain has an SPF record
@@ -684,9 +593,9 @@ class ForwardEmail {
     }
   }
 
-  async validateDKIM(rawEmail) {
+  async validateDKIM(raw) {
     try {
-      const result = await dkimVerify(Buffer.from(rawEmail, 'utf8'));
+      const result = await dkimVerify(raw);
       return result;
     } catch (err) {
       if (log) console.error(err);
@@ -896,7 +805,8 @@ if (!module.parent) {
     config.dkim = {
       domainName: 'forwardemail.net',
       keySelector: 'default',
-      privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8')
+      privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8'),
+      cacheDir: os.tmpdir()
     };
   }
 
