@@ -100,6 +100,8 @@
 | ------------------ | :--: | ----------- | ----------------------------------------------- |
 | _@ or leave blank_ | 3600 | SPF         | `v=spf1 a mx include:spf.forwardemail.net -all` |
 
+> :warning: If you are using Google Apps, you'll need to append `include:_spf.google.com` to the value above – e.g. `v=spf1 a mx include:spf.forwardemail.net include:_spf.google.com -all`.
+>
 > If you already have a similar line with `v=spf1`, then you'll need to append `include:spf.forwardemail.net` right before any existing `include:host.com` records and before the `-all` in the same line (e.g. `v=spf1 a mx include:spf.forwardemail.net include:host.com -all`).
 >
 > Note that there is a difference between `-all` and `~all`.  The `-` indicates that the SPF check should FAIL if it does not match, and `~` indicates that the SPF check should SOFTFAIL.  We recommend to use the `-all` approach to prevent domain forgery.
@@ -114,7 +116,7 @@
 
 _Optional Add-ons:_
 
-* Add a DMARC record for your domain name by folowing the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass)
+* Add a DMARC record for your domain name by following the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass)
 * If the email lands in your spam folder (which it should not), you can whitelist it (e.g. here are instructions for Google <https://support.google.com/a/answer/60751?hl=en&ref_topic=1685627>)
 * Add the ability to "Send Mail As" from Gmail by following [Send Mail As Using Gmail](#send-mail-as-using-gmail) below
 
