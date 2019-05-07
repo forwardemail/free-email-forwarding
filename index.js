@@ -141,7 +141,7 @@ class ForwardEmail {
   rewriteFriendlyFrom(from) {
     // preserve user's name
     const { name } = addressParser(from)[0];
-    return `${name} <${this.config.noReply}>`;
+    return `"${name}" <${this.config.noReply}>`;
   }
 
   parseUsername(address) {
@@ -233,10 +233,7 @@ class ForwardEmail {
     messageSplitter.on('readable', () => {
       let chunk;
       while ((chunk = messageSplitter.read()) !== null) {
-        // TODO: it would be nice if we could exit early
-        // rather than continuing to read the entire stream
-        if (stream.sizeExceeded) return;
-        chunks.push(chunk);
+        if (!stream.sizeExceeded) chunks.push(chunk);
       }
     });
 

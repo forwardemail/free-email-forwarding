@@ -165,6 +165,41 @@ if (!isCI)
     });
   });
 
+if (!isCI)
+  test('forwards an email with DKIM and SPF and a comma in the FROM', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      from: '"Doe, John" <john.doe@forwardemail.net>',
+      to: 'Niftylettuce <hello@niftylettuce.com>',
+      cc: 'cc@niftylettuce.com',
+      subject: 'test',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: [],
+      dkim: {
+        domainName: 'forwardemail.net',
+        keySelector: 'default',
+        privateKey: fs.readFileSync(
+          path.join(__dirname, '..', 'dkim-private.key'),
+          'utf8'
+        )
+      }
+    });
+    return new Promise(resolve => {
+      connection.once('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          t.is(err, null);
+          connection.close();
+        });
+      });
+    });
+  });
+
 if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
   test('rejects a spam file', async t => {
     const transporter = nodemailer.createTransport({
