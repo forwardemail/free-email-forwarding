@@ -3,18 +3,18 @@ const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-// const { Resolver } = require('dns');
+const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Promise = require('bluebird');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
-const DKIM = require('nodemailer/lib/dkim');
 const autoBind = require('auto-bind');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
+const getFQDN = require('get-fqdn');
 const ip = require('ip');
 const isCI = require('is-ci');
 const ms = require('ms');
@@ -34,23 +34,20 @@ const MessageSplitter = require('./message-splitter');
 
 mailUtilities = Promise.promisifyAll(mailUtilities);
 
-// currently running into this error when using this code:
-// `Error: Mail command failed: 421 Cannot read property '_handle' of undefined`
-// const resolver = new Resolver();
-// resolver.setServers(servers);
-// const resolveMx = Promise.promisify(resolver.resolveMx);
-// const resolveTxt = Promise.promisify(resolver.resolveTxt);
-
 const blacklist = require('./blacklist');
 
-const invalidTXTError = new Error('Invalid forward-email TXT record');
-invalidTXTError.responseCode = 550;
-
-const invalidMXError = new Error('Sender has invalid MX records');
-invalidMXError.responseCode = 550;
-
-// our server's current IP address
-const IP_ADDRESS = ip.address();
+class CustomError extends Error {
+  constructor(
+    message = 'An unknown error has occurred',
+    responseCode = 550,
+    ...params
+  ) {
+    super(...params);
+    Error.captureStackTrace(this, CustomError);
+    this.message = message;
+    this.responseCode = responseCode;
+  }
+}
 
 const log = process.env.NODE_ENV !== 'production';
 
@@ -97,7 +94,15 @@ class ForwardEmail {
       // https://gist.github.com/zhurui1008/48130439a079a3c23920
       //
       // <https://blog.cloudflare.com/announcing-1111/>
-      dns: ['1.1.1.1'],
+      dns: [
+        // TODO: <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
+        // cloudflare
+        '1.1.1.1',
+        '1.0.0.1',
+        // google
+        '8.8.8.8',
+        '8.8.4.4'
+      ],
       noReply: 'no-reply@forwardemail.net',
       smtp: {
         size: bytes('25mb'),
@@ -115,6 +120,10 @@ class ForwardEmail {
       ssl: this.ssl,
       exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
       dkim: {},
+      maxForwardedAddresses: 10,
+      email: 'support@forwardemail.net',
+      website: 'https://forwardemail.net',
+      recordPrefix: 'forward-email',
       ...config
     };
 
@@ -167,39 +176,36 @@ class ForwardEmail {
     domain = punycode.toASCII(domain);
 
     // check against blacklist
-    if (this.isBlacklisted(domain)) {
-      const err = new Error('Blacklisted domains are not permitted');
-      err.responseCode = 550;
-      throw err;
-    }
+    if (this.isBlacklisted(domain))
+      throw new CustomError('Blacklisted domains are not permitted');
 
     // ensure fully qualified domain name
-    if (!validator.isFQDN(domain)) {
-      const err = new Error(`${domain} is not a FQDN`);
-      err.responseCode = 550;
-      throw err;
-    }
+    if (!validator.isFQDN(domain))
+      throw new CustomError(
+        `${domain} is not a fully qualified domain name ("FQDN")`
+      );
 
     // prevent disposable email addresses from being used
-    if (this.isDisposable(domain)) {
-      const err = new Error('Disposable email addresses are not permitted');
-      err.responseCode = 550;
-      throw err;
-    }
+    if (this.isDisposable(domain))
+      throw new CustomError(
+        `Disposable email address domain of ${domain} is not permitted`
+      );
 
     return domain;
   }
 
   async onConnect(session, fn) {
-    // TODO: this needs tested in production
-    // or we need to come up with a better way to do this
     if (process.env.NODE_ENV === 'test') return fn();
+
     // ensure it's a fully qualififed domain name
-    if (!validator.isFQDN(session.clientHostname)) {
-      const err = new Error(`${session.clientHostname} is not a FQDN`);
-      err.responseCode = 550;
-      return fn(err);
-    }
+    if (!validator.isFQDN(session.clientHostname))
+      return fn(
+        new CustomError(
+          `${
+            session.clientHostname
+          } is not a fully qualified domain name ("FQDN")`
+        )
+      );
 
     // ensure that it's not on the DNS blacklist
     try {
@@ -211,15 +217,16 @@ class ForwardEmail {
         }
       );
       if (!result) return fn();
-      const error = new Error(
-        `Your IP address of ${
-          session.remoteAddress
-        } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
-          session.remoteAddress
-        } for more information.`
+      fn(
+        new CustomError(
+          `Your IP address of ${
+            session.remoteAddress
+          } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
+            session.remoteAddress
+          } for more information.`,
+          554
+        )
       );
-      error.responseCode = 554;
-      fn(error);
     } catch (err) {
       if (log) console.error(err);
       fn();
@@ -250,7 +257,7 @@ class ForwardEmail {
       // 6) X if SPF is valid (child process python)
       // 7) X check for DMARC compliance (DNS lookup)
       // 8) X reverse SPF check and rewrite with friendly-from (DNS lookup)
-      // 9) X rewrite message ID
+      // 9) X rewrite message ID and lookup multiple recipients
       // 10) X add our own DKIM signature and remove DKIM header (no bottleneck)
       // 11) X send email
       //
@@ -262,13 +269,11 @@ class ForwardEmail {
         //
         // 1) if email file size exceeds the limit
         //
-        if (stream.sizeExceeded) {
-          const err = new Error(
-            `Message size exceeds maximum of ${bytes(this.config.smtp.size)}`
+        if (stream.sizeExceeded)
+          throw new CustomError(
+            `Message size exceeds maximum of ${bytes(this.config.smtp.size)}`,
+            450
           );
-          err.responseCode = 450;
-          throw err;
-        }
 
         //
         // 2) prevent replies to no-reply@forwardemail.net
@@ -278,26 +283,21 @@ class ForwardEmail {
             session.envelope.rcptTo,
             to => to.address === this.config.noReply
           )
-        ) {
-          const err = new Error(
+        )
+          throw new CustomError(
             oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${
               this.config.noReply
             }>`
           );
-          err.responseCode = 550;
-          throw err;
-        }
 
         //
         // 3) ensure all email headers were parsed
         //
-        if (!messageSplitter.headersParsed) {
-          const err = new Error(
-            'Headers were unable to be parsed, please try again'
+        if (!messageSplitter.headersParsed)
+          throw new CustomError(
+            'Headers were unable to be parsed, please try again',
+            421
           );
-          err.responseCode = 421;
-          throw new Error(err);
-        }
 
         //
         // store variables for use later
@@ -326,13 +326,11 @@ class ForwardEmail {
           if (log) console.error(err);
         }
 
-        if (spamScore >= 5) {
-          const err = new Error(
-            `Message detected as spam (spam score was ${spamScore})`
+        if (spamScore >= 5)
+          throw new CustomError(
+            `Message detected as spam (spam score was ${spamScore})`,
+            554
           );
-          err.responseCode = 554;
-          throw err;
-        }
 
         //
         // 5) if DKIM signature passed and was valid
@@ -341,42 +339,48 @@ class ForwardEmail {
           headers.getFirst('dkim-signature') === ''
             ? true
             : await this.validateDKIM(originalRaw);
-        if (!dkim) {
-          const err = new Error(
+
+        if (!dkim)
+          throw new CustomError(
             oneLine`
               The email you sent has an invalid DKIM signature, please try again or check your email service's DKIM configuration.\n
-              If you believe this is an error, please forward this email to: support@forwardemail.net
+              If you believe this is an error, please forward this email to: ${
+                this.config.email
+              }
             `
           );
-          err.responseCode = 550;
-          throw err;
-        }
+
+        // get the fully qualified domain name ("FQDN") of this server
+        const ipAddress =
+          process.env.NODE_ENV === 'test' ? '178.128.149.101' : ip.address();
+        const fqdn =
+          process.env.NODE_ENV === 'test'
+            ? 'mx1.forwardemail.net'
+            : await getFQDN(ipAddress);
 
         //
         // 6) if SPF is valid
         //
         const spf = await this.validateSPF(
-          session.remoteAddress,
+          process.env.NODE_ENV === 'test' ? ipAddress : session.remoteAddress,
           session.envelope.mailFrom.address,
-          session.clientHostname
+          process.env.NODE_ENV === 'test' ? fqdn : session.clientHostname
         );
-        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf)) {
-          const err = new Error(
+        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
+          throw new CustomError(
             oneLine`
               The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
-              If you believe this is an error, please forward this email to: support@forwardemail.net
+              If you believe this is an error, please forward this email to: ${
+                this.config.email
+              }
             `
           );
-          err.responseCode = 550;
-          throw err;
-        }
 
         //
         // 7) check for DMARC compliance
         //
-        const dmarcRecord = await this.getDMARC(
-          session.envelope.mailFrom.address.split('@')[1]
-        );
+        const fromDomain = session.envelope.mailFrom.address.split('@')[1];
+        const dmarcRecord = await this.getDMARC(fromDomain);
         if (dmarcRecord) {
           try {
             const result = dmarcParse(dmarcRecord);
@@ -386,7 +390,9 @@ class ForwardEmail {
               !_.isObject(result.tags.p) ||
               !_.isString(result.tags.p.value)
             )
-              throw new Error('Invalid DMARC parsed result');
+              throw new CustomError(
+                `Invalid DMARC parsed result for ${fromDomain}`
+              );
             // if quarantine or reject then we need to rewrite w/friendly-from
             if (
               ['quarantine', 'reject'].includes(
@@ -409,11 +415,12 @@ class ForwardEmail {
         //
         if (!rewriteFriendlyFrom) {
           const reverseSpf = await this.validateSPF(
-            IP_ADDRESS,
+            // our server's current IP address
+            ipAddress,
+            // original from address
             session.envelope.mailFrom.address,
-            // TODO: eventually we need a way to map which IP
             // is to which exchange/FQDN without assuming it's the first
-            this.config.exchanges[0] // our server's FQDN (pick the first)
+            fqdn
           );
 
           if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
@@ -425,27 +432,33 @@ class ForwardEmail {
         }
 
         //
-        // 9) rewrite message ID
+        // 9) rewrite message ID and lookup multiple recipients
         //
         let rewritten = false;
-        const recipients = await Promise.all(
+        let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
-            const address = await this.getForwardingAddress(to.address);
-            if (rewritten) return address;
+            const addresses = await this.getForwardingAddresses(to.address);
+            if (rewritten) return addresses;
             // Gmail won't show the message in the inbox if it's sending FROM
             // the same address that gets forwarded TO using our service
             // (we can assume that other mail providers do the same)
-            const fromAddress = addressParser(from)[0].address;
-            if (address === fromAddress) {
-              rewritten = true;
-              if (headers.getFirst('message-id') !== '')
-                headers.update('In-Reply-To', headers.getFirst('message-id'));
-              headers.update('Message-ID', createMessageID(session));
-            }
+            addresses.forEach(address => {
+              if (rewritten) return;
+              const fromAddress = addressParser(from)[0].address;
+              if (address === fromAddress) {
+                rewritten = true;
+                if (headers.getFirst('message-id') !== '')
+                  headers.update('In-Reply-To', headers.getFirst('message-id'));
+                headers.update('Message-ID', createMessageID(session));
+              }
+            });
 
-            return address;
+            return addresses;
           })
         );
+
+        // flatten the recipients and make them unique
+        recipients = _.uniq(_.flatten(recipients));
 
         //
         // 10) add our own DKIM signature and remove DKIM header (no bottleneck)
@@ -483,9 +496,9 @@ class ForwardEmail {
                 direct: true,
                 opportunisticTLS: true,
                 port: 25,
-                host: addresses[0].exchange,
+                host: addresses[0].exchange, // already pre-sorted by priority
                 ...this.ssl,
-                name: os.hostname(),
+                name: fqdn,
                 tls: {
                   rejectUnauthorized: process.env.NODE_ENV !== 'test'
                 }
@@ -517,8 +530,9 @@ class ForwardEmail {
         err.message = err.message.split('msg:')[1];
       }
 
-      err.message +=
-        '\n\n If you need help please forward this email to support@forwardemail.net or visit https://forwardemail.net';
+      err.message += `\n\n If you need help please forward this email to ${
+        this.config.email
+      } or visit ${this.config.website}`;
       if (log) console.error(err);
       fn(err);
     });
@@ -540,11 +554,6 @@ class ForwardEmail {
   // we should respond with a `421` code as we do below
   //
   async validateSPF(remoteAddress, from, clientHostname) {
-    if (process.env.NODE_ENV === 'test') {
-      remoteAddress = '178.128.149.101';
-      clientHostname = 'mx1.forwardemail.net';
-    }
-
     try {
       const [result, explanation] = await spfCheck2(
         remoteAddress,
@@ -552,7 +561,7 @@ class ForwardEmail {
         clientHostname
       );
       if (['permerror', 'temperror'].includes(result))
-        throw new Error(
+        throw new CustomError(
           `SPF validation failed with result "${result}" and explanation "${explanation}"`
         );
       return result;
@@ -605,12 +614,18 @@ class ForwardEmail {
     try {
       const domain = this.parseDomain(address);
       const addresses = await dns.resolveMxAsync(domain);
-      if (!addresses || addresses.length === 0) throw invalidMXError;
+      if (!addresses || addresses.length === 0)
+        throw new CustomError(
+          `DNS lookup for ${domain} did not return any valid MX records`
+        );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      if (/queryMx ENODATA/.test(err) || /queryTxt ENOTFOUND/.test(err)) {
-        err.message = invalidMXError.message;
-        err.responseCode = invalidMXError.responseCode;
+      if (/queryMx ENODATA/.test(err)) {
+        err.message = `DNS lookup for ${address} did not return a valid MX record`;
+        err.responseCode = 550;
+      } else if (/queryTxt ENOTFOUND/.test(err)) {
+        err.message = `DNS lookup for ${address} did not return a valid TXT record`;
+        err.responseCode = 550;
       } else if (!err.responseCode) {
         err.responseCode = 421;
       }
@@ -635,11 +650,12 @@ class ForwardEmail {
 
         if (limit.remaining) return resolve();
         const delta = (limit.reset * 1000 - Date.now()) | 0;
-        err = new Error(
-          `Rate limit exceeded, retry in ${ms(delta, { long: true })}`
+        reject(
+          new CustomError(
+            `Rate limit exceeded, retry in ${ms(delta, { long: true })}`,
+            451
+          )
         );
-        err.responseCode = 451;
-        reject(err);
       });
     });
   }
@@ -662,8 +678,10 @@ class ForwardEmail {
 
   async onMailFrom(address, session, fn) {
     try {
-      await this.validateRateLimit(address.address);
-      await this.validateMX(address.address);
+      await Promise.all([
+        this.validateRateLimit(address.address),
+        this.validateMX(address.address)
+      ]);
       fn();
     } catch (err) {
       fn(err);
@@ -671,7 +689,7 @@ class ForwardEmail {
   }
 
   // this returns the forwarding address for a given email address
-  async getForwardingAddress(address) {
+  async getForwardingAddresses(address, isRecursive = false) {
     const domain = this.parseDomain(address);
     const records = await dns.resolveTxtAsync(domain);
 
@@ -681,8 +699,10 @@ class ForwardEmail {
     // add support for multi-line TXT records
     for (let i = 0; i < records.length; i++) {
       records[i] = records[i].join(''); // join chunks together
-      if (records[i].startsWith('forward-email='))
-        validRecords.push(records[i].replace('forward-email=', ''));
+      if (records[i].startsWith(`${this.config.recordPrefix}=`))
+        validRecords.push(
+          records[i].replace(`${this.config.recordPrefix}=`, '')
+        );
     }
 
     // join multi-line TXT records together and replace double w/single commas
@@ -692,7 +712,12 @@ class ForwardEmail {
       .trim();
 
     // if the record was blank then throw an error
-    if (s.isBlank(record)) throw invalidTXTError;
+    if (s.isBlank(record))
+      throw new CustomError(
+        `${address} domain of ${domain} has a blank "${
+          this.config.recordPrefix
+        }" TXT record`
+      );
 
     // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
     // record = "forward-email=hello:niftylettuce@gmail.com"
@@ -706,13 +731,13 @@ class ForwardEmail {
     // remove trailing whitespaces from each address listed
     const addresses = record.split(',').map(a => a.trim());
 
-    if (addresses.length === 0) throw invalidTXTError;
+    if (addresses.length === 0) throw new CustomError(``);
 
     // store if we have a forwarding address or not
-    let forwardingAddress;
+    let forwardingAddresses = [];
 
     // store if we have a global redirect or not
-    let globalForwardingAddress;
+    const globalForwardingAddresses = [];
 
     // check if we have a specific redirect and store global redirects (if any)
     // get username from recipient email address
@@ -727,43 +752,95 @@ class ForwardEmail {
           validator.isFQDN(this.parseDomain(addresses[i])) &&
           validator.isEmail(addresses[i])
         )
-          globalForwardingAddress = addresses[i];
+          globalForwardingAddresses.push(addresses[i]);
       } else {
-        const address = addresses[i].split(':');
+        const addr = addresses[i].split(':');
 
-        if (address.length !== 2) throw invalidTXTError;
+        if (addr.length !== 2 || !validator.isEmail(addr[1]))
+          throw new CustomError(
+            `${address} domain of ${domain} has an invalid "${
+              this.config.recordPrefix
+            }" TXT record due to an invalid email address of "${addresses[i]}"`
+          );
 
-        // address[0] = hello (username)
-        // address[1] = niftylettuce@gmail.com (forwarding email)
+        // addr[0] = hello (username)
+        // addr[1] = niftylettuce@gmail.com (forwarding email)
 
         // check if we have a match
-        if (username === address[0]) {
-          forwardingAddress = address[1];
+        if (username === addr[0]) {
+          forwardingAddresses.push(addr[1]);
           break;
         }
       }
     }
 
     // if we don't have a specific forwarding address try the global redirect
-    if (!forwardingAddress && globalForwardingAddress)
-      forwardingAddress = globalForwardingAddress;
+    if (
+      forwardingAddresses.length === 0 &&
+      globalForwardingAddresses.length > 0
+    ) {
+      globalForwardingAddresses.forEach(address => {
+        forwardingAddresses.push(address);
+      });
+    }
 
     // if we don't have a forwarding address then throw an error
-    if (!forwardingAddress) throw invalidTXTError;
+    if (forwardingAddresses.length === 0)
+      throw new CustomError(
+        `${address} domain of ${domain} is not configured properly and does not contain any valid "${
+          this.config.recordPrefix
+        }" TXT records`
+      );
+
+    // allow one recursive lookup on forwarding addresses
+    await Promise.each(forwardingAddresses, async forwardingAddress => {
+      try {
+        const addresses = await this.getForwardingAddresses(
+          forwardingAddress,
+          true
+        );
+        if (addresses.length === 0) return;
+        if (isRecursive)
+          throw new CustomError(
+            `${address} contains a forwarded address of ${forwardingAddress} which is recursively forwarded to (${
+              addresses.length
+            }) addresses`
+          );
+        addresses.forEach(address => {
+          forwardingAddresses.push(address);
+        });
+      } catch (err) {}
+    });
+
+    // make the forwarding addresses unique
+    forwardingAddresses = _.uniq(forwardingAddresses);
+
+    // if max number of forwarding addresses exceeded
+    if (forwardingAddresses.length > this.config.maxForwardedAddresses)
+      throw new CustomError(
+        `The address ${address} is attempted to be forwarded to (${
+          forwardingAddresses.length
+        }) addresses which exceeds the maximum of (${
+          this.config.maxForwardedAddresses
+        })`
+      );
 
     // otherwise transform the + symbol filter if we had it
     // and then resolve with the newly formatted forwarding address
-    if (address.indexOf('+') === -1) return forwardingAddress;
+    // (we can return early here if there was no + symbol)
+    if (address.indexOf('+') === -1) return forwardingAddresses;
 
-    return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
-      address
-    )}@${this.parseDomain(forwardingAddress)}`;
+    return forwardingAddresses.map(forwardingAddress => {
+      return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
+        address
+      )}@${this.parseDomain(forwardingAddress)}`;
+    });
   }
 
   async onRcptTo(address, session, fn) {
     try {
       // validate forwarding address by looking up TXT record `forward-email=`
-      await this.getForwardingAddress(address.address);
+      await this.getForwardingAddresses(address.address);
 
       // validate MX records exist and contain ours
       const addresses = await this.validateMX(address.address);
@@ -772,11 +849,11 @@ class ForwardEmail {
         exchanges.includes(exchange)
       );
       if (hasAllExchanges) return fn();
-      const err = new Error(
-        `Missing required DNS MX records: ${this.config.exchanges.join(', ')}`
+      throw new CustomError(
+        `${address} is missing required DNS MX records of ${this.config.exchanges.join(
+          ', '
+        )}`
       );
-      err.responseCode = 550;
-      throw err;
     } catch (err) {
       fn(err);
     }

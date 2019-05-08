@@ -1,14 +1,14 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const uuid = require('uuid');
-const isCI = require('is-ci');
-const shell = require('shelljs');
-const bytes = require('bytes');
-const test = require('ava');
-const nodemailer = require('nodemailer');
 const Client = require('nodemailer/lib/smtp-connection');
+const bytes = require('bytes');
 const domains = require('disposable-email-domains');
+const isCI = require('is-ci');
+const nodemailer = require('nodemailer');
+const shell = require('shelljs');
+const test = require('ava');
+const uuid = require('uuid');
 
 const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
@@ -64,7 +64,7 @@ test('rejects forwarding a non-FQDN email', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(err.message, /is not a FQDN/);
+        t.regex(err.message, /is not a fully qualified domain name/);
         connection.close();
       });
     });
@@ -94,7 +94,10 @@ test('rejects forwarding a non-registered email address', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(err.message, /Invalid forward-email TXT record/);
+        t.regex(
+          err.message,
+          /is not configured properly and does not contain any valid/
+        );
         connection.close();
       });
     });
@@ -284,7 +287,7 @@ test('rejects a disposable email sender', async t => {
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
         t.is(err.responseCode, 550);
-        t.regex(err.message, /Disposable email addresses are not permitted/);
+        t.regex(err.message, /is not permitted/);
         connection.close();
       });
     });

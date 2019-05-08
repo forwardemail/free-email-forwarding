@@ -27,6 +27,10 @@
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
   * [Why did I create this service](#why-did-i-create-this-service)
+  * [Can I forward emails to multiple recipients](#can-i-forward-emails-to-multiple-recipients)
+  * [Can I have multiple global catch-all recipients](#can-i-have-multiple-global-catch-all-recipients)
+  * [Is there a maximum limit on the number of email addressess I can forward to](#is-there-a-maximum-limit-on-the-number-of-email-addressess-i-can-forward-to)
+  * [Can I recursively forward emails](#can-i-recursively-forward-emails)
   * [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
   * [How is it free](#how-is-it-free)
   * [What is the max email size limit](#what-is-the-max-email-size-limit)
@@ -394,6 +398,52 @@ There's also Zoho mail, but again that requires you signing up for an account wi
 Put simply, there was no current email-forwarding service that was free, simple, secure, tested, and open-source.
 
 This service solves all of these problems.
+
+### Can I forward emails to multiple recipients
+
+Yes, absolutely.  Just specify multiple recipients in your TXT records.
+
+For example, if I want an email that goes to `hello@niftylettuce.com` to get forwarded to `niftylettuce+a@gmail.com` and `niftylettuce+b@gmail.com`, then my TXT record would look like this:
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                                      |
+| ------------------ | :--: | ----------- | ----------------------------------------------------------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce+a@gmail.com,hello:niftylettuce+b@gmail.com` |
+
+Or, you could specify them in two separate lines, such as this:
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                       |
+| ------------------ | :--: | ----------- | ---------------------------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce+a@gmail.com` |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=hello:niftylettuce+b@gmail.com` |
+
+It's up to you!
+
+### Can I have multiple global catch-all recipients
+
+Yes, you can. Just specify multiple global catch-all recipients in your TXT records.
+
+For example, if I want every email that goes to `*@niftylettuce.com` (the asterisk meaning its a wildcard aka catch-all) to get forwarded to `niftylettuce+a@gmail.com` and `niftylettuce+b@gmail.com`, then my TXT record would loo like this:
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                          |
+| ------------------ | :--: | ----------- | ----------------------------------------------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=niftylettuce+a@gmail.com,niftylettuce+b@gmail.com` |
+
+Or, you could specify them in two separate lines, such as this:
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                 |
+| ------------------ | :--: | ----------- | ---------------------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=niftylettuce+a@gmail.com` |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=niftylettuce+b@gmail.com` |
+
+It's up to you!
+
+### Is there a maximum limit on the number of email addressess I can forward to
+
+Yes, the default limit is 10.  You could have `hello:niftylettuce+1@gmail.com`, `hello:niftylettuce+2@gmail.com`, `hello:niftylettuce+3@gmail.com`, … (from 1-10) – and any emails to `hello@niftylettuce.com` would get forwarded to `niftylettuce+1@gmail.com`, `niftylettuce+2@gmail.com`, `niftylettuce+3@gmail.com`, … (from 1-10).
+
+### Can I recursively forward emails
+
+Yes, you can, however you still must adhere to the maximum limit.  If you have `hello:nick@niftylettuce.com` and `nick:niftylettuce@gmail.com`, then emails to `hello@niftylettuce.com` would get forwarded to `nick@niftylettuce.com` and `niftylettuce@gmail.com`.  Note that an error will be thrown if you attempt to recursively forward emails.
 
 ### Can people unregister or register my email forwarding without my permission
 
