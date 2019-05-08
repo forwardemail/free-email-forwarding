@@ -16,13 +16,10 @@
 
 * [How It Works](#how-it-works)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
+* [Issues & Debugging](#issues--debugging)
 * [Timeline](#timeline)
 * [Self-Hosted Requirements](#self-hosted-requirements)
-* [CLI](#cli)
-* [API](#api)
-* [Usage](#usage)
-  * [CLI](#cli-1)
-  * [API](#api-1)
+* [Programmatic Usage](#programmatic-usage)
 * [Service-Level Agreement](#service-level-agreement)
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
@@ -149,6 +146,15 @@ After you've followed the steps above in [How It Works](#how-it-works) you can f
 14. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
 15. Once you've done that, go back to the email and click the link to "confirm the request". You need to do this step and the previous step for the email to be correctly configured.
 16. Done!
+
+
+## Issues & Debugging
+
+The most probable cause of your issues with not receiving test emails or with configuration in general is due to DNS propagation and caching.
+
+Fortunately our DNS provider Cloudflare has a nice "Purge Cache" tool available for you to use at <https://1.1.1.1/purge-cache/>.
+
+All you need to do is go to that link for both "MX" and "TXT" record types, enter your domain name, and click "Purge Cache".  You'll then need to wait a few minutes and try again!
 
 
 ## Timeline
@@ -294,22 +300,7 @@ You'll also need the following dependencies installed:
 * Nameservers - we highly recommend you set your server's nameservers to `1.1.1.` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
 
 
-## CLI
-
-[npm][]:
-
-```sh
-npm install -g forward-email
-```
-
-[yarn][]:
-
-```sh
-yarn global add forward-email
-```
-
-
-## API
+## Programmatic Usage
 
 [npm][]:
 
@@ -322,15 +313,6 @@ npm install forward-email
 ```sh
 yarn add forward-email
 ```
-
-
-## Usage
-
-### CLI
-
-Use PM2 in combination with an `ecosystem.json` file and `authbind` (see the example [ecosystem.json](ecosystem.json) file as an example.  Basically instead of `index` in your `ecosystem.json` file, you will use the globally installed command `forward-email` instead.
-
-### API
 
 ```js
 const ForwardEmail = require('forward-email');
