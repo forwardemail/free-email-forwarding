@@ -2877,6 +2877,14 @@ get-caller-file@^2.0.1:
   resolved "https://registry.yarnpkg.com/get-caller-file/-/get-caller-file-2.0.5.tgz#4f94412a82db32f36e3b0b9741f8a97feb031f7e"
   integrity sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==
 
+get-fqdn@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/get-fqdn/-/get-fqdn-0.0.2.tgz#6ddbce289a9ee0868f6a2b54564910df6a7ae215"
+  integrity sha512-Xx3bf+8cZRHx7fSFigxu+eFQ617BDCw2H9e8+GruHPiu8A84CjJ6HrSJG9zbyFAhQ0MaaaaLkB6c3zSANW390Q==
+  dependencies:
+    ip "^1.1.5"
+    universalify "^0.1.2"
+
 get-func-name@^2.0.0:
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/get-func-name/-/get-func-name-2.0.0.tgz#ead774abee72e20409433a066366023dd6887a41"
@@ -4091,10 +4099,10 @@ libbase64@1.0.3:
   resolved "https://registry.yarnpkg.com/libbase64/-/libbase64-1.0.3.tgz#de3023234abeefeb9d49378804c8a94404f5c98c"
   integrity sha512-ULQZAATVGTAgVNwP61R+MbbSGNBy1tVzWupB9kbE6p+VccWd+J+ICXgOwQic5Yqagzpu+oPZ8sI7yXdWJnPPkA==
 
-libmime@4.1.0:
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/libmime/-/libmime-4.1.0.tgz#41d53a0160e7c76e117b63c9527ea479b7863ecd"
-  integrity sha512-SHkLd8rgKC33O9nMea2uKaLRgZgX7/ewniAyLkaTSkRUSXL1StY/GgFR+Xjk5bGU2Er/M93DPtnSuKo/zNViug==
+libmime@4.1.1:
+  version "4.1.1"
+  resolved "https://registry.yarnpkg.com/libmime/-/libmime-4.1.1.tgz#eb7a60c775ba78c3715ddaec5cd52596a047f8d1"
+  integrity sha512-HkOfBSj+l7pBOOucEgiI6PdbgHa8ljv+1rARzW743HQ51UP8gabMlcA2wAF3Dg1aeuMjHZ+LzAPYxM52IZsyGA==
   dependencies:
     iconv-lite "0.4.24"
     libbase64 "1.0.3"
@@ -4440,13 +4448,13 @@ mailparser@^0.5.1:
     mimelib "^0.2.19"
     uue "^3.0.0"
 
-mailsplit@^4.4.0:
-  version "4.4.0"
-  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.4.0.tgz#96508f5557a41870e320c57932bf7b9e43e8cd63"
-  integrity sha512-zbYcmM/USOX9Up+wsdGSAxPhdbZxvGirCR/preKxVmbSJbxt1MnYvHtbtLiDlvP1clBkXL9CB+3ktqFFEKjXvQ==
+mailsplit@^4.4.1:
+  version "4.4.1"
+  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.4.1.tgz#838603af3c1561e27aedd8599cec2a59c097faa6"
+  integrity sha512-AmWLEHQAg/zbNb1MdrPQS9VOzysHaU9IuoQV9kGU5fgjM5RCbgqVkZzp0+DhPep8sj8iHfbWkl16Nb1PbNlTYg==
   dependencies:
     libbase64 "1.0.3"
-    libmime "4.1.0"
+    libmime "4.1.1"
     libqp "1.1.0"
 
 make-dir@^1.0.0:
@@ -7901,6 +7909,11 @@ unist-util-visit@^1.0.0, unist-util-visit@^1.1.0, unist-util-visit@^1.1.1, unist
   integrity sha512-FiGu34ziNsZA3ZUteZxSFaczIjGmksfSgdKqBfOejrrfzyUy5b7YrlzT1Bcvi+djkYDituJDy2XB7tGTeBieKw==
   dependencies:
     unist-util-visit-parents "^2.0.0"
+
+universalify@^0.1.2:
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/universalify/-/universalify-0.1.2.tgz#b646f69be3942dabcecc9d6639c80dc105efaa66"
+  integrity sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==
 
 unset-value@^1.0.0:
   version "1.0.0"
