@@ -26,7 +26,7 @@
   * [Why did I create this service](#why-did-i-create-this-service)
   * [Can I forward emails to multiple recipients](#can-i-forward-emails-to-multiple-recipients)
   * [Can I have multiple global catch-all recipients](#can-i-have-multiple-global-catch-all-recipients)
-  * [Is there a maximum limit on the number of email addressess I can forward to](#is-there-a-maximum-limit-on-the-number-of-email-addressess-i-can-forward-to)
+  * [Is there a maximum limit on the number of email addresses I can forward to](#is-there-a-maximum-limit-on-the-number-of-email-addresses-i-can-forward-to)
   * [Can I recursively forward emails](#can-i-recursively-forward-emails)
   * [Can people unregister or register my email forwarding without my permission](#can-people-unregister-or-register-my-email-forwarding-without-my-permission)
   * [How is it free](#how-is-it-free)
@@ -419,7 +419,7 @@ Or, you could specify them in two separate lines, such as this:
 
 It's up to you!
 
-### Is there a maximum limit on the number of email addressess I can forward to
+### Is there a maximum limit on the number of email addresses I can forward to
 
 Yes, the default limit is 10.  You could have `hello:niftylettuce+1@gmail.com`, `hello:niftylettuce+2@gmail.com`, `hello:niftylettuce+3@gmail.com`, … (from 1-10) – and any emails to `hello@niftylettuce.com` would get forwarded to `niftylettuce+1@gmail.com`, `niftylettuce+2@gmail.com`, `niftylettuce+3@gmail.com`, … (from 1-10).
 
