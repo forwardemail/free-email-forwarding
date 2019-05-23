@@ -299,7 +299,7 @@ You'll also need the following dependencies installed:
   +domain.com
   ```
 
-* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
+* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
 
 
 ## Programmatic Usage
