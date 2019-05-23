@@ -136,16 +136,18 @@ After you've followed the steps above in [How It Works](#how-it-works) you can f
 4. Go to [Gmail](https://gmail.com) and under [Settings > Accounts and Import > Send mail as](https://mail.google.com/mail/u/0/#settings/accounts), click `Add another email address`
 5. When prompted for `Name`, enter the name that you want your email to be seen as "From" (e.g. `Niftylettuce`)
 6. When prompted for `Email address`, enter the email address with the custom domain you used above (e.g. `hello@niftylettuce.com`)
-7. Click `Next Step` to proceed
-8. When prompted for `SMTP Server`, enter `smtp.gmail.com` and leave the port as `587`
-9. When prompted for `Username`, enter the portion of your Gmail address without the `@gmail.com` part (e.g. `niftylettuce` if my email is `niftylettuce@gmail.com`)
-10. When prompted for `Password`, paste from your clipboard the password you generated in step 2 above
-11. Leave the radio button checked to `Secured connection using TLS`
-12. Click `Add Account` to proceed
-13. Open a new tab to [Gmail](https://gmail.com) and wait for your verification email to arrive (you will receive a verification code that confirms you are the owner of the email address you are attempting to "Send Mail As")
-14. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
-15. Once you've done that, go back to the email and click the link to "confirm the request". You need to do this step and the previous step for the email to be correctly configured.
-16. Done!
+7. Uncheck `Treat as an alias`
+   > Check it if you prefer the recipient to reply (to the mail sent using your custom domain) directly to your Gmail address. [See details](https://support.google.com/a/answer/1710338)
+8. Click `Next Step` to proceed
+9. When prompted for `SMTP Server`, enter `smtp.gmail.com` and leave the port as `587`
+10. When prompted for `Username`, enter the portion of your Gmail address without the `@gmail.com` part (e.g. `niftylettuce` if my email is `niftylettuce@gmail.com`)
+11. When prompted for `Password`, paste from your clipboard the password you generated in step 2 above
+12. Leave the radio button checked to `Secured connection using TLS`
+13. Click `Add Account` to proceed
+14. Open a new tab to [Gmail](https://gmail.com) and wait for your verification email to arrive (you will receive a verification code that confirms you are the owner of the email address you are attempting to "Send Mail As")
+15. Once it arrives, copy and paste the verification code at the prompt you received in the previous step
+16. Once you've done that, go back to the email and click the link to "confirm the request". You need to do this step and the previous step for the email to be correctly configured.
+17. Done!
 
 
 ## Issues & Debugging
@@ -297,7 +299,7 @@ You'll also need the following dependencies installed:
   +domain.com
   ```
 
-* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
+* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
 
 
 ## Programmatic Usage
