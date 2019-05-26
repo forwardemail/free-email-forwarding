@@ -406,7 +406,7 @@ It's up to you!
 
 Yes, you can. Just specify multiple global catch-all recipients in your TXT records.
 
-For example, if I want every email that goes to `*@niftylettuce.com` (the asterisk meaning its a wildcard aka catch-all) to get forwarded to `niftylettuce+a@gmail.com` and `niftylettuce+b@gmail.com`, then my TXT record would loo like this:
+For example, if I want every email that goes to `*@niftylettuce.com` (the asterisk meaning its a wildcard aka catch-all) to get forwarded to `niftylettuce+a@gmail.com` and `niftylettuce+b@gmail.com`, then my TXT record would look like this:
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                                          |
 | ------------------ | :--: | ----------- | ----------------------------------------------------------------- |
