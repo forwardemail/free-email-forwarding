@@ -68,6 +68,7 @@ class CustomError extends Error {
 const log = process.env.NODE_ENV !== 'production';
 
 const logger = new Cabin({
+  capture: false,
   axe: {
     logger: signale
   },
