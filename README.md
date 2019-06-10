@@ -117,6 +117,10 @@
 _Optional Add-ons:_
 
 * Add a DMARC record for your domain name by following the instructions at <https://dmarc.postmarkapp.com> (this will allow DMARC verification to pass)
+> :warning: If you intend to use [Send Mail As using Gmail](#send-mail-as-using-gmail), you can only set the DMARC policy to `p=none` – e.g. `v=DMARC1; p=none; pct=100; rua=mailto:re+random-key@dmarc.postmarkapp.com;`. Setting other policies, `quarantine` or `reject`, may cause sent mails to end up in recipient's spam folder or not delivered at all.
+>
+> DMARC requires both `From` and `Return-Path` to match the same domain. When you use "Send Mail As", your Gmail address would be used as the `Return-Path`, instead of your custom domain in `From`.
+
 * If the email lands in your spam folder (which it should not), you can whitelist it (e.g. here are instructions for Google <https://support.google.com/a/answer/60751?hl=en&ref_topic=1685627>)
 * Add the ability to "Send Mail As" from Gmail by following [Send Mail As Using Gmail](#send-mail-as-using-gmail) below
 
@@ -571,7 +575,7 @@ At no point in time do we write to disk or store emails – everything is done i
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
