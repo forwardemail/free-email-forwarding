@@ -5,6 +5,7 @@
 
 const { Transform } = require('stream');
 const { Headers } = require('mailsplit');
+const bytes = require('bytes');
 
 /**
  * MessageSplitter instance is a transform stream that separates message headers
@@ -19,7 +20,9 @@ class MessageSplitter extends Transform {
     this.headerBytes = 0;
     this.headerChunks = [];
     this.rawHeaders = false;
-    this.bodySize = 0;
+    this.dataBytes = 0;
+    this._maxBytes = (options.maxBytes && Number(options.maxBytes)) || Infinity;
+    this.sizeExceeded = false;
   }
 
   /**
@@ -95,7 +98,6 @@ class MessageSplitter extends Transform {
       this.emit('headers', this.headers);
       if (data.length - 1 > headerPos) {
         const chunk = data.slice(headerPos);
-        this.bodySize += chunk.length;
         // this would be the first chunk of data sent downstream
         // from now on we keep header and body separated until final delivery
         setImmediate(() => this.push(chunk));
@@ -114,13 +116,20 @@ class MessageSplitter extends Transform {
   }
 
   _transform(chunk, encoding, callback) {
-    if (!chunk || chunk.length === 0) {
-      return callback();
+    if (!chunk || chunk.length === 0) return callback();
+
+    // stop reading if max size reached
+    this.dataBytes += chunk.length;
+    this.sizeExceeded = this.dataBytes > this._maxBytes;
+    if (this.sizeExceeded) {
+      const err = new Error(
+        `Maximum allowed message size ${bytes(this._maxBytes)} exceeded`
+      );
+      err.statusCode = 552;
+      return callback(err);
     }
 
-    if (typeof chunk === 'string') {
-      chunk = Buffer.from(chunk, encoding);
-    }
+    if (typeof chunk === 'string') chunk = Buffer.from(chunk, encoding);
 
     let headersFound;
 
@@ -130,10 +139,9 @@ class MessageSplitter extends Transform {
       return callback(err);
     }
 
-    if (headersFound) {
-      this.bodySize += chunk.length;
-      this.push(chunk);
-    }
+    // this.bodySize += chunk.length;
+
+    if (headersFound) this.push(chunk);
 
     setImmediate(callback);
   }

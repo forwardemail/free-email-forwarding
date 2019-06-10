@@ -4,7 +4,7 @@
       "name": "smtp",
       "script": "index.js",
       "exec_mode": "cluster",
-      "instances": "max",
+      "instances": "6",
       "env_production": {
         "NODE_ENV": "production"
       }
@@ -13,7 +13,7 @@
       "name": "smtps",
       "script": "index.js",
       "exec_mode": "cluster",
-      "instances": "max",
+      "instances": "6",
       "env_production": {
         "NODE_ENV": "production",
         "SECURE": "true",
@@ -24,7 +24,7 @@
       "name": "msa",
       "script": "index.js",
       "exec_mode": "cluster",
-      "instances": "max",
+      "instances": "6",
       "env_production": {
         "NODE_ENV": "production",
         "SECURE": "true",
