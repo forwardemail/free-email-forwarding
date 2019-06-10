@@ -1026,7 +1026,9 @@ class ForwardEmail {
         addresses.forEach(address => {
           forwardingAddresses.push(address);
         });
-      } catch {}
+      } catch (err) {
+        logger.error(err);
+      }
     });
 
     // make the forwarding addresses unique
