@@ -16,8 +16,7 @@
 
 * [How It Works](#how-it-works)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
-* [Issues & Debugging](#issues--debugging)
-* [Timeline](#timeline)
+* [Issues and Debugging](#issues-and-debugging)
 * [Self-Hosted Requirements](#self-hosted-requirements)
 * [Programmatic Usage](#programmatic-usage)
 * [Service-Level Agreement](#service-level-agreement)
@@ -150,20 +149,13 @@ After you've followed the steps above in [How It Works](#how-it-works) you can f
 17. Done!
 
 
-## Issues & Debugging
+## Issues and Debugging
 
 The most probable cause of your issues with not receiving test emails or with configuration in general is due to DNS propagation and caching.
 
 Fortunately our DNS provider Cloudflare has a nice "Purge Cache" tool available for you to use at <https://1.1.1.1/purge-cache/>.
 
 All you need to do is go to that link for both "MX" and "TXT" record types, enter your domain name, and click "Purge Cache".  You'll then need to wait a few minutes and try again!
-
-
-## Timeline
-
-* May 6, 2019: [**@niftylettuce**](https://github.com/niftylettuce) refactored the project thanks to [**@andris9**](https://github.com/andris9) and released [v2 with major performance gains](#how-fast-is-this-service)
-* November 5, 2017: [**@niftylettuce**](https://github.com/niftylettuce) released v1 of the project, with a focus to always be completely open source, transparent, private, secure, and free
-* 2010-2017: [**@niftylettuce**](https://github.com/niftylettuce) grew weary from the headache of setting of mail servers for every domain or the hassle and costs of using services Google Business and Zoho
 
 
 ## Self-Hosted Requirements
@@ -178,6 +170,8 @@ You'll also need the following dependencies installed:
   * We also recommend you install [yarn][], which is an alternative to [npm][]
 
 * [Redis][] (v4.x+) - this is a fast key-value store database used for rate-limiting and preventing spammers
+
+  > _NOTE_: You can pass `limiter: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ limiter: false });`
 
   * Mac (via [brew][]): `brew install redis && brew services start redis`
   * Ubuntu:
@@ -344,6 +338,44 @@ if (process.env.NODE_ENV === 'production') {
 
 const forwardEmail = new ForwardEmail(config);
 forwardEmail.server.listen(process.env.PORT || 25);
+
+const close = (code = 0) => {
+  forwardEmail.server.close(() => {
+    // eslint-disable-next-line unicorn/no-process-exit
+    process.exit(code);
+  });
+};
+
+// handle warnings
+process.on('warning', warning => {
+  console.warn(warning);
+});
+
+// handle uncaught promises
+process.on('unhandledRejection', err => {
+  console.error(err);
+  close(1);
+});
+
+// handle uncaught exceptions
+process.on('uncaughtException', err => {
+  console.error(err);
+  close(1);
+});
+
+// handle windows support (signals not available)
+// <http://pm2.keymetrics.io/docs/usage/signals-clean-restart/#windows-graceful-stop>
+process.on('message', msg => {
+  if (msg === 'shutdown') {
+    console.log(msg);
+    close();
+  }
+});
+
+// handle graceful restarts
+process.on('SIGTERM', () => close());
+process.on('SIGHUP', () => close());
+process.on('SIGINT', () => close());
 ```
 
 
@@ -423,7 +455,7 @@ It's up to you!
 
 ### Is there a maximum limit on the number of email addresses I can forward to
 
-Yes, the default limit is 10.  You could have `hello:niftylettuce+1@gmail.com`, `hello:niftylettuce+2@gmail.com`, `hello:niftylettuce+3@gmail.com`, … (from 1-10) – and any emails to `hello@niftylettuce.com` would get forwarded to `niftylettuce+1@gmail.com`, `niftylettuce+2@gmail.com`, `niftylettuce+3@gmail.com`, … (from 1-10).
+Yes, the default limit is 5.  You could have `hello:niftylettuce+1@gmail.com`, `hello:niftylettuce+2@gmail.com`, `hello:niftylettuce+3@gmail.com`, … (from 1-5) – and any emails to `hello@niftylettuce.com` would get forwarded to `niftylettuce+1@gmail.com`, `niftylettuce+2@gmail.com`, `niftylettuce+3@gmail.com`, … (from 1-5).
 
 ### Can I recursively forward emails
 

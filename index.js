@@ -3,6 +3,8 @@ const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+const Cabin = require('cabin');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Promise = require('bluebird');
@@ -23,6 +25,7 @@ const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
 const redis = require('redis');
 const s = require('underscore.string');
+const signale = require('signale');
 const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
@@ -35,6 +38,19 @@ const MessageSplitter = require('./message-splitter');
 mailUtilities = Promise.promisifyAll(mailUtilities);
 
 const blacklist = require('./blacklist');
+
+const CODES_TO_RESPONSE_CODES = {
+  ETIMEDOUT: 420,
+  ECONNRESET: 442,
+  EADDRINUSE: 421,
+  ECONNREFUSED: 421,
+  EPIPE: 421,
+  ENOTFOUND: 421,
+  ENETUNREACH: 421,
+  EAI_AGAIN: 421
+};
+
+const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 
 class CustomError extends Error {
   constructor(
@@ -51,7 +67,26 @@ class CustomError extends Error {
 
 const log = process.env.NODE_ENV !== 'production';
 
-if (log) Error.stackTraceLimit = Infinity;
+const logger = new Cabin({
+  axe: {
+    logger: signale
+  },
+  silent: log
+});
+
+const transporterConfig = {
+  debug: log,
+  logger,
+  direct: true,
+  opportunisticTLS: true,
+  port: 25,
+  tls: {
+    rejectUnauthorized: process.env.NODE_ENV !== 'test'
+  },
+  connectionTimeout: ms('5s'),
+  greetingTimeout: ms('5s'),
+  socketTimeout: 0
+};
 
 // taken from:
 // node_modules/nodemailer/lib/mime-node/index.js
@@ -98,10 +133,7 @@ class ForwardEmail {
         // TODO: <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
         // cloudflare
         '1.1.1.1',
-        '1.0.0.1',
-        // google
-        '8.8.8.8',
-        '8.8.4.4'
+        '1.0.0.1'
       ],
       noReply: 'no-reply@forwardemail.net',
       smtp: {
@@ -112,7 +144,7 @@ class ForwardEmail {
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
         logInfo: log,
-        logger: log,
+        logger,
         ...config.smtp,
         ...this.ssl
       },
@@ -120,7 +152,7 @@ class ForwardEmail {
       ssl: this.ssl,
       exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
       dkim: {},
-      maxForwardedAddresses: 10,
+      maxForwardedAddresses: 5,
       email: 'support@forwardemail.net',
       website: 'https://forwardemail.net',
       recordPrefix: 'forward-email',
@@ -131,20 +163,72 @@ class ForwardEmail {
     this.dkim = new DKIM(this.config.dkim);
 
     // setup rate limiting with redis
-    this.limiter = {
-      db: redis.createClient(),
-      max: 200, // max requests within duration
-      duration: ms('1h'),
-      ...this.config.limiter
-    };
+    if (this.config.limiter)
+      this.limiter = {
+        db: redis.createClient(),
+        max: 200, // max requests within duration
+        duration: ms('1h'),
+        ...this.config.limiter
+      };
 
     // setup our smtp server which listens for incoming email
     this.server = new SMTPServer(this.config.smtp);
+    this.server.on('error', err => {
+      logger.error(err);
+    });
 
     this.dns = Promise.promisifyAll(dns);
     this.dns.setServers(this.config.dns);
 
     autoBind(this);
+  }
+
+  processRecipient(options) {
+    const { recipient, name, from, raw } = options;
+    const { address, addresses } = recipient;
+    return Promise.all(
+      addresses.map(({ to, host }) =>
+        this.processAddress(address, {
+          to,
+          host,
+          name,
+          from,
+          raw: this.dkim.sign(raw)
+        })
+      )
+    );
+  }
+
+  async processAddress(address, options) {
+    try {
+      const info = await this.sendEmail(options);
+      logger.log(info);
+      return info;
+    } catch (err) {
+      // here we do some magic so that we push an error message
+      // that has the end-recipient's email masked with the
+      // original to address that we were trying to send to
+      err.message = err.message.replace(new RegExp(options.to, 'gi'), address);
+      logger.error(err);
+      return {
+        accepted: [],
+        rejected: [address],
+        rejectedErrors: [err]
+      };
+    }
+  }
+
+  // TODO: eventually we can combine multiple recipients
+  // that have the same MX records in the same envelope `to`
+  sendEmail(options) {
+    const { to, host, name, from, raw } = options;
+    const transporter = nodemailer.createTransport({
+      ...transporterConfig,
+      ...this.ssl,
+      host,
+      name
+    });
+    return transporter.sendMail({ envelope: { from, to }, raw });
   }
 
   rewriteFriendlyFrom(from) {
@@ -201,9 +285,7 @@ class ForwardEmail {
     if (!validator.isFQDN(session.clientHostname))
       return fn(
         new CustomError(
-          `${
-            session.clientHostname
-          } is not a fully qualified domain name ("FQDN")`
+          `${session.clientHostname} is not a fully qualified domain name ("FQDN")`
         )
       );
 
@@ -219,29 +301,51 @@ class ForwardEmail {
       if (!result) return fn();
       fn(
         new CustomError(
-          `Your IP address of ${
-            session.remoteAddress
-          } is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${
-            session.remoteAddress
-          } for more information.`,
+          `Your IP address of ${session.remoteAddress} is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${session.remoteAddress} for more information.`,
           554
         )
       );
     } catch (err) {
-      if (log) console.error(err);
+      logger.error(err);
       fn();
     }
   }
 
-  onData(stream, session, fn) {
-    const messageSplitter = new MessageSplitter();
+  async onData(stream, session, fn) {
+    //
+    // store an object of email addresses that bounced
+    // with their associated error that occurred
+    //
+    const bounces = [];
+
+    //
+    // store an array of chunks of the message
+    //
     const chunks = [];
+
+    //
+    // read the message headers and message itself
+    //
+    const messageSplitter = new MessageSplitter({
+      size: this.config.smtp.size
+    });
 
     messageSplitter.on('readable', () => {
       let chunk;
       while ((chunk = messageSplitter.read()) !== null) {
-        if (!stream.sizeExceeded) chunks.push(chunk);
+        chunks.push(chunk);
       }
+    });
+
+    //
+    // if an error occurs we have to continue reading the stream
+    //
+    messageSplitter.once('error', err => {
+      stream.unpipe(messageSplitter);
+      stream.on('readable', () => {
+        stream.read();
+      });
+      stream.once('end', () => fn(err));
     });
 
     // eslint-disable-next-line complexity
@@ -250,8 +354,8 @@ class ForwardEmail {
       // we need to check the following:
       //
       // 1) X if email file size exceeds the limit (no bottleneck)
-      // 2) X prevent replies to no-reply@forwardemail.net (no bottleneck)
-      // 3) X ensure all email headers were parsed
+      // 2) X ensure all email headers were parsed
+      // 3) X prevent replies to no-reply@forwardemail.net (no bottleneck)
       // 4) X check for spam (score must be < 5) (child process spam daemon)
       // 5) X if DKIM signature passed and was valid (child process python)
       // 6) X if SPF is valid (child process python)
@@ -271,27 +375,14 @@ class ForwardEmail {
         //
         if (stream.sizeExceeded)
           throw new CustomError(
-            `Message size exceeds maximum of ${bytes(this.config.smtp.size)}`,
-            450
+            `Maximum allowed message size ${bytes(
+              this.config.smtp.size
+            )} exceeded`,
+            552
           );
 
         //
-        // 2) prevent replies to no-reply@forwardemail.net
-        //
-        if (
-          _.some(
-            session.envelope.rcptTo,
-            to => to.address === this.config.noReply
-          )
-        )
-          throw new CustomError(
-            oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${
-              this.config.noReply
-            }>`
-          );
-
-        //
-        // 3) ensure all email headers were parsed
+        // 2) ensure all email headers were parsed
         //
         if (!messageSplitter.headersParsed)
           throw new CustomError(
@@ -300,16 +391,27 @@ class ForwardEmail {
           );
 
         //
+        // 3) prevent replies to no-reply@forwardemail.net
+        //
+        if (
+          _.every(
+            session.envelope.rcptTo,
+            to => to.address === this.config.noReply
+          )
+        )
+          throw new CustomError(
+            oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
+          );
+
+        //
         // store variables for use later
         //
         let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
-        const from = headers.getFirst('from');
+        const originalFrom = headers.getFirst('from');
         // message body as a single Buffer (everything after the \r\n\r\n separator)
-        const body = Buffer.concat(chunks);
-
-        const originalRaw = Buffer.concat([headers.build(), body]);
+        const originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
         //
         // 4) check for spam (score must be < 5)
@@ -323,7 +425,7 @@ class ForwardEmail {
         try {
           spamScore = await mailUtilities.computeSpamScoreAsync(originalRaw);
         } catch (err) {
-          if (log) console.error(err);
+          logger.error(err);
         }
 
         if (spamScore >= 5)
@@ -343,17 +445,15 @@ class ForwardEmail {
         if (!dkim)
           throw new CustomError(
             oneLine`
-              The email you sent has an invalid DKIM signature, please try again or check your email service's DKIM configuration.\n
-              If you believe this is an error, please forward this email to: ${
-                this.config.email
-              }
+              The email you sent has an invalid DKIM signature, please try again or check your email service's DKIM configuration.\r\n
+              If you believe this is an error, please forward this email to: ${this.config.email}
             `
           );
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
           process.env.NODE_ENV === 'test' ? '178.128.149.101' : ip.address();
-        const fqdn =
+        const name =
           process.env.NODE_ENV === 'test'
             ? 'mx1.forwardemail.net'
             : await getFQDN(ipAddress);
@@ -364,15 +464,13 @@ class ForwardEmail {
         const spf = await this.validateSPF(
           process.env.NODE_ENV === 'test' ? ipAddress : session.remoteAddress,
           session.envelope.mailFrom.address,
-          process.env.NODE_ENV === 'test' ? fqdn : session.clientHostname
+          process.env.NODE_ENV === 'test' ? name : session.clientHostname
         );
         if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
           throw new CustomError(
             oneLine`
-              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\n
-              If you believe this is an error, please forward this email to: ${
-                this.config.email
-              }
+              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\r\n
+              If you believe this is an error, please forward this email to: ${this.config.email}
             `
           );
 
@@ -402,11 +500,11 @@ class ForwardEmail {
               rewriteFriendlyFrom = true;
               // eslint-disable-next-line max-depth
               if (headers.getFirst('reply-to') === '')
-                headers.update('Reply-To', from);
-              headers.update('From', this.rewriteFriendlyFrom(from));
+                headers.update('Reply-To', originalFrom);
+              headers.update('From', this.rewriteFriendlyFrom(originalFrom));
             }
           } catch (err) {
-            if (log) console.error(err);
+            logger.error(err);
           }
         }
 
@@ -420,14 +518,14 @@ class ForwardEmail {
             // original from address
             session.envelope.mailFrom.address,
             // is to which exchange/FQDN without assuming it's the first
-            fqdn
+            name
           );
 
           if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
             rewriteFriendlyFrom = true;
             if (headers.getFirst('reply-to') === '')
-              headers.update('Reply-To', from);
-            headers.update('From', this.rewriteFriendlyFrom(from));
+              headers.update('Reply-To', originalFrom);
+            headers.update('From', this.rewriteFriendlyFrom(originalFrom));
           }
         }
 
@@ -435,30 +533,116 @@ class ForwardEmail {
         // 9) rewrite message ID and lookup multiple recipients
         //
         let rewritten = false;
+
+        // TODO: message-id should be the same if the message gets retried
+        // that way duplicate messages sent in part due to failure will have
+        // the same re-created message id
+        const messageId = createMessageID(session);
+
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
-            const addresses = await this.getForwardingAddresses(to.address);
-            if (rewritten) return addresses;
-            // Gmail won't show the message in the inbox if it's sending FROM
-            // the same address that gets forwarded TO using our service
-            // (we can assume that other mail providers do the same)
-            addresses.forEach(address => {
-              if (rewritten) return;
-              const fromAddress = addressParser(from)[0].address;
-              if (address === fromAddress) {
+            try {
+              // bounce message if it was sent to no-reply@
+              if (to.address === this.config.noReply)
+                throw new CustomError(
+                  oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
+                );
+
+              // get all forwarding addresses for this individual address
+              const addresses = await this.getForwardingAddresses(to.address);
+
+              // if we already rewrote headers no need to continue
+              if (rewritten) return { address: to.address, addresses };
+
+              // Gmail won't show the message in the inbox if it's sending FROM
+              // the same address that gets forwarded TO using our service
+              // (we can assume that other mail providers do the same)
+              for (let i = 0; i < addresses.length; i++) {
+                if (rewritten) break;
+                const address = addresses[i];
+                const fromAddress = addressParser(originalFrom)[0].address;
+                if (address !== fromAddress) continue;
                 rewritten = true;
                 if (headers.getFirst('message-id') !== '')
                   headers.update('In-Reply-To', headers.getFirst('message-id'));
-                headers.update('Message-ID', createMessageID(session));
+                headers.update('Message-ID', messageId);
               }
-            });
 
-            return addresses;
+              return { address: to.address, addresses };
+            } catch (err) {
+              logger.error(err);
+              bounces.push({
+                address: to.address,
+                err
+              });
+            }
           })
         );
 
         // flatten the recipients and make them unique
-        recipients = _.uniq(_.flatten(recipients));
+        recipients = _.uniqBy(_.compact(_.flatten(recipients)), 'address');
+
+        // go through recipients and if we have a user+xyz@domain
+        // AND we also have user@domain then honor the user@domain only
+        // (helps to alleviate bulk spam with services like Gmail)
+        recipients = recipients.map(recipient => {
+          recipient.addresses = recipient.addresses.filter(address => {
+            if (address.indexOf('+') === -1) return true;
+            return !recipient.addresses.includes(
+              `${this.parseUsername(address)}@${this.parseDomain(address)}`
+            );
+          });
+          return recipient;
+        });
+
+        recipients = await Promise.all(
+          recipients.map(async recipient => {
+            try {
+              const errors = [];
+              const { addresses } = recipient;
+              recipient.addresses = await Promise.all(
+                addresses.map(async address => {
+                  try {
+                    const addresses = await this.validateMX(address);
+                    // `addresses` are already pre-sorted by lowest priority
+                    return { to: address, host: addresses[0].exchange };
+                  } catch (err) {
+                    logger.error(err);
+                    errors.push({
+                      address,
+                      err
+                    });
+                  }
+                })
+              );
+              recipient.addresses = _.compact(recipient.addresses);
+              if (!_.isEmpty(recipient.addresses)) return recipient;
+              throw new Error(
+                errors.map(error => `${error.address}: ${error.err.message}`)
+              );
+            } catch (err) {
+              logger.error(err);
+              bounces.push({
+                address: recipient.address,
+                err
+              });
+            }
+          })
+        );
+
+        recipients = _.compact(recipients);
+
+        // if no recipients return early with bounces joined together
+        if (_.isEmpty(recipients)) {
+          if (_.isEmpty(bounces)) throw new CustomError('Invalid recipients');
+          throw new CustomError(
+            bounces
+              .map(
+                bounce => `Error for ${bounce.address}: ${bounce.err.message}`
+              )
+              .join('\r\n\r\n')
+          );
+        }
 
         //
         // 10) add our own DKIM signature and remove DKIM header (no bottleneck)
@@ -468,76 +652,106 @@ class ForwardEmail {
         headers.remove('dkim-signature');
         headers.remove('x-google-dkim-signature');
 
-        // sign new message
-        const signedChunks = [];
-        const output = this.dkim.sign(
-          // join headers object and body into a full rfc822 formatted email
-          // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
-          Buffer.concat([headers.build(), body])
-        );
-        output.once('error', err => stream.destroy(err));
-        output.on('readable', () => {
-          let chunk;
-          while ((chunk = output.read()) !== null) {
-            signedChunks.push(chunk);
-          }
-        });
-        output.once('end', async () => {
-          //
-          // 11) send email
-          //
-          const raw = Buffer.concat(signedChunks);
-          try {
-            await Promise.each(_.uniq(recipients), async to => {
-              const addresses = await this.validateMX(to);
-              const transporter = nodemailer.createTransport({
-                debug: log,
-                logger: log,
-                direct: true,
-                opportunisticTLS: true,
-                port: 25,
-                host: addresses[0].exchange, // already pre-sorted by priority
-                ...this.ssl,
-                name: fqdn,
-                tls: {
-                  rejectUnauthorized: process.env.NODE_ENV !== 'test'
-                }
-              });
-              await transporter.sendMail({
-                envelope: {
-                  from: rewriteFriendlyFrom
-                    ? this.config.noReply
-                    : session.envelope.mailFrom.address,
-                  to
-                },
+        // join headers object and body into a full rfc822 formatted email
+        // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
+        // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
+        const raw = Buffer.concat([headers.build(), ...chunks]);
+
+        // set from address based if we had to do a friendly-from rewrite
+        const from = rewriteFriendlyFrom
+          ? this.config.noReply
+          : session.envelope.mailFrom.address;
+
+        //
+        // 11) send email
+        //
+        try {
+          const accepted = [];
+          await Promise.all(
+            recipients.map(async recipient => {
+              const results = await this.processRecipient({
+                recipient,
+                name,
+                from,
                 raw
               });
-            });
-            fn();
-          } catch (err) {
-            stream.destroy(err);
+              for (let i = 0; i < results.length; i++) {
+                // TODO: a@a.com -> b@b.com + c@c.com when c@c.com fails
+                // it will still say a@a.com is successful
+                // but it will be confusing because the b@b.com will be
+                // masked to a@a.com and the end user will see that there
+                // was both a success and a failure for the same address
+                // (perhaps we indicate this user has email forwarded?)
+                if (results[i].accepted.length > 0)
+                  accepted.push(recipient.address);
+                if (results[i].rejected.length === 0) continue;
+                for (let x = 0; x < results[i].rejected.length; x++) {
+                  const err = results[i].rejectedErrors[x];
+                  bounces.push({
+                    address: recipient.address,
+                    err
+                  });
+                }
+              }
+            })
+          );
+
+          if (bounces.length === 0) return fn();
+
+          const codes = bounces.map(bounce => {
+            if (_.isNumber(bounce.err.responseCode))
+              return bounce.err.responseCode;
+            if (
+              _.isString(bounce.err.code) &&
+              RETRY_CODES.includes(bounce.err.code)
+            )
+              return CODES_TO_RESPONSE_CODES[bounce.err.code];
+            return 550;
+          });
+
+          // sort the codes and get the lowest one
+          // (that way 4xx retries are attempted)
+          const [code] = codes.sort();
+
+          const messages = [];
+
+          if (accepted.length > 0) {
+            for (let a = 0; a < accepted.length; a++) {
+              messages.push(`Message was sent successfully to ${accepted[a]}`);
+            }
           }
-        });
+
+          for (let b = 0; b < bounces.length; b++) {
+            messages.push(
+              `Error for ${bounces[b].address}: ${bounces[b].err.message}`
+            );
+          }
+
+          // join the messages together and make them unique
+          const err = new CustomError(_.uniq(messages).join('\r\n\r\n'), code);
+
+          logger.error(err);
+
+          fn(err);
+        } catch (err) {
+          stream.destroy(err);
+        }
       } catch (err) {
         stream.destroy(err);
       }
     });
 
-    messageSplitter.once('error', err => {
+    stream.once('error', err => {
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
         err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
         err.message = err.message.split('msg:')[1];
       }
 
-      err.message += `\n\n If you need help please forward this email to ${
-        this.config.email
-      } or visit ${this.config.website}`;
-      if (log) console.error(err);
+      err.message += `\r\n\r\n If you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
+      logger.error(err);
       fn(err);
     });
-
-    stream.once('error', err => messageSplitter.destroy(err));
 
     stream.pipe(messageSplitter);
   }
@@ -592,7 +806,7 @@ class ForwardEmail {
         return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
       }
 
-      if (log) console.error(err);
+      logger.error(err);
       // if there's an error then assume that we need to rewrite
       // with a friendly-from, for whatever reason
       return true;
@@ -604,7 +818,7 @@ class ForwardEmail {
       const result = await dkimVerify(raw);
       return result;
     } catch (err) {
-      if (log) console.error(err);
+      logger.error(err);
       err.responseCode = 421;
       throw err;
     }
@@ -639,7 +853,8 @@ class ForwardEmail {
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
     return new Promise((resolve, reject) => {
-      if (email === this.config.noReply) return resolve();
+      if (email === this.config.noReply || !this.config.limiter)
+        return resolve();
       const id = email;
       const limit = new Limiter({ id, ...this.limiter });
       limit.get((err, limit) => {
@@ -688,8 +903,9 @@ class ForwardEmail {
     }
   }
 
+  // TODO: we should cache this recursive lookup for 2m or something
   // this returns the forwarding address for a given email address
-  async getForwardingAddresses(address, isRecursive = false) {
+  async getForwardingAddresses(address, recursive = []) {
     const domain = this.parseDomain(address);
     const records = await dns.resolveTxtAsync(domain);
 
@@ -714,9 +930,7 @@ class ForwardEmail {
     // if the record was blank then throw an error
     if (s.isBlank(record))
       throw new CustomError(
-        `${address} domain of ${domain} has a blank "${
-          this.config.recordPrefix
-        }" TXT record`
+        `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record`
       );
 
     // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
@@ -731,7 +945,10 @@ class ForwardEmail {
     // remove trailing whitespaces from each address listed
     const addresses = record.split(',').map(a => a.trim());
 
-    if (addresses.length === 0) throw new CustomError(``);
+    if (addresses.length === 0)
+      throw new CustomError(
+        `${address} domain of ${domain} has zero forwarded addresses configured in the TXT record with "${this.config.recordPrefix}"`
+      );
 
     // store if we have a forwarding address or not
     let forwardingAddresses = [];
@@ -758,19 +975,14 @@ class ForwardEmail {
 
         if (addr.length !== 2 || !validator.isEmail(addr[1]))
           throw new CustomError(
-            `${address} domain of ${domain} has an invalid "${
-              this.config.recordPrefix
-            }" TXT record due to an invalid email address of "${addresses[i]}"`
+            `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
           );
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
 
         // check if we have a match
-        if (username === addr[0]) {
-          forwardingAddresses.push(addr[1]);
-          break;
-        }
+        if (username === addr[0]) forwardingAddresses.push(addr[1]);
       }
     }
 
@@ -787,42 +999,62 @@ class ForwardEmail {
     // if we don't have a forwarding address then throw an error
     if (forwardingAddresses.length === 0)
       throw new CustomError(
-        `${address} domain of ${domain} is not configured properly and does not contain any valid "${
-          this.config.recordPrefix
-        }" TXT records`
+        `${address} domain of ${domain} is not configured properly and does not contain any valid "${this.config.recordPrefix}" TXT records`
       );
 
     // allow one recursive lookup on forwarding addresses
+    const recursivelyForwardedAddresses = [];
     await Promise.each(forwardingAddresses, async forwardingAddress => {
       try {
+        if (recursive.includes(forwardingAddress)) return;
+
+        const newRecursive = forwardingAddresses.concat(recursive);
+        // prevent a double-lookup if user is using + symbols
+        if (forwardingAddress.indexOf('+') !== -1)
+          newRecursive.push(
+            `${this.parseUsername(address)}@${this.parseDomain(address)}`
+          );
+
         const addresses = await this.getForwardingAddresses(
           forwardingAddress,
-          true
+          newRecursive
         );
-        if (addresses.length === 0) return;
-        if (isRecursive)
-          throw new CustomError(
-            `${address} contains a forwarded address of ${forwardingAddress} which is recursively forwarded to (${
-              addresses.length
-            }) addresses`
-          );
+        // if it was recursive then remove the original
+        if (addresses.length > 0)
+          recursivelyForwardedAddresses.push(forwardingAddress);
+        // add the recursively forwarded addresses
         addresses.forEach(address => {
           forwardingAddresses.push(address);
         });
-      } catch (err) {}
+      } catch {}
     });
 
     // make the forwarding addresses unique
+    // and omit the addresses recursively forwarded
     forwardingAddresses = _.uniq(forwardingAddresses);
+    _.pullAll(forwardingAddresses, recursivelyForwardedAddresses);
+
+    // NOTE:
+    // issue is that people could work around the limit
+    // for example:
+    //
+    // a:a.com
+    // a:b.com
+    // a:c.com
+    // a:d.com
+    // a:e.com
+    // a:f.com <--- cut off after here
+    //
+    // a:test@domain.com
+    // test:f.com <-- here is workaround
+    // test:g.com
+    // test:h.com
+    // ...
 
     // if max number of forwarding addresses exceeded
     if (forwardingAddresses.length > this.config.maxForwardedAddresses)
       throw new CustomError(
-        `The address ${address} is attempted to be forwarded to (${
-          forwardingAddresses.length
-        }) addresses which exceeds the maximum of (${
-          this.config.maxForwardedAddresses
-        })`
+        `The address ${address} is attempted to be forwarded to (${forwardingAddresses.length}) addresses which exceeds the maximum of (${this.config.maxForwardedAddresses})`
       );
 
     // otherwise transform the + symbol filter if we had it
@@ -886,6 +1118,44 @@ if (!module.parent) {
 
   const forwardEmail = new ForwardEmail(config);
   forwardEmail.server.listen(process.env.PORT || 25);
+
+  const close = (code = 0) => {
+    forwardEmail.server.close(() => {
+      // eslint-disable-next-line unicorn/no-process-exit
+      process.exit(code);
+    });
+  };
+
+  // handle warnings
+  process.on('warning', warning => {
+    logger.warn(warning);
+  });
+
+  // handle uncaught promises
+  process.on('unhandledRejection', err => {
+    logger.error(err);
+    close(1);
+  });
+
+  // handle uncaught exceptions
+  process.on('uncaughtException', err => {
+    logger.error(err);
+    close(1);
+  });
+
+  // handle windows support (signals not available)
+  // <http://pm2.keymetrics.io/docs/usage/signals-clean-restart/#windows-graceful-stop>
+  process.on('message', msg => {
+    if (msg === 'shutdown') {
+      logger.warn(msg);
+      close();
+    }
+  });
+
+  // handle graceful restarts
+  process.on('SIGTERM', () => close());
+  process.on('SIGHUP', () => close());
+  process.on('SIGINT', () => close());
 }
 
 module.exports = ForwardEmail;
