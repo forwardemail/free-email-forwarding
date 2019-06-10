@@ -234,7 +234,9 @@ class ForwardEmail {
 
   rewriteFriendlyFrom(from) {
     // preserve user's name
-    const { name } = addressParser(from)[0];
+    const { address, name } = addressParser(from)[0];
+    if (!name || name.trim() === '')
+      return `"${address}" <${this.config.noReply}>`;
     return `"${name}" <${this.config.noReply}>`;
   }
 
