@@ -65,18 +65,18 @@ class CustomError extends Error {
   }
 }
 
-const log = process.env.NODE_ENV !== 'production';
+const silent = process.env.NODE_ENV === 'production';
 
 const logger = new Cabin({
   axe: {
     capture: false,
-    logger: signale
-  },
-  silent: log
+    logger: signale,
+    silent
+  }
 });
 
 const transporterConfig = {
-  debug: log,
+  debug: !silent,
   logger,
   direct: true,
   opportunisticTLS: true,
@@ -144,7 +144,7 @@ class ForwardEmail {
         onMailFrom: this.onMailFrom.bind(this),
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
-        logInfo: log,
+        logInfo: !silent,
         logger,
         ...config.smtp,
         ...this.ssl
@@ -445,10 +445,7 @@ class ForwardEmail {
 
         if (!dkim)
           throw new CustomError(
-            oneLine`
-              The email you sent has an invalid DKIM signature, please try again or check your email service's DKIM configuration.\r\n
-              If you believe this is an error, please forward this email to: ${this.config.email}
-            `
+            'The email you sent has an invalid DKIM signature'
           );
 
         // get the fully qualified domain name ("FQDN") of this server
@@ -469,10 +466,7 @@ class ForwardEmail {
         );
         if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
           throw new CustomError(
-            oneLine`
-              The email you sent has failed SPF validation with a result of "${spf}".  Please try again or check your email service's SPF configuration.\r\n
-              If you believe this is an error, please forward this email to: ${this.config.email}
-            `
+            `The email you sent has failed SPF validation with a result of "${spf}"`
           );
 
         //
