@@ -187,15 +187,15 @@ class ForwardEmail {
     const { recipient, name, from, raw } = options;
     const { address, addresses } = recipient;
     return Promise.all(
-      addresses.map(({ to, host }) =>
-        this.processAddress(address, {
+      addresses.map(({ to, host }) => {
+        return this.processAddress(address, {
           to,
           host,
           name,
           from,
           raw: this.dkim.sign(raw)
-        })
-      )
+        });
+      })
     );
   }
 
