@@ -248,7 +248,7 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: 'ForwardEmail <from@forwardemail.net>',
+      from: 'from@forwardemail.net',
       to: [
         'test@niftylettuce.com',
         'admin@niftylettuce.com',
@@ -256,7 +256,7 @@ if (!isCI)
         'hello+test@niftylettuce.com',
         'test+hello@niftylettuce.com'
       ],
-      subject: 'test',
+      subject: 'forwards an email without recursive loop',
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
