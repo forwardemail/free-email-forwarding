@@ -10,6 +10,7 @@ const Limiter = require('ratelimiter');
 const Promise = require('bluebird');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
+const arrayJoinConjunction = require('array-join-conjunction');
 const autoBind = require('auto-bind');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
@@ -413,6 +414,14 @@ class ForwardEmail {
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
         const originalFrom = headers.getFirst('from');
+
+        // parse the from address and set a parsed reply-to if necessary
+        const fromAddress = addressParser(originalFrom)[0];
+        const replyTo =
+          fromAddress.name && fromAddress.name.trim() !== ''
+            ? `"${fromAddress.name}" <${fromAddress.address}>`
+            : fromAddress.address;
+
         // message body as a single Buffer (everything after the \r\n\r\n separator)
         const originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
@@ -497,7 +506,7 @@ class ForwardEmail {
               rewriteFriendlyFrom = true;
               // eslint-disable-next-line max-depth
               if (headers.getFirst('reply-to') === '')
-                headers.update('Reply-To', originalFrom);
+                headers.update('Reply-To', replyTo);
               headers.update('From', this.rewriteFriendlyFrom(originalFrom));
             }
           } catch (err) {
@@ -712,11 +721,12 @@ class ForwardEmail {
 
           const messages = [];
 
-          if (accepted.length > 0) {
-            for (let a = 0; a < accepted.length; a++) {
-              messages.push(`Message was sent successfully to ${accepted[a]}`);
-            }
-          }
+          if (accepted.length > 0)
+            messages.push(
+              `Message was sent successfully to ${arrayJoinConjunction(
+                accepted
+              )}.`
+            );
 
           for (let b = 0; b < bounces.length; b++) {
             messages.push(

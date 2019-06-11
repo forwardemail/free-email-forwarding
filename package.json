@@ -4,7 +4,10 @@
   "version": "2.1.0",
   "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
   "ava": {
-    "verbose": true
+    "verbose": true,
+    "helpers": [
+      "test/helpers/**/*"
+    ]
   },
   "bugs": {
     "url": "https://github.com/niftylettuce/forward-email/issues",
@@ -19,6 +22,7 @@
     "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)"
   ],
   "dependencies": {
+    "array-join-conjunction": "^1.0.0",
     "bluebird": "^3.5.5",
     "bytes": "^3.1.0",
     "cabin": "^2.1.2",
@@ -50,7 +54,7 @@
     "@commitlint/cli": "^8.0.0",
     "@commitlint/config-conventional": "^8.0.0",
     "auto-bind": "^2.1.0",
-    "ava": "1.x",
+    "ava": "^2.1.0",
     "codecov": "^3.5.0",
     "cross-env": "^5.2.0",
     "eslint": "^5.16.0",
