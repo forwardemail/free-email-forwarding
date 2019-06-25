@@ -12,8 +12,8 @@ const shell = require('shelljs');
 const test = require('ava');
 const uuid = require('uuid');
 
-const ForwardEmail = require('..');
 const { beforeEach, afterEach } = require('./helpers');
+const ForwardEmail = require('..');
 
 const tls = { rejectUnauthorized: false };
 
