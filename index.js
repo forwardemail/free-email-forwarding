@@ -1091,7 +1091,9 @@ class ForwardEmail {
       );
       if (hasAllExchanges) return fn();
       throw new CustomError(
-        `${address} is missing required DNS MX records of ${this.config.exchanges.join(
+        `${
+          address.address
+        } is missing required DNS MX records of ${this.config.exchanges.join(
           ', '
         )}`
       );
