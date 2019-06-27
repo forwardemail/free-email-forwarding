@@ -644,9 +644,10 @@ class ForwardEmail {
           throw new CustomError(
             bounces
               .map(
-                bounce => `Error for ${bounce.address}: ${bounce.err.message}`
+                bounce =>
+                  `Error for ${bounce.address} of "${bounce.err.message}"`
               )
-              .join('\r\n\r\n')
+              .join(', ')
           );
         }
 
@@ -725,17 +726,17 @@ class ForwardEmail {
             messages.push(
               `Message was sent successfully to ${arrayJoinConjunction(
                 accepted
-              )}.`
+              )}`
             );
 
           for (let b = 0; b < bounces.length; b++) {
             messages.push(
-              `Error for ${bounces[b].address}: ${bounces[b].err.message}`
+              `Error for ${bounces[b].address} of "${bounces[b].err.message}"`
             );
           }
 
           // join the messages together and make them unique
-          const err = new CustomError(_.uniq(messages).join('\r\n\r\n'), code);
+          const err = new CustomError(_.uniq(messages).join(', '), code);
 
           logger.error(err);
 
@@ -755,7 +756,7 @@ class ForwardEmail {
         err.message = err.message.split('msg:')[1];
       }
 
-      err.message += `\r\n\r\n If you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
+      err.message += `— if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
       logger.error(err);
       fn(err);
     });
