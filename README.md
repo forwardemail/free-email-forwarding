@@ -92,7 +92,7 @@
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=info:niftylettuce@gmail.com,beep:niftylettuce@gmail.com`     |
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=errors:niftylettuce@gmail.com,boop:niftylettuce@gmail.com`   |
 
-> As of July 28, 2019 we added support for global domain alias forwarding.  You can now specify simply a domain name in your TXT record (e.g. `user@a.com` will get forwarded to `user@b.com`):
+> As of June 28, 2019 we added support for global domain alias forwarding.  You can now specify simply a domain name in your TXT record (e.g. `user@a.com` will get forwarded to `user@b.com`):
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination    |
 | ------------------ | :--: | ----------- | --------------------------- |
