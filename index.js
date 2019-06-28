@@ -973,11 +973,16 @@ class ForwardEmail {
       // convert addresses to lowercase
       addresses[i] = addresses[i].toLowerCase();
       if (addresses[i].indexOf(':') === -1) {
-        if (
-          validator.isFQDN(this.parseDomain(addresses[i])) &&
-          validator.isEmail(addresses[i])
-        )
-          globalForwardingAddresses.push(addresses[i]);
+        // allow domain alias forwarding
+        // (e.. the record is just "b.com" if it's not a valid email)
+        if (validator.isFQDN(addresses[i])) {
+          globalForwardingAddresses.push(`${username}@${addresses[i]}`);
+        } else {
+          const domain = this.parseDomain(addresses[i]);
+          if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
+            globalForwardingAddresses.push(addresses[i]);
+          }
+        }
       } else {
         const addr = addresses[i].split(':');
 
