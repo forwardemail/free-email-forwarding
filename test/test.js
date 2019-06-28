@@ -317,6 +317,44 @@ if (!isCI)
   });
 
 if (!isCI)
+  test('forwards an email with DKIM and SPF to domain aliased recipients', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      from: 'ForwardEmail <from@forwardemail.net>',
+      // a@cabinjs.com -> a@lipo.io -> niftylettuce+a@gmail.com
+      to: 'Alias <a@cabinjs.com>',
+      subject: 'test',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: [],
+      dkim: {
+        domainName: 'forwardemail.net',
+        keySelector: 'default',
+        privateKey: fs.readFileSync(
+          path.join(__dirname, '..', 'dkim-private.key'),
+          'utf8'
+        )
+      }
+    });
+    /*
+    t.deepEqual(info.envelope, ['niftylettuce@gmail.com']);
+    */
+    return new Promise(resolve => {
+      connection.once('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          t.is(err, null);
+          connection.close();
+        });
+      });
+    });
+  });
+
+if (!isCI)
   test('forwards an email with DKIM and SPF to global recipients', async t => {
     const transporter = nodemailer.createTransport({
       streamTransport: true

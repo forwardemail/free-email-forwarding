@@ -63,6 +63,8 @@
 **2.** Set (and customize) the following DNS TXT records on your domain name:
 
 > If you are forwarding all emails from your domain, (`all@niftylettuce.com`, `hello@niftylettuce.com`, etc) to a specific address `niftylettuce@gmail.com`:
+>
+> **Make sure to replace the values below in the "Value/Answer/Destination" column with your own email address!  Do not leave it as-is, otherwise I will get your forwarded emails!**
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination               |
 | ------------------ | :--: | ----------- | -------------------------------------- |
@@ -89,6 +91,12 @@
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=orders:niftylettuce@gmail.com,baz:niftylettuce@gmail.com`    |
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=info:niftylettuce@gmail.com,beep:niftylettuce@gmail.com`     |
 | _@ or leave blank_ | 3600 | TXT         | `forward-email=errors:niftylettuce@gmail.com,boop:niftylettuce@gmail.com`   |
+
+> As of July 28, 2019 we added support for global domain alias forwarding.  You can now specify simply a domain name in your TXT record (e.g. `user@a.com` will get forwarded to `user@b.com`):
+
+| Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination    |
+| ------------------ | :--: | ----------- | --------------------------- |
+| _@ or leave blank_ | 3600 | TXT         | `forward-email=cabinjs.com` |
 
 **3.** Set (and customize) the following SPF record for SPF verification for your domain name (this will allow SPF verification to pass, note that you may need to enclose this value in quotes if you are using Amazon Route53):
 
