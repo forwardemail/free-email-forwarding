@@ -441,8 +441,7 @@ Absolutely.  If you use Google Business for email, and want to use our server as
 | _@ or leave blank_ | 3600 | MX          | 10       | ALT3.ASPMX.L.GOOGLE.COM. |
 | _@ or leave blank_ | 3600 | MX          | 10       | ALT4.ASPMX.L.GOOGLE.COM. |
 | _@ or leave blank_ | 3600 | MX          | 20       | mx1.forwardemail.net     |
-| _@ or leave blank_ | 3600 | MX          | 30       | mx1.forwardemail.net     |
-| _@ or leave blank_ | 3600 | MX          | 40       | mx2.forwardemail.net     |
+| _@ or leave blank_ | 3600 | MX          | 30       | mx2.forwardemail.net     |
 
 ### Can I forward emails to multiple recipients
 
