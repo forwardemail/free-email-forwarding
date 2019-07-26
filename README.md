@@ -23,6 +23,7 @@
 * [Terms of Use](#terms-of-use)
 * [FAQ](#faq)
   * [Why did I create this service](#why-did-i-create-this-service)
+  * [Can I just use this mail forwarding service as a "fallback" or "fallover" MX server](#can-i-just-use-this-mail-forwarding-service-as-a-fallback-or-fallover-mx-server)
   * [Can I forward emails to multiple recipients](#can-i-forward-emails-to-multiple-recipients)
   * [Can I have multiple global catch-all recipients](#can-i-have-multiple-global-catch-all-recipients)
   * [Is there a maximum limit on the number of email addresses I can forward to](#is-there-a-maximum-limit-on-the-number-of-email-addresses-i-can-forward-to)
@@ -427,6 +428,21 @@ There's also Zoho mail, but again that requires you signing up for an account wi
 Put simply, there was no current email-forwarding service that was free, simple, secure, tested, and open-source.
 
 This service solves all of these problems.
+
+### Can I just use this mail forwarding service as a "fallback" or "fallover" MX server
+
+Absolutely.  If you use Google Business for email, and want to use our server as a fallback so your mail still gets delivered, then just specify the Google mail servers with a lower priority than our mail servers.  An example is provided below:
+
+| Name/Host/Alias    |  TTL | Record Type | Priority | Value/Answer/Destination |
+| ------------------ | :--: | ----------- | -------- | ------------------------ |
+| _@ or leave blank_ | 3600 | MX          | 1        | ASPMX.L.GOOGLE.COM.      |
+| _@ or leave blank_ | 3600 | MX          | 5        | ALT1.ASPMX.L.GOOGLE.COM. |
+| _@ or leave blank_ | 3600 | MX          | 5        | ALT2.ASPMX.L.GOOGLE.COM. |
+| _@ or leave blank_ | 3600 | MX          | 10       | ALT3.ASPMX.L.GOOGLE.COM. |
+| _@ or leave blank_ | 3600 | MX          | 10       | ALT4.ASPMX.L.GOOGLE.COM. |
+| _@ or leave blank_ | 3600 | MX          | 20       | mx1.forwardemail.net     |
+| _@ or leave blank_ | 3600 | MX          | 30       | mx1.forwardemail.net     |
+| _@ or leave blank_ | 3600 | MX          | 40       | mx2.forwardemail.net     |
 
 ### Can I forward emails to multiple recipients
 
