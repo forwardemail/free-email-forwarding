@@ -17,6 +17,8 @@
 * [How It Works](#how-it-works)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
 * [Issues and Debugging](#issues-and-debugging)
+* [Service Specific Settings](#service-specific-settings)
+  * [Shopify](#shopify)
 * [Self-Hosted Requirements](#self-hosted-requirements)
 * [Programmatic Usage](#programmatic-usage)
 * [Service-Level Agreement](#service-level-agreement)
@@ -170,6 +172,13 @@ The most probable cause of your issues with not receiving test emails or with co
 Fortunately our DNS provider Cloudflare has a nice "Purge Cache" tool available for you to use at <https://1.1.1.1/purge-cache/>.
 
 All you need to do is go to that link for both "MX" and "TXT" record types, enter your domain name, and click "Purge Cache".  You'll then need to wait a few minutes and try again!
+
+
+## Service Specific Settings
+
+### Shopify
+
+See <https://help.shopify.com/en/manual/intro-to-shopify/initial-setup/setup-business-settings#add-shopifys-spf-record-to-your-domain-host-custom-domains-only> for instructions.
 
 
 ## Self-Hosted Requirements
