@@ -1,0 +1,4 @@
+[submodule "deployments/forward-email-docker"]
+	path = deployments/forward-email-docker
+	url = git@github.com:UnoSD/forward-email-docker.git
+	branch = master
