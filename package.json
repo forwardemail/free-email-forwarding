@@ -112,6 +112,12 @@
     }
   },
   "main": "index.js",
+  "files": [
+    "blacklist.json",
+    "ecosystem.json",
+    "index.js",
+    "message-splitter.js"
+  ],
   "prettier": {
     "singleQuote": true,
     "bracketSpacing": true,
