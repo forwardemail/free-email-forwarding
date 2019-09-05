@@ -109,7 +109,7 @@
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                        |
 | ------------------ | :--: | ----------- | ----------------------------------------------- |
-| _@ or leave blank_ | 3600 | SPF         | `v=spf1 a mx include:spf.forwardemail.net -all` |
+| _@ or leave blank_ | 3600 | TXT         | `v=spf1 a mx include:spf.forwardemail.net -all` |
 
 > :warning: If you are using Google Apps, you'll need to append `include:_spf.google.com` to the value above – e.g. `v=spf1 a mx include:spf.forwardemail.net include:_spf.google.com -all`.
 >
