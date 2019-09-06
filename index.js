@@ -23,6 +23,8 @@ const isString = require('lodash/isString');
 const uniq = require('lodash/uniq');
 const addressParser = require('nodemailer/lib/addressparser');
 const common = require('email-providers/common.json');
+const jwt = require('jsonwebtoken');
+
 let mailUtilities = require('mailin/lib/mailUtilities.js');
 
 const blacklist = require('./blacklist');
@@ -577,21 +579,29 @@ class ForwardEmail {
           if (records[i].startsWith('forward-email=')) {
             record = records[i];
             break;
+          }else if(records[i].startsWith('forward-email-hashed=')){
+            record = records[i];
+            break;
           }
         }
 
         if (!record) throw invalidTXTError;
 
-        // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=hello:niftylettuce@gmail.com"
-        // e.g. hello+test@niftylettuce.com => niftylettuce+test@gmail.com
-        // record = "forward-email=hello:niftylettuce@gmail.com"
-        // e.g. *@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=niftylettuce@gmail.com"
-        // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
-        // record = "forward-email=niftylettuce@gmail.com"
-        record = record.replace('forward-email=', '');
-
+        if(record.indexOf('forward-email-hashed=' == -1){
+          // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
+          // record = "forward-email=hello:niftylettuce@gmail.com"
+          // e.g. hello+test@niftylettuce.com => niftylettuce+test@gmail.com
+          // record = "forward-email=hello:niftylettuce@gmail.com"
+          // e.g. *@niftylettuce.com => niftylettuce@gmail.com
+          // record = "forward-email=niftylettuce@gmail.com"
+          // e.g. *+test@niftylettuce.com => niftylettuce@gmail.com
+          // record = "forward-email=niftylettuce@gmail.com"
+          record = record.replace('forward-email=', '');
+        }else{
+          record = record.replace('forward-email-hashed=','');
+          record = await jwt.verify(record, process.env.JWT_SECRET).catch(e=>{throw e};
+          if(record.email) record.email;
+        }
         // remove trailing whitespaces from each address listed
         const addresses = record.split(',').map(a => a.trim());
 
@@ -599,6 +609,7 @@ class ForwardEmail {
 
         // store if we have a forwarding address or not
         let forwardingAddress;
+      
 
         // check if we have a global redirect
         if (
