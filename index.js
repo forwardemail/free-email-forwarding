@@ -461,7 +461,7 @@ class ForwardEmail {
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
-          process.env.NODE_ENV === 'test' ? '178.128.149.101' : ip.address();
+          process.env.NODE_ENV === 'test' ? '178.128.149.101' : (this.config.ipAddress || ip.address());
         const name =
           process.env.NODE_ENV === 'test'
             ? 'mx1.forwardemail.net'
