@@ -30,7 +30,7 @@ CMD \
   /usr/bin/redis-server /etc/redis/redis.conf && \
   /app/index.js
 
-#docker run -e --network host --hostname <yourdomain.com> --name <container name> -d forward-email:latest
+#docker run --network host --hostname <yourdomain.com> --name <container name> -d forward-email:latest
 
 # Add the following line to your DNS zonefile:
 #docker exec <container name> cat /app/DKIM-TXT-record

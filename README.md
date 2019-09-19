@@ -316,6 +316,19 @@ You'll also need the following dependencies installed:
 
 * Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
 
+### Docker deployment
+
+Instead of installing the server and all its dependencies manually on a server,
+you can use [Docker](https://docker.com).
+
+Clone this repo, then:
+
+```bash
+docker build -t forward-email:latest .
+docker run --network host --hostname <yourdomain.com> --name <container name> -d forward-email:latest
+```
+
+Then, you'll need to add the DKIM public key that was generated for you as a TXT record to your zonefile. Run ```docker exec <container name> cat /app/DKIM-TXT-record``` to print it out.
 
 ## Programmatic Usage
 
@@ -606,7 +619,7 @@ At no point in time do we write to disk or store emails – everything is done i
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
