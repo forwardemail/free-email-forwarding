@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
@@ -1110,25 +1112,34 @@ class ForwardEmail {
 }
 
 if (!module.parent) {
+  const hostname = process.env.HOSTNAME || 'forwardemail.net';
+  const defaultDeployment = hostname === 'forwardemail.net';
+
   const config = {
-    noReply: 'no-reply@forwardemail.net',
-    exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
+    noReply: `no-reply@${hostname}`,
+    exchanges: process.env.EXCHANGES 
+      ? process.env.EXCHANGES.split(',')
+      : (defaultDeployment ?  ['mx1.forwardemail.net', 'mx2.forwardemail.net'] : [hostname]),
     ssl: {},
-    dkim: {}
+    dkim: {},
+    ipAddress: process.env.IP_ADDRESS || undefined,
   };
 
-  if (process.env.NODE_ENV === 'production') {
-    // needsUpgrade = true;
+
+  if (process.env.SECURE === 'true') {
     config.ssl = {
-      secure: process.env.SECURE === 'true',
-      key: fs.readFileSync('/home/deploy/mx1.forwardemail.net.key', 'utf8'),
-      cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
-      ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
+      secure: true,
+      key: fs.readFileSync(process.env.SSL_KEY || '/home/deploy/mx1.forwardemail.net.key', 'utf8'),
+      cert: fs.readFileSync(process.env.SSL_CERT || '/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
+      ca: fs.readFileSync(proicess.env.SSL_CA || '/home/deploy/mx1.forwardemail.net.ca', 'utf8')
     };
+  }
+
+  if (process.env.DKIM_PRIVATE_KEY || (defaultDeployment && process.env.NODE_ENV === 'production')) {
     config.dkim = {
-      domainName: 'forwardemail.net',
+      domainName: hostname,
       keySelector: 'default',
-      privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8'),
+      privateKey: fs.readFileSync(process.env.DKIM_PRIVATE_KEY || '/home/deploy/dkim-private.key', 'utf8'),
       cacheDir: os.tmpdir()
     };
   }
