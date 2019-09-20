@@ -1117,7 +1117,7 @@ if (!module.parent) {
 
   const config = {
     noReply: `no-reply@${hostname}`,
-    exchanges: process.env.EXCHANGES 
+    exchanges: process.env.EXCHANGES
       ? process.env.EXCHANGES.split(',')
       : (defaultDeployment ?  ['mx1.forwardemail.net', 'mx2.forwardemail.net'] : [hostname]),
     ssl: {},
@@ -1125,21 +1125,22 @@ if (!module.parent) {
     ipAddress: process.env.IP_ADDRESS || undefined,
   };
 
+  const readKey = (key, keyFile) => key || (keyFile && fs.readFileSync(keyFile, 'utf8')) || undefined;
 
   if (process.env.SECURE === 'true') {
     config.ssl = {
       secure: true,
-      key: fs.readFileSync(process.env.SSL_KEY || '/home/deploy/mx1.forwardemail.net.key', 'utf8'),
-      cert: fs.readFileSync(process.env.SSL_CERT || '/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
-      ca: fs.readFileSync(proicess.env.SSL_CA || '/home/deploy/mx1.forwardemail.net.ca', 'utf8')
+      key: readKey(process.env.SSL_KEY, process.env.SSL_KEY_FILE || '/home/deploy/mx1.forwardemail.net.key'),
+      cert: readKey(process.env.SSL_CERT, process.env.SSL_CERT_FILE || '/home/deploy/mx1.forwardemail.net.cert'),
+      ca: readKey(process.env.SSL_CA, process.env.SSL_CA_FILE || '/home/deploy/mx1.forwardemail.net.ca'),
     };
   }
 
-  if (process.env.DKIM_PRIVATE_KEY || (defaultDeployment && process.env.NODE_ENV === 'production')) {
+  if (process.env.DKIM_PRIVATE_KEY || process.env.DKIM_PRIVATE_KEY_FILE || (defaultDeployment && process.env.NODE_ENV === 'production')) {
     config.dkim = {
       domainName: hostname,
-      keySelector: 'default',
-      privateKey: fs.readFileSync(process.env.DKIM_PRIVATE_KEY || '/home/deploy/dkim-private.key', 'utf8'),
+      keySelector: process.env.DKIM_KEY_SELECTOR || 'default',
+      privateKey: readKey(process.env.DKIM_PRIVATE_KEY, process.env.DKIM_PRIVATE_KEY_FILE || '/home/deploy/dkim-private.key'),
       cacheDir: os.tmpdir()
     };
   }

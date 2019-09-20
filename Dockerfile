@@ -23,7 +23,16 @@ EXPOSE 25
 
 ENV IP_ADDRESS ""
 ENV EXCHANGES ""
-ENV DKIM_PRIVATE_KEY /app/dkim-private.key
+ENV SECURE "false"
+ENV SSL_KEY ""
+ENV SSL_KEY_FILE ""
+ENV SSL_CERT ""
+ENV SSL_CERT_FILE ""
+ENV SSL_CA ""
+ENV SSL_CA_FILE ""
+ENV DKIM_PRIVATE_KEY ""
+ENV DKIM_KEY_SELECTOR "default"
+ENV DKIM_PRIVATE_KEY_FILE /app/dkim-private.key
 
 CMD \
   /usr/sbin/spamd -d --pidfile=/var/run/spamd.pid && \
