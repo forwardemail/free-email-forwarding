@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://forwardemail.net"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service/media/header.png" alt="ForwardEmail" /></a>
+  <a href="https://forwardemail.net"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service@556515889f706db16731dfd77e1d7a5a8184c720/media/header.png" alt="ForwardEmail" /></a>
 </h1>
 <div align="center">
   <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
@@ -624,7 +624,7 @@ If you are seeking permission to use these trademarks, then please [contact us](
 
 ## 
 
-<a href="#"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service/media/footer.png" alt="#" /></a>
+<a href="#"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service@556515889f706db16731dfd77e1d7a5a8184c720/media/footer.png" alt="#" /></a>
 
 [npm]: https://www.npmjs.com/
 
