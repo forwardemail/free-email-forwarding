@@ -20,12 +20,12 @@ const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
 const ip = require('ip');
 const isCI = require('is-ci');
+const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
 const redis = require('redis');
-const s = require('underscore.string');
 const signale = require('signale');
 const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
@@ -936,7 +936,7 @@ class ForwardEmail {
       .trim();
 
     // if the record was blank then throw an error
-    if (s.isBlank(record))
+    if (!isSANB(record))
       throw new CustomError(
         `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record`
       );

@@ -1,20 +1,28 @@
-# Forward Email
+<h1 align="center">
+  <a href="https://forwardemail.net"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service/media/header.png" alt="ForwardEmail" /></a>
+</h1>
+<div align="center">
+  <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
+  <a href="https://travis-ci.org/niftylettuce/forward-email"><img src="https://travis-ci.org/niftylettuce/forward-email.svg?branch=master" alt="build status" /></a>
+  <a href="https://codecov.io/github/niftylettuce/forward-email"><img src="https://img.shields.io/codecov/c/github/niftylettuce/forward-email/master.svg" alt="code coverage" /></a>
+  <a href="https://github.com/sindresorhus/xo"><img src="https://img.shields.io/badge/code_style-XO-5ed9c7.svg" alt="code style" /></a>
+  <a href="https://github.com/prettier/prettier"><img src="https://img.shields.io/badge/styled_with-prettier-ff69b4.svg" alt="styled with prettier" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/lassjs/lass.svg" alt="license" /></a>
+</div>
+<br />
 
-[![build status](https://img.shields.io/travis/niftylettuce/forward-email.svg)](https://travis-ci.org/niftylettuce/forward-email)
-[![code coverage](https://img.shields.io/codecov/c/github/niftylettuce/forward-email.svg)](https://codecov.io/gh/niftylettuce/forward-email)
-[![code style](https://img.shields.io/badge/code_style-XO-5ed9c7.svg)](https://github.com/sindresorhus/xo)
-[![styled with prettier](https://img.shields.io/badge/styled_with-prettier-ff69b4.svg)](https://github.com/prettier/prettier)
-[![made with lass](https://img.shields.io/badge/made_with-lass-95CC28.svg)](https://lass.js.org)
-[![license](https://img.shields.io/github/license/niftylettuce/forward-email.svg)](<>)
+<div align="center">ForwardEmail is a free, encrypted, and open-source email forwarding service for custom domains.</div>
 
-> :heart: Love this project? Support <a href="https://github.com/niftylettuce" target="_blank">@niftylettuce's</a> [FOSS](https://en.wikipedia.org/wiki/Free_and_open-source_software) on <a href="https://patreon.com/niftylettuce" target="_blank">Patreon</a> or <a href="https://paypal.me/niftylettuce">PayPal</a> :unicorn:
+<div align="center"><sub>Built by <a href="https://github.com/niftylettuce">@niftylettuce</a> and <a href="#contributors">contributors</a></sub></div>
 
-[ForwardEmail](http://forwardemail.net) is a free, encrypted, and open-source email forwarding service for custom domains at <http://forwardemail.net>
+<hr />
+
+<div align="center">:heart: Love this project? Support <a href="https://github.com/niftylettuce" target="_blank">@niftylettuce's</a> <a href="https://en.wikipedia.org/wiki/Free_and_open-source_software" target="_blank">FOSS</a> on <a href="https://patreon.com/niftylettuce" target="_blank">Patreon</a> or <a href="https://paypal.me/niftylettuce">PayPal</a> :unicorn:</div>
 
 
 ## Table of Contents
 
-* [How It Works](#how-it-works)
+* [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
 * [Issues and Debugging](#issues-and-debugging)
 * [Service Specific Settings](#service-specific-settings)
@@ -37,7 +45,7 @@
   * [Do you store emails and their contents](#do-you-store-emails-and-their-contents)
   * [Do you store logs of emails](#do-you-store-logs-of-emails)
   * [Can you read my forwarded emails](#can-you-read-my-forwarded-emails)
-  * [Does it support the + symbol (e.g. for Gmail aliases)](#does-it-support-the--symbol-eg-for-gmail-aliases)
+  * [Does it support the `+` symbol (e.g. for Gmail aliases)](#does-it-support-the--symbol-eg-for-gmail-aliases)
   * [Does this forward my email's headers](#does-this-forward-my-emails-headers)
   * [Is this well-tested](#is-this-well-tested)
   * [Do you pass along SMTP response messages and codes](#do-you-pass-along-smtp-response-messages-and-codes)
@@ -47,10 +55,11 @@
   * [How do you perform DNS lookups on domain names](#how-do-you-perform-dns-lookups-on-domain-names)
   * [How fast is this service](#how-fast-is-this-service)
 * [Contributors](#contributors)
+* [Trademark Notice](#trademark-notice)
 * [License](#license)
 
 
-## How It Works
+## How Do I Get Started and Set Up Email Forwarding
 
 > <u>**IMPORTANT NOTE:**</u> Replace `niftylettuce@gmail.com` below with the email address you want to forward emails to:
 
@@ -137,7 +146,7 @@ _Optional Add-ons:_
 
 ## Send Mail As Using Gmail
 
-After you've followed the steps above in [How It Works](#how-it-works) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
+After you've followed the steps above in [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
 
 1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.
 2. When prompted for `Select the app and device you want to generate the app password for`:
@@ -291,7 +300,7 @@ You'll also need the following dependencies installed:
 
 * [python-dkim-verify][] - for validation of DKIM signatures, see [its requirements][python-dkim-verify] for more information
 
-* DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How It Works](#how-it-works) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
+* DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
 
 * Reverse DNS ("rDNS") with PTR Record- - the PTR record for your server's IP address is controlled by your server provider, and therefore you need to contact your server provider to set the PTR record for you.  Services such as DigitalOcean will set a PTR record for you automatically as long as you use a fully-qualified domain name ("FQDN").
 
@@ -601,12 +610,21 @@ At no point in time do we write to disk or store emails – everything is done i
 | **Nick Baugh** | <http://niftylettuce.com/> |
 
 
+## Trademark Notice
+
+ForwardEmail, Lass, Lad, Cabin, Lipo, and their respective logos are trademarks of Niftylettuce LLC.
+These trademarks may not be reproduced, distributed, transmitted, or otherwise used, except with the prior written permission of Niftylettuce LLC.
+If you are seeking permission to use these trademarks, then please [contact us](mailto:niftylettuce@gmail.com).
+
+
 ## License
 
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
 ## 
+
+<a href="#"><img src="https://cdn.jsdelivr.net/gh/forwardemail/free-email-forwarding-service/media/footer.png" alt="#" /></a>
 
 [npm]: https://www.npmjs.com/
 
