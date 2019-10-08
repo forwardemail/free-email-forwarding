@@ -268,10 +268,12 @@ class ForwardEmail {
       throw new CustomError('Blacklisted domains are not permitted');
 
     // ensure fully qualified domain name
+    /*
     if (!validator.isFQDN(domain))
       throw new CustomError(
         `${domain} is not a fully qualified domain name ("FQDN")`
       );
+    */
 
     // prevent disposable email addresses from being used
     if (this.isDisposable(domain))
@@ -285,13 +287,16 @@ class ForwardEmail {
   async onConnect(session, fn) {
     if (process.env.NODE_ENV === 'test') return fn();
 
+    // TODO: implement stricter spam checking to alleviate this
     // ensure it's a fully qualififed domain name
+    /*
     if (!validator.isFQDN(session.clientHostname))
       return fn(
         new CustomError(
           `${session.clientHostname} is not a fully qualified domain name ("FQDN")`
         )
       );
+    */
 
     // ensure that it's not on the DNS blacklist
     try {
