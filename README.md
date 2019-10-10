@@ -11,7 +11,7 @@
 </div>
 <br />
 
-<div align="center">ForwardEmail is the best free email forwarding service for custom domains.</div>
+<div align="center">ForwardEmail is the best free email forwarding for custom domains.</div>
 
 <div align="center"><sub>Built by <a href="https://github.com/niftylettuce">@niftylettuce</a> and <a href="#contributors">contributors</a></sub></div>
 
