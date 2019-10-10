@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://forwardemail.net"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding-service/master/media/header.png" alt="ForwardEmail" /></a>
+  <a href="https://forwardemail.net"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding/master/media/header.png" alt="ForwardEmail" /></a>
 </h1>
 <div align="center">
   <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
@@ -11,7 +11,7 @@
 </div>
 <br />
 
-<div align="center">ForwardEmail is a free, encrypted, and open-source email forwarding service for custom domains.</div>
+<div align="center">ForwardEmail is the best free email forwarding service for custom domains.</div>
 
 <div align="center"><sub>Built by <a href="https://github.com/niftylettuce">@niftylettuce</a> and <a href="#contributors">contributors</a></sub></div>
 
@@ -627,9 +627,9 @@ If you are seeking permission to use these trademarks, then please [contact us](
 [MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
 
 
-## 
+##
 
-<a href="#"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding-service/master/media/footer.png" alt="#" /></a>
+<a href="#"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding/master/media/footer.png" alt="#" /></a>
 
 [npm]: https://www.npmjs.com/
 
