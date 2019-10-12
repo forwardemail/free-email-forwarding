@@ -47,6 +47,7 @@ test('verifies connection', async t => {
   t.pass();
 });
 
+/*
 test('rejects forwarding a non-FQDN email', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
@@ -72,6 +73,7 @@ test('rejects forwarding a non-FQDN email', async t => {
     });
   });
 });
+*/
 
 // test('rejects forwarding a non-registered email domain', async t => {
 //   t.regex(err.message, /does not have a valid forwardemail TXT record/);

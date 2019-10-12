@@ -22,12 +22,12 @@ const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
 const ip = require('ip');
 const isCI = require('is-ci');
+const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
 const redis = require('redis');
-const s = require('underscore.string');
 const signale = require('signale');
 const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
@@ -270,10 +270,12 @@ class ForwardEmail {
       throw new CustomError('Blacklisted domains are not permitted');
 
     // ensure fully qualified domain name
+    /*
     if (!validator.isFQDN(domain))
       throw new CustomError(
         `${domain} is not a fully qualified domain name ("FQDN")`
       );
+    */
 
     // prevent disposable email addresses from being used
     if (this.isDisposable(domain))
@@ -287,13 +289,16 @@ class ForwardEmail {
   async onConnect(session, fn) {
     if (process.env.NODE_ENV === 'test') return fn();
 
+    // TODO: implement stricter spam checking to alleviate this
     // ensure it's a fully qualififed domain name
+    /*
     if (!validator.isFQDN(session.clientHostname))
       return fn(
         new CustomError(
           `${session.clientHostname} is not a fully qualified domain name ("FQDN")`
         )
       );
+    */
 
     // ensure that it's not on the DNS blacklist
     try {
@@ -938,7 +943,7 @@ class ForwardEmail {
       .trim();
 
     // if the record was blank then throw an error
-    if (s.isBlank(record))
+    if (!isSANB(record))
       throw new CustomError(
         `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record`
       );
