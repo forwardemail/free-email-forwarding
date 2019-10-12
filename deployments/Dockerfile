@@ -1,37 +1,45 @@
-# Use Ubuntu latest LTS
-FROM ubuntu:latest
+FROM node:10-stretch
 
-WORKDIR /
+WORKDIR /app
 
 RUN \
   apt-get -y update && \
   apt-get -y upgrade && \
-  apt-get -y install software-properties-common && \
-  add-apt-repository -y ppa:chris-lea/redis-server && \
-  apt-get update && \
-  apt-get install -y npm redis-server spamassassin spamc python authbind openssl python-pip curl && \
-  /usr/sbin/spamd -d --pidfile=/var/run/spamd.pid && \
-  /usr/bin/redis-server /etc/redis/redis.conf && \
-  touch /etc/authbind/byport/25 && \
-  chmod 755 /etc/authbind/byport/25 && \
-  touch /etc/authbind/byport/465 && \
-  chmod 755 /etc/authbind/byport/465 && \
-  touch /etc/authbind/byport/\!587 && \
-  openssl genrsa -out private.key 1024 && \
-  openssl rsa -in private.key -pubout -out public.key && \
-  sed '2,3!d' public.key | sed ':a;N;$!ba;s/\n//g' | xargs -I{} echo "default._domainkey 14400 IN TXT \"v=DKIM1; k=rsa; p={}\"" > DKIM-TXT-record && \
-  pip install pyspf pydns ipaddr dkimpy pynacl authres dnspython pydns && \
-  npm install python-spfcheck2 python-dkim-verify forward-email auto-bind is-ci && \
-  sed -i "s/  \.stderr\.split(' ')\[1\]/  \.stdout\.split(' ')\[1\]/" node_modules/python-spfcheck2/index.js && \
-  curl "https://raw.githubusercontent.com/niftylettuce/python-dkim-verify/c5db6545a6640ac70e0f396c61f38da378b7c764/index.js" > node_modules/python-dkim-verify/index.js && \
-  curl "https://raw.githubusercontent.com/niftylettuce/python-spfcheck2/6494dfa0abb9b062828dcec78bf9c412e44d84c6/index.js" > node_modules/python-spfcheck2/index.js && \
-  curl "https://raw.githubusercontent.com/niftylettuce/forward-email/b9f6cb8cfaef8024fa51b4a023ff4f3812993d05/README.md" > forward-email.js && \
-  sed -i '337,401!d' forward-email.js; exit 0 /*
+  apt-get install -y software-properties-common redis-server spamassassin spamc python openssl python-pip curl && \
+  pip install pyspf pydns ipaddr dkimpy pynacl authres dnspython pydns
 
-RUN nohup /usr/bin/redis-server /etc/redis/redis.conf
+RUN \
+  openssl genrsa -out dkim-private.key 1024 && \
+  openssl rsa -in dkim-private.key -pubout -out dkim-public.key && \
+  echo "Add this to your DNS zonefile:" && \
+  sed '3,3!d' dkim-public.key | sed ':a;N;$!ba;s/\n//g' | xargs -I{} echo "default._domainkey 14400 IN TXT \"v=DKIM1; k=rsa; p={}\"" | tee DKIM-TXT-record
+
+COPY package.json yarn.lock /app/
+RUN yarn
+
+COPY * /app/
 
 EXPOSE 25
 
-CMD /usr/bin/redis-server /etc/redis/redis.conf && nodejs forward-email.js
+ENV IP_ADDRESS ""
+ENV EXCHANGES ""
+ENV SECURE "false"
+ENV SSL_KEY ""
+ENV SSL_KEY_FILE ""
+ENV SSL_CERT ""
+ENV SSL_CERT_FILE ""
+ENV SSL_CA ""
+ENV SSL_CA_FILE ""
+ENV DKIM_PRIVATE_KEY ""
+ENV DKIM_KEY_SELECTOR "default"
+ENV DKIM_PRIVATE_KEY_FILE /app/dkim-private.key
 
-#docker exec <container name> cat /DKIM-TXT-record
+CMD \
+  /usr/sbin/spamd -d --pidfile=/var/run/spamd.pid && \
+  /usr/bin/redis-server /etc/redis/redis.conf && \
+  /app/index.js
+
+#docker run --network host --hostname <yourdomain.com> --name <container name> -d forward-email:latest
+
+# Add the following line to your DNS zonefile:
+#docker exec <container name> cat /app/DKIM-TXT-record
