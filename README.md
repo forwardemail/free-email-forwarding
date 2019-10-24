@@ -149,7 +149,7 @@ _Optional Add-ons:_
 
 After you've followed the steps above in [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding) you can follow these steps in Gmail in order to "Send Mail As" using your custom domain.
 
-1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.  **If you are not using two-factor authentication**, then you can skip to step [#4](https://github.com/niftylettuce/forward-email/issues/4), and when you get to step [#11](https://github.com/niftylettuce/forward-email/issues/11) you will use your account's password instead of one that is in your clipboard as mentioned.
+1. Assuming you are using [Gmail's Two-Factor Authentication][gmail-2fa] (strongly recommended for security), visit <https://myaccount.google.com/apppasswords>.  **If you are not using two-factor authentication**, then you can skip to step 4, and when you get to step 11 you will use your account's password instead of one that is in your clipboard as mentioned.
 2. When prompted for `Select the app and device you want to generate the app password for`:
    * Select `Mail` under the drop-down for `Select app`
    * Select `Other` under the drop-down for `Select device`
