@@ -4,7 +4,7 @@
 <div align="center">
   <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
   <a href="https://travis-ci.org/niftylettuce/forward-email"><img src="https://travis-ci.org/niftylettuce/forward-email.svg?branch=master" alt="build status" /></a>
-  <a href="https://codecov.io/github/niftylettuce/forward-email"><img src="https://img.shields.io/codecov/c/github/niftylettuce/forward-email/master.svg" alt="code coverage" /></a>
+  <a href="https://codecov.io/github/forwardemail/free-email-forwarding"><img src="https://img.shields.io/codecov/c/github/forwardemail/free-email-forwarding/master.svg" alt="code coverage" /></a>
   <a href="https://github.com/sindresorhus/xo"><img src="https://img.shields.io/badge/code_style-XO-5ed9c7.svg" alt="code style" /></a>
   <a href="https://github.com/prettier/prettier"><img src="https://img.shields.io/badge/styled_with-prettier-ff69b4.svg" alt="styled with prettier" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/lassjs/lass.svg" alt="license" /></a>
