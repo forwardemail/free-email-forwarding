@@ -7421,14 +7421,6 @@ punycode@^2.1.0, punycode@^2.1.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
 
-python-dkim-verify@^0.0.3:
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/python-dkim-verify/-/python-dkim-verify-0.0.3.tgz#f4be4838e37ca68f57c85916eabbcc30e408ca8e"
-  integrity sha512-CO7wHtQ4tztZ9qfR40NyRUqGwlHbyV4Pj9iYVKTeHz32zijZQDp3ZmM5f+Xx9KO8nv6qTEcP81kBqU1VoH3d6w==
-  dependencies:
-    semver "^6.3.0"
-    shelljs "^0.8.3"
-
 python-spfcheck2@^0.0.4:
   version "0.0.4"
   resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.4.tgz#06b33c1105eb744ab955b63fee1927924c475f00"
