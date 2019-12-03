@@ -1,7 +1,7 @@
 {
   "name": "forward-email",
   "description": "ForwardEmail is the best free email forwarding for custom domains at http://forwardemail.net",
-  "version": "2.1.3",
+  "version": "3.0.0",
   "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
   "ava": {
     "serial": true,
