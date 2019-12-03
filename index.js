@@ -1,17 +1,15 @@
-const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
+const util = require('util');
 
-const Cabin = require('cabin');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Promise = require('bluebird');
+const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
-const autoBind = require('auto-bind');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
@@ -19,14 +17,12 @@ const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
 const ip = require('ip');
-const isCI = require('is-ci');
 const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
-const redis = require('redis');
-const signale = require('signale');
+const sharedConfig = require('@ladjs/shared-config');
 const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
@@ -34,11 +30,16 @@ const { SMTPServer } = require('smtp-server');
 const { oneLine } = require('common-tags');
 
 let mailUtilities = require('mailin/lib/mailUtilities.js');
-const MessageSplitter = require('./message-splitter');
+
+const {
+  CustomError,
+  MessageSplitter,
+  createMessageID,
+  env,
+  logger
+} = require('./helpers');
 
 mailUtilities = Promise.promisifyAll(mailUtilities);
-
-const blacklist = require('./blacklist');
 
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
@@ -52,60 +53,19 @@ const CODES_TO_RESPONSE_CODES = {
 };
 
 const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
-
-class CustomError extends Error {
-  constructor(
-    message = 'An unknown error has occurred',
-    responseCode = 550,
-    ...params
-  ) {
-    super(...params);
-    Error.captureStackTrace(this, CustomError);
-    this.message = message;
-    this.responseCode = responseCode;
-  }
-}
-
-const silent = process.env.NODE_ENV === 'production';
-
-const logger = new Cabin({
-  axe: {
-    capture: false,
-    logger: signale,
-    silent
-  }
-});
-
 const transporterConfig = {
-  debug: !silent,
+  debug: !env.IS_SILENT,
   logger,
   direct: true,
   opportunisticTLS: true,
   port: 25,
   tls: {
-    rejectUnauthorized: process.env.NODE_ENV !== 'test'
+    rejectUnauthorized: env.NODE_ENV !== 'test'
   },
   connectionTimeout: ms('5s'),
   greetingTimeout: ms('5s'),
   socketTimeout: 0
 };
-
-// taken from:
-// node_modules/nodemailer/lib/mime-node/index.js
-function createMessageID(session) {
-  return (
-    '<' +
-    [2, 2, 2, 6].reduce(
-      // crux to generate UUID-like random strings
-      (prev, len) => prev + '-' + crypto.randomBytes(len).toString('hex'),
-      crypto.randomBytes(4).toString('hex')
-    ) +
-    '@' +
-    // try to use the domain of the FROM address
-    session.envelope.mailFrom.address.split('@').pop() +
-    '>'
-  );
-}
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -114,67 +74,69 @@ class ForwardEmail {
       ...config.ssl
     };
 
-    if (process.env.NODE_ENV === 'test' && !isCI)
-      config.dkim = {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, 'dkim-private.key'),
-          'utf8'
-        ),
-        cacheDir: os.tmpdir()
-      };
-
     this.config = {
+      ...sharedConfig('SMTP'),
       // TODO: eventually set 127.0.0.1 as DNS server
       // for both `dnsbl` and `dns` usage
       // https://gist.github.com/zhurui1008/48130439a079a3c23920
       //
       // <https://blog.cloudflare.com/announcing-1111/>
-      dns: [
-        // TODO: <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
-        // cloudflare
-        '1.1.1.1',
-        '1.0.0.1'
-      ],
-      noReply: 'no-reply@forwardemail.net',
+      // TODO: <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
+      dns: env.DNS_PROVIDERS,
+      noReply: env.EMAIL_NOREPLY,
+      logger,
       smtp: {
-        size: bytes('25mb'),
+        size: bytes(env.SMTP_MESSAGE_MAX_SIZE),
         onConnect: this.onConnect.bind(this),
         onData: this.onData.bind(this),
         onMailFrom: this.onMailFrom.bind(this),
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
-        logInfo: !silent,
+        logInfo: !env.IS_SILENT,
         logger,
-        ...config.smtp,
-        ...this.ssl
+        ...config.smtp
       },
-      limiter: { ...config.limiter },
-      ssl: this.ssl,
-      exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
-      dkim: {},
-      maxForwardedAddresses: 5,
-      email: 'support@forwardemail.net',
-      website: 'https://forwardemail.net',
-      recordPrefix: 'forward-email',
+      exchanges: env.SMTP_EXCHANGE_DOMAINS,
+      dkim: {
+        domainName: env.DKIM_DOMAIN_NAME,
+        keySelector: env.DKIM_KEY_SELECTOR,
+        privateKey: fs.readFileSync(env.DKIM_PRIVATE_KEY_PATH, 'utf8'),
+        cacheDir: os.tmpdir()
+      },
+      maxForwardedAddresses: env.MAX_FORWARDED_ADDRESSES,
+      email: env.EMAIL_SUPPORT,
+      website: env.WEBSITE_URL,
+      recordPrefix: env.TXT_RECORD_PREFIX,
       ...config
     };
+
+    this.config.smtp.ssl = this.config.ssl;
 
     // set up DKIM instance for signing messages
     this.dkim = new DKIM(this.config.dkim);
 
-    // setup rate limiting with redis
-    if (this.config.limiter)
-      this.limiter = {
-        db: redis.createClient(),
-        max: 200, // max requests within duration
-        duration: ms('1h'),
-        ...this.config.limiter
-      };
+    // initialize redis
+    const client = new Redis(
+      this.config.redis,
+      logger,
+      this.config.redisMonitor
+    );
 
+    // setup rate limiting with redis
+    if (this.config.rateLimit) {
+      this.limiter = {
+        db: client,
+        ...this.config.rateLimit
+      };
+    }
+
+    // expose client
+    this.client = client;
     // setup our smtp server which listens for incoming email
     this.server = new SMTPServer(this.config.smtp);
+    // kind of hacky but I filed a GH issue
+    // <https://github.com/nodemailer/smtp-server/issues/135>
+    this.server.address = this.server.server.address.bind(this.server.server);
     this.server.on('error', err => {
       logger.error(err);
     });
@@ -182,7 +144,35 @@ class ForwardEmail {
     this.dns = Promise.promisifyAll(dns);
     this.dns.setServers(this.config.dns);
 
-    autoBind(this);
+    this.listen = this.listen.bind(this);
+    this.close = this.close.bind(this);
+    this.processRecipient = this.processRecipient.bind(this);
+    this.processAddress = this.processAddress.bind(this);
+    this.sendEmail = this.sendEmail.bind(this);
+    this.rewriteFriendlyFrom = this.rewriteFriendlyFrom.bind(this);
+    this.parseUsername = this.parseUsername.bind(this);
+    this.parseFilter = this.parseFilter.bind(this);
+    this.parseDomain = this.parseDomain.bind(this);
+    this.onConnect = this.onConnect.bind(this);
+    this.onData = this.onData.bind(this);
+    this.validateSPF = this.validateSPF.bind(this);
+    this.getDMARC = this.getDMARC.bind(this);
+    this.validateDKIM = this.validateDKIM.bind(this);
+    this.validateMX = this.validateMX.bind(this);
+    this.validateRateLimit = this.validateRateLimit.bind(this);
+    this.isBlacklisted = this.isBlacklisted.bind(this);
+    this.isDisposable = this.isDisposable.bind(this);
+    this.onMailFrom = this.onMailFrom.bind(this);
+    this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
+    this.onRcptTo = this.onRcptTo.bind(this);
+  }
+
+  async listen(port) {
+    await util.promisify(this.server.listen).bind(this.server)(port);
+  }
+
+  async close() {
+    await util.promisify(this.server.close).bind(this.server);
   }
 
   processRecipient(options) {
@@ -226,7 +216,8 @@ class ForwardEmail {
     const { to, host, name, from, raw } = options;
     const transporter = nodemailer.createTransport({
       ...transporterConfig,
-      ...this.ssl,
+      ...this.config.ssl,
+      secure: this.config.ssl.key && this.config.ssl.cert,
       host,
       name
     });
@@ -243,10 +234,9 @@ class ForwardEmail {
 
   parseUsername(address) {
     ({ address } = addressParser(address)[0]);
-    let username =
-      address.indexOf('+') === -1
-        ? address.split('@')[0]
-        : address.split('+')[0];
+    let username = address.includes('+')
+      ? address.split('+')[0]
+      : address.split('@')[0];
 
     username = punycode.toASCII(username).toLowerCase();
     return username;
@@ -254,9 +244,7 @@ class ForwardEmail {
 
   parseFilter(address) {
     ({ address } = addressParser(address)[0]);
-    return address.indexOf('+') === -1
-      ? ''
-      : address.split('+')[1].split('@')[0];
+    return address.includes('+') ? address.split('+')[1].split('@')[0] : '';
   }
 
   parseDomain(address) {
@@ -285,7 +273,7 @@ class ForwardEmail {
   }
 
   async onConnect(session, fn) {
-    if (process.env.NODE_ENV === 'test') return fn();
+    if (env.NODE_ENV === 'test') return fn();
 
     // TODO: implement stricter spam checking to alleviate this
     // ensure it's a fully qualififed domain name
@@ -300,17 +288,13 @@ class ForwardEmail {
 
     // ensure that it's not on the DNS blacklist
     try {
-      const result = await dnsbl.lookup(
-        session.remoteAddress,
-        'zen.spamhaus.org',
-        {
-          servers: this.config.dns
-        }
-      );
+      const result = await dnsbl.lookup(session.remoteAddress, env.DNSBL, {
+        servers: this.config.dns
+      });
       if (!result) return fn();
       fn(
         new CustomError(
-          `Your IP address of ${session.remoteAddress} is listed on the ZEN Spamhaus DNS Blacklist.  See https://www.spamhaus.org/query/ip/${session.remoteAddress} for more information.`,
+          `Your IP address of ${session.remoteAddress} is listed on the ${env.DNSBL} DNS Blacklist.  See https://www.spamhaus.org/query/ip/${session.remoteAddress} for more information.`,
           554
         )
       );
@@ -445,9 +429,9 @@ class ForwardEmail {
           logger.error(err);
         }
 
-        if (spamScore >= 5)
+        if (spamScore >= env.SPAM_SCORE_THRESHOLD)
           throw new CustomError(
-            `Message detected as spam (spam score was ${spamScore})`,
+            `Message detected as spam (spam score of ${spamScore} exceeds threshold of ${env.SPAM_SCORE_THRESHOLD})`,
             554
           );
 
@@ -466,19 +450,19 @@ class ForwardEmail {
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
-          process.env.NODE_ENV === 'test' ? '178.128.149.101' : ip.address();
+          env.NODE_ENV === 'test' ? env.SMTP_EXCHANGE_IPS[0] : ip.address();
         const name =
-          process.env.NODE_ENV === 'test'
-            ? 'mx1.forwardemail.net'
+          env.NODE_ENV === 'test'
+            ? env.SMTP_EXCHANGE_DOMAINS[0]
             : await getFQDN(ipAddress);
 
         //
         // 6) if SPF is valid
         //
         const spf = await this.validateSPF(
-          process.env.NODE_ENV === 'test' ? ipAddress : session.remoteAddress,
+          env.NODE_ENV === 'test' ? ipAddress : session.remoteAddress,
           session.envelope.mailFrom.address,
-          process.env.NODE_ENV === 'test' ? name : session.clientHostname
+          env.NODE_ENV === 'test' ? name : session.clientHostname
         );
         if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
           throw new CustomError(
@@ -568,9 +552,8 @@ class ForwardEmail {
               // Gmail won't show the message in the inbox if it's sending FROM
               // the same address that gets forwarded TO using our service
               // (we can assume that other mail providers do the same)
-              for (let i = 0; i < addresses.length; i++) {
+              for (const address of addresses) {
                 if (rewritten) break;
-                const address = addresses[i];
                 const fromAddress = addressParser(originalFrom)[0].address;
                 if (address !== fromAddress) continue;
                 rewritten = true;
@@ -598,7 +581,7 @@ class ForwardEmail {
         // (helps to alleviate bulk spam with services like Gmail)
         recipients = recipients.map(recipient => {
           recipient.addresses = recipient.addresses.filter(address => {
-            if (address.indexOf('+') === -1) return true;
+            if (!address.includes('+')) return true;
             return !recipient.addresses.includes(
               `${this.parseUsername(address)}@${this.parseDomain(address)}`
             );
@@ -687,18 +670,18 @@ class ForwardEmail {
                 from,
                 raw
               });
-              for (let i = 0; i < results.length; i++) {
+              for (const element of results) {
                 // TODO: a@a.com -> b@b.com + c@c.com when c@c.com fails
                 // it will still say a@a.com is successful
                 // but it will be confusing because the b@b.com will be
                 // masked to a@a.com and the end user will see that there
                 // was both a success and a failure for the same address
                 // (perhaps we indicate this user has email forwarded?)
-                if (results[i].accepted.length > 0)
+                if (element.accepted.length > 0)
                   accepted.push(recipient.address);
-                if (results[i].rejected.length === 0) continue;
-                for (let x = 0; x < results[i].rejected.length; x++) {
-                  const err = results[i].rejectedErrors[x];
+                if (element.rejected.length === 0) continue;
+                for (let x = 0; x < element.rejected.length; x++) {
+                  const err = element.rejectedErrors[x];
                   bounces.push({
                     address: recipient.address,
                     err
@@ -734,9 +717,9 @@ class ForwardEmail {
               )}`
             );
 
-          for (let b = 0; b < bounces.length; b++) {
+          for (const element of bounces) {
             messages.push(
-              `Error for ${bounces[b].address} of "${bounces[b].err.message}"`
+              `Error for ${element.address} of "${element.err.message}"`
             );
           }
 
@@ -799,7 +782,7 @@ class ForwardEmail {
   }
 
   async getDMARC(hostname) {
-    if (process.env.NODE_ENV === 'test') hostname = 'forwardemail.net';
+    if (env.NODE_ENV === 'test') hostname = 'forwardemail.net';
     const parsedDomain = parseDomain(hostname);
     if (!parsedDomain) return false;
     const entry = `_dmarc.${hostname}`;
@@ -866,8 +849,7 @@ class ForwardEmail {
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
     return new Promise((resolve, reject) => {
-      if (email === this.config.noReply || !this.config.limiter)
-        return resolve();
+      if (email === this.config.noReply || !this.limiter) return resolve();
       const id = email;
       const limit = new Limiter({ id, ...this.limiter });
       limit.get((err, limit) => {
@@ -889,7 +871,9 @@ class ForwardEmail {
   }
 
   isBlacklisted(domain) {
-    return blacklist.includes(domain);
+    return Array.isArray(env.BLACKLIST)
+      ? env.BLACKLIST.includes(domain)
+      : false;
   }
 
   isDisposable(domain) {
@@ -977,18 +961,7 @@ class ForwardEmail {
     for (let i = 0; i < addresses.length; i++) {
       // convert addresses to lowercase
       addresses[i] = addresses[i].toLowerCase();
-      if (addresses[i].indexOf(':') === -1) {
-        // allow domain alias forwarding
-        // (e.. the record is just "b.com" if it's not a valid email)
-        if (validator.isFQDN(addresses[i])) {
-          globalForwardingAddresses.push(`${username}@${addresses[i]}`);
-        } else {
-          const domain = this.parseDomain(addresses[i]);
-          if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
-            globalForwardingAddresses.push(addresses[i]);
-          }
-        }
-      } else {
+      if (addresses[i].includes(':')) {
         const addr = addresses[i].split(':');
 
         if (addr.length !== 2 || !validator.isEmail(addr[1]))
@@ -1001,6 +974,15 @@ class ForwardEmail {
 
         // check if we have a match
         if (username === addr[0]) forwardingAddresses.push(addr[1]);
+      } else if (validator.isFQDN(addresses[i])) {
+        // allow domain alias forwarding
+        // (e.. the record is just "b.com" if it's not a valid email)
+        globalForwardingAddresses.push(`${username}@${addresses[i]}`);
+      } else {
+        const domain = this.parseDomain(addresses[i]);
+        if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
+          globalForwardingAddresses.push(addresses[i]);
+        }
       }
     }
 
@@ -1028,7 +1010,7 @@ class ForwardEmail {
 
         const newRecursive = forwardingAddresses.concat(recursive);
         // prevent a double-lookup if user is using + symbols
-        if (forwardingAddress.indexOf('+') !== -1)
+        if (forwardingAddress.includes('+'))
           newRecursive.push(
             `${this.parseUsername(address)}@${this.parseDomain(address)}`
           );
@@ -1080,7 +1062,7 @@ class ForwardEmail {
     // otherwise transform the + symbol filter if we had it
     // and then resolve with the newly formatted forwarding address
     // (we can return early here if there was no + symbol)
-    if (address.indexOf('+') === -1) return forwardingAddresses;
+    if (!address.includes('+')) return forwardingAddresses;
 
     return forwardingAddresses.map(forwardingAddress => {
       return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
@@ -1112,72 +1094,6 @@ class ForwardEmail {
       fn(err);
     }
   }
-}
-
-if (!module.parent) {
-  const config = {
-    noReply: 'no-reply@forwardemail.net',
-    exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
-    ssl: {},
-    dkim: {}
-  };
-
-  if (process.env.NODE_ENV === 'production') {
-    // needsUpgrade = true;
-    config.ssl = {
-      secure: process.env.SECURE === 'true',
-      key: fs.readFileSync('/home/deploy/mx1.forwardemail.net.key', 'utf8'),
-      cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
-      ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
-    };
-    config.dkim = {
-      domainName: 'forwardemail.net',
-      keySelector: 'default',
-      privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8'),
-      cacheDir: os.tmpdir()
-    };
-  }
-
-  const forwardEmail = new ForwardEmail(config);
-  forwardEmail.server.listen(process.env.PORT || 25);
-
-  const close = (code = 0) => {
-    forwardEmail.server.close(() => {
-      // eslint-disable-next-line unicorn/no-process-exit
-      process.exit(code);
-    });
-  };
-
-  // handle warnings
-  process.on('warning', warning => {
-    logger.warn(warning);
-  });
-
-  // handle uncaught promises
-  process.on('unhandledRejection', err => {
-    logger.error(err);
-    close(1);
-  });
-
-  // handle uncaught exceptions
-  process.on('uncaughtException', err => {
-    logger.error(err);
-    close(1);
-  });
-
-  // handle windows support (signals not available)
-  // <http://pm2.keymetrics.io/docs/usage/signals-clean-restart/#windows-graceful-stop>
-  process.on('message', msg => {
-    if (msg === 'shutdown') {
-      logger.warn(msg);
-      close();
-    }
-  });
-
-  // handle graceful restarts
-  process.on('SIGTERM', () => close());
-  process.on('SIGHUP', () => close());
-  process.on('SIGINT', () => close());
 }
 
 module.exports = ForwardEmail;

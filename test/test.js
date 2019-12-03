@@ -1,7 +1,9 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
 const Client = require('nodemailer/lib/smtp-connection');
+const IORedis = require('ioredis');
 const _ = require('lodash');
 const bytes = require('bytes');
 const domains = require('disposable-email-domains');
@@ -12,13 +14,24 @@ const shell = require('shelljs');
 const test = require('ava');
 const uuid = require('uuid');
 
-const { beforeEach, afterEach } = require('./helpers');
 const ForwardEmail = require('..');
 
 const tls = { rejectUnauthorized: false };
 
-test.beforeEach(beforeEach);
-test.afterEach(afterEach);
+const client = new IORedis();
+
+test.beforeEach(async t => {
+  const keys = await client.keys('limit:*');
+  if (keys.length > 0) await Promise.all(keys.map(key => client.del(key)));
+  const forwardEmail = new ForwardEmail();
+  const port = await getPort();
+  await forwardEmail.listen(port);
+  t.context.forwardEmail = forwardEmail;
+});
+
+test.afterEach(async t => {
+  await t.context.forwardEmail.close();
+});
 
 test('returns itself', t => {
   t.true(new ForwardEmail() instanceof ForwardEmail);

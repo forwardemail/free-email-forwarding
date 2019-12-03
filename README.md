@@ -24,6 +24,7 @@
 
 * [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding)
 * [Send Mail As Using Gmail](#send-mail-as-using-gmail)
+* [Service Status, Uptime, and Reliability](#service-status-uptime-and-reliability)
 * [Issues and Debugging](#issues-and-debugging)
 * [Service Specific Settings](#service-specific-settings)
   * [Shopify](#shopify)
@@ -113,7 +114,7 @@
 
 **3.** Set (and customize) the following SPF record for SPF verification for your domain name (this will allow SPF verification to pass, note that you may need to enclose this value in quotes if you are using Amazon Route53):
 
-> If you're using a service like AWS Route 53, then edit your existing TXT record and add the following as a new line:
+> If you're using a service like Cloudflare or Amazon Route 53, then edit your existing TXT record and add the following as a new line:
 
 | Name/Host/Alias    |  TTL | Record Type | Value/Answer/Destination                        |
 | ------------------ | :--: | ----------- | ----------------------------------------------- |
@@ -173,6 +174,11 @@ After you've followed the steps above in [How Do I Get Started and Set Up Email 
 17. Done!
 
 
+## Service Status, Uptime, and Reliability
+
+As of December 3, 2019, the service now is powered using Cloudflare DNS and Global Load Balancing across multiple, secure, locked-down servers hosted using Digital Ocean in US East, US West, and UK London regions.
+
+
 ## Issues and Debugging
 
 The most probable cause of your issues with not receiving test emails or with configuration in general is due to DNS propagation and caching.
@@ -223,15 +229,16 @@ You'll also need the following dependencies installed:
     sudo apt-get -y install spamassassin spamc python
     ```
 
-    > If you are using a `jessie` based version of Debian (e.g. Ubuntu 16.04):
+    > If you are using a `jessie` based version of Debian (e.g. Ubuntu 16.04+):
 
     ```sh
-    systemctl enable spamassassin
+    systemctl enable spamassassin.service
     ```
 
     > This is due to the bug identified here: <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=764438>
     >
-    > You **must** follow the remainder of instructions here to enable it and setup automatic rule updating: <https://www.digitalocean.com/community/tutorials/how-to-install-and-setup-spamassassin-on-ubuntu-12-04>
+    > You **must** follow the remainder of instructions here to enable it and setup automatic rule updating:
+    > <https://www.digitalocean.com/community/tutorials/how-to-install-and-setup-spamassassin-on-ubuntu-12-04>
 
 * [ufw][] - recommended for security on Ubuntu server
 
@@ -301,7 +308,7 @@ You'll also need the following dependencies installed:
 
 * [python-dkim-verify][] - for validation of DKIM signatures, see [its requirements][python-dkim-verify] for more information
 
-* DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Amazon Route 53 for DNS hosting.
+* DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See [How Do I Get Started and Set Up Email Forwarding](#how-do-i-get-started-and-set-up-email-forwarding) (obviously replace `forwardemail.net` with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Cloudflare or Amazon Route 53 for DNS hosting.
 
 * Reverse DNS ("rDNS") with PTR Record- - the PTR record for your server's IP address is controlled by your server provider, and therefore you need to contact your server provider to set the PTR record for you.  Services such as DigitalOcean will set a PTR record for you automatically as long as you use a fully-qualified domain name ("FQDN").
 
@@ -324,90 +331,12 @@ You'll also need the following dependencies installed:
   +domain.com
   ```
 
-* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [Digital Ocean guide][do-guide])
+* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see ["How do you perform DNS lookups on domain names"](#how-do-you-perform-dns-lookups-on-domain-names) below and here is a [TechRepublic][tr-guide] or a [Digital Ocean guide][do-guide])
 
 
 ## Programmatic Usage
 
-[npm][]:
-
-```sh
-npm install forward-email
-```
-
-[yarn][]:
-
-```sh
-yarn add forward-email
-```
-
-```js
-const ForwardEmail = require('forward-email');
-const os = require('os');
-
-const config = {
-  noReply: 'no-reply@forwardemail.net',
-  exchanges: ['mx1.forwardemail.net', 'mx2.forwardemail.net'],
-  ssl: {},
-  dkim: {}
-};
-
-if (process.env.NODE_ENV === 'production') {
-  config.ssl = {
-    secure: process.env.SECURE === 'true',
-    key: fs.readFileSync('/home/deploy/mx1.forwardemail.net.key', 'utf8'),
-    cert: fs.readFileSync('/home/deploy/mx1.forwardemail.net.cert', 'utf8'),
-    ca: fs.readFileSync('/home/deploy/mx1.forwardemail.net.ca', 'utf8')
-  };
-  config.dkim = {
-    domainName: 'forwardemail.net',
-    keySelector: 'default',
-    privateKey: fs.readFileSync('/home/deploy/dkim-private.key', 'utf8'),
-    cacheDir: os.tmpdir()
-  };
-}
-
-const forwardEmail = new ForwardEmail(config);
-forwardEmail.server.listen(process.env.PORT || 25);
-
-const close = (code = 0) => {
-  forwardEmail.server.close(() => {
-    // eslint-disable-next-line unicorn/no-process-exit
-    process.exit(code);
-  });
-};
-
-// handle warnings
-process.on('warning', warning => {
-  console.warn(warning);
-});
-
-// handle uncaught promises
-process.on('unhandledRejection', err => {
-  console.error(err);
-  close(1);
-});
-
-// handle uncaught exceptions
-process.on('uncaughtException', err => {
-  console.error(err);
-  close(1);
-});
-
-// handle windows support (signals not available)
-// <http://pm2.keymetrics.io/docs/usage/signals-clean-restart/#windows-graceful-stop>
-process.on('message', msg => {
-  if (msg === 'shutdown') {
-    console.log(msg);
-    close();
-  }
-});
-
-// handle graceful restarts
-process.on('SIGTERM', () => close());
-process.on('SIGHUP', () => close());
-process.on('SIGINT', () => close());
-```
+See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more insight.
 
 
 ## Service-Level Agreement
@@ -666,3 +595,5 @@ If you are seeking permission to use these trademarks, then please [contact us](
 [do-guide]: https://www.digitalocean.com/community/questions/how-do-i-switch-my-dns-resolvers-away-from-google
 
 [nodemailer]: https://github.com/nodemailer/nodemailer
+
+[tr-guide]: https://www.techrepublic.com/article/how-to-set-dns-nameservers-in-ubuntu-server-18-04/
