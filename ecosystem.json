@@ -9,15 +9,7 @@
       "env_production": {
         "NODE_ENV": "production",
         "IS_SILENT": true,
-        "SMTP_PORT": "3025",
-        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
-        "DKIM_DOMAIN_NAME": "forwardemail.net",
-        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
-        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
-        "EMAIL_SUPPORT": "support@forwardemail.net",
-        "WEBSITE_URL": "https://forwardemail.net",
-        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
-        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
+        "SMTP_PORT": "3025"
       }
     },
     {
@@ -29,15 +21,7 @@
       "env_production": {
         "NODE_ENV": "production",
         "IS_SILENT": true,
-        "SMTP_PORT": "3465",
-        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
-        "DKIM_DOMAIN_NAME": "forwardemail.net",
-        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
-        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
-        "EMAIL_SUPPORT": "support@forwardemail.net",
-        "WEBSITE_URL": "https://forwardemail.net",
-        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
-        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
+        "SMTP_PORT": "3465"
       }
     },
     {
@@ -49,15 +33,7 @@
       "env_production": {
         "NODE_ENV": "production",
         "IS_SILENT": true,
-        "SMTP_PORT": "3587",
-        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
-        "DKIM_DOMAIN_NAME": "forwardemail.net",
-        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
-        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
-        "EMAIL_SUPPORT": "support@forwardemail.net",
-        "WEBSITE_URL": "https://forwardemail.net",
-        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
-        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
+        "SMTP_PORT": "3587"
       }
     }
   ],
