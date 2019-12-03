@@ -49,7 +49,6 @@
     "parse-domain": "^2.3.4",
     "pino": "^5.14.0",
     "punycode": "^2.1.1",
-    "python-dkim-verify": "^0.0.3",
     "python-spfcheck2": "^0.0.4",
     "ratelimiter": "^3.4.0",
     "signale": "^1.4.0",

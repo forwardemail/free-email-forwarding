@@ -8,7 +8,6 @@
       "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "IS_SILENT": true,
         "SMTP_PORT": "3025"
       }
     },
@@ -20,7 +19,6 @@
       "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "IS_SILENT": true,
         "SMTP_PORT": "3465"
       }
     },
@@ -32,7 +30,6 @@
       "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "IS_SILENT": true,
         "SMTP_PORT": "3587"
       }
     }

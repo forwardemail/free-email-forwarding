@@ -11,7 +11,7 @@ const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
-const dkimVerify = require('python-dkim-verify');
+const NodeDKIM = require('dkim');
 const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
@@ -30,6 +30,8 @@ const { SMTPServer } = require('smtp-server');
 const { oneLine } = require('common-tags');
 
 let mailUtilities = require('mailin/lib/mailUtilities.js');
+
+const verifyDKIM = util.promisify(NodeDKIM.verify).bind(NodeDKIM);
 
 const {
   CustomError,
@@ -811,8 +813,10 @@ class ForwardEmail {
 
   async validateDKIM(raw) {
     try {
-      const result = await dkimVerify(raw);
-      return result;
+      const result = await verifyDKIM(raw);
+      return (
+        result && result.length > 0 && result.every(record => record.verified)
+      );
     } catch (err) {
       logger.error(err);
       err.responseCode = 421;
