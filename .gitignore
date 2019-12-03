@@ -4,10 +4,9 @@
 node_modules
 coverage
 .nyc_output
-dkim-public.key
-dkim-private.key
-mx1.forwardemail.net.ca
-mx1.forwardemail.net.cert
-mx1.forwardemail.net.csr
-mx1.forwardemail.net.key
-package-lock.json
+*.ca
+*.cert
+*.csr
+*.key
+*.env
+*.pem

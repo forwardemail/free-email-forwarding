@@ -2,45 +2,78 @@
   "apps": [
     {
       "name": "smtp",
-      "script": "index.js",
-      "exec_mode": "cluster",
-      "instances": "6",
+      "script": "app.js",
+      "exec_mode": "cluster_mode",
+      "wait_ready": true,
+      "instances": "max",
       "env_production": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "IS_SILENT": true,
+        "SMTP_PORT": "3025",
+        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
+        "DKIM_DOMAIN_NAME": "forwardemail.net",
+        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
+        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
+        "EMAIL_SUPPORT": "support@forwardemail.net",
+        "WEBSITE_URL": "https://forwardemail.net",
+        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
+        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
       }
     },
     {
       "name": "smtps",
-      "script": "index.js",
-      "exec_mode": "cluster",
-      "instances": "6",
+      "script": "app.js",
+      "exec_mode": "cluster_mode",
+      "wait_ready": true,
+      "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "SECURE": "true",
-        "PORT": "465"
+        "IS_SILENT": true,
+        "SMTP_PORT": "3465",
+        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
+        "DKIM_DOMAIN_NAME": "forwardemail.net",
+        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
+        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
+        "EMAIL_SUPPORT": "support@forwardemail.net",
+        "WEBSITE_URL": "https://forwardemail.net",
+        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
+        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
       }
     },
     {
       "name": "msa",
-      "script": "index.js",
-      "exec_mode": "cluster",
-      "instances": "6",
+      "script": "app.js",
+      "exec_mode": "cluster_mode",
+      "wait_ready": true,
+      "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "SECURE": "true",
-        "PORT": "587"
+        "IS_SILENT": true,
+        "SMTP_PORT": "3587",
+        "SMTP_EXCHANGE_IPS": "138.197.213.185,104.248.224.170",
+        "DKIM_DOMAIN_NAME": "forwardemail.net",
+        "DKIM_PRIVATE_KEY_PATH": "/home/deploy/.dkim.key",
+        "EMAIL_NOREPLY": "no-reply@forwardemail.net",
+        "EMAIL_SUPPORT": "support@forwardemail.net",
+        "WEBSITE_URL": "https://forwardemail.net",
+        "SMTP_SSL_KEY_PATH": "/home/deploy/.forwardemail.net.key",
+        "SMTP_SSL_CERT_PATH": "/home/deploy/.forwardemail.net.cert"
       }
     }
   ],
   "deploy": {
     "production": {
       "user": "deploy",
-      "host": ["forwardemailmx1-deploy"],
+      "host": [
+        "us-sf-1-mx1-forwardemail-net-deploy",
+        "uk-london-1-mx1-forwardemail-net-deploy",
+        "us-nyc-1-mx2-forwardemail-net-deploy"
+      ],
       "ref": "origin/master",
       "repo": "git@github.com:niftylettuce/forward-email.git",
       "path": "/var/www/production",
       "post-deploy":
-        "yarn && pm2 startOrGracefulReload ecosystem.json --env production"
+        "yarn && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
     }
   }
 }
