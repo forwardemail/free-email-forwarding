@@ -26,7 +26,6 @@
   "dependencies": {
     "@ladjs/env": "^0.0.4",
     "@ladjs/graceful": "^1.0.0",
-    "@ladjs/proxy": "^1.0.1",
     "@ladjs/redis": "^1.0.3",
     "@ladjs/shared-config": "^0.0.10",
     "array-join-conjunction": "^1.0.0",
@@ -50,8 +49,8 @@
     "parse-domain": "^2.3.4",
     "pino": "^5.14.0",
     "punycode": "^2.1.1",
-    "python-dkim-verify": "^0.0.1",
-    "python-spfcheck2": "^0.0.3",
+    "python-dkim-verify": "^0.0.3",
+    "python-spfcheck2": "^0.0.4",
     "ratelimiter": "^3.4.0",
     "signale": "^1.4.0",
     "smtp-server": "3.5.0",
