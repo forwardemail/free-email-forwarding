@@ -31,6 +31,7 @@
     "@ladjs/shared-config": "^0.0.10",
     "array-join-conjunction": "^1.0.0",
     "bluebird": "^3.7.2",
+    "boolean": "^3.0.0",
     "bytes": "^3.1.0",
     "cabin": "^5.0.10",
     "common-tags": "^1.8.0",

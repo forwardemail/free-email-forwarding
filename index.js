@@ -5,13 +5,13 @@ const util = require('util');
 
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
+const NodeDKIM = require('dkim');
 const Promise = require('bluebird');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
-const NodeDKIM = require('dkim');
 const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
@@ -27,6 +27,7 @@ const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const { SMTPServer } = require('smtp-server');
+const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 
 let mailUtilities = require('mailin/lib/mailUtilities.js');
@@ -110,8 +111,8 @@ class ForwardEmail {
     if (this.config.ssl.ca === null) delete this.config.ssl.ca;
     // shared config automatically adds this
     delete this.config.ssl.allowHTTP1;
-    this.config.ssl.secure =
-      !env.IS_NOT_SECURE || (this.config.ssl.key && this.config.ssl.cert);
+    if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
+    else this.config.ssl.secure = true;
     this.config.smtp = {
       ...this.config.smtp,
       ...this.config.ssl
