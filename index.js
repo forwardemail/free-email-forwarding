@@ -71,11 +71,6 @@ const transporterConfig = {
 
 class ForwardEmail {
   constructor(config = {}) {
-    this.ssl = {
-      secure: false,
-      ...config.ssl
-    };
-
     this.config = {
       ...sharedConfig('SMTP'),
       // TODO: eventually set 127.0.0.1 as DNS server
@@ -112,7 +107,10 @@ class ForwardEmail {
       ...config
     };
 
-    this.config.smtp.ssl = this.config.ssl;
+    this.config.smtp = {
+      ...this.config.smtp,
+      ...this.config.ssl
+    };
 
     // set up DKIM instance for signing messages
     this.dkim = new DKIM(this.config.dkim);
