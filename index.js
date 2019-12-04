@@ -129,12 +129,14 @@ class ForwardEmail {
     );
 
     // setup rate limiting with redis
+    /*
     if (this.config.rateLimit) {
       this.limiter = {
         db: client,
         ...this.config.rateLimit
       };
     }
+    */
 
     // expose client
     this.client = client;
