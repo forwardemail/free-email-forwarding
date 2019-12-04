@@ -26,6 +26,7 @@
   "dependencies": {
     "@ladjs/env": "^0.0.4",
     "@ladjs/graceful": "^1.0.0",
+    "@ladjs/proxy": "^1.0.2",
     "@ladjs/redis": "^1.0.3",
     "@ladjs/shared-config": "^0.0.10",
     "array-join-conjunction": "^1.0.0",
