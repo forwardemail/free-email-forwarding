@@ -6,6 +6,7 @@
       "exec_mode": "cluster_mode",
       "wait_ready": true,
       "instances": "max",
+      "node_args": "--tls-min-v1.0",
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3025",
@@ -18,6 +19,7 @@
       "exec_mode": "cluster_mode",
       "wait_ready": true,
       "instances": "max",
+      "node_args": "--tls-min-v1.0",
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3465"
@@ -29,6 +31,7 @@
       "exec_mode": "cluster_mode",
       "wait_ready": true,
       "instances": "max",
+      "node_args": "--tls-min-v1.0",
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3587"
