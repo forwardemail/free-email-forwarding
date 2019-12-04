@@ -107,6 +107,11 @@ class ForwardEmail {
       ...config
     };
 
+    if (this.config.ssl.ca === null) delete this.config.ssl.ca;
+    // shared config automatically adds this
+    delete this.config.ssl.allowHTTP1;
+    this.config.ssl.secure =
+      !env.IS_NOT_SECURE || (this.config.ssl.key && this.config.ssl.cert);
     this.config.smtp = {
       ...this.config.smtp,
       ...this.config.ssl
@@ -217,7 +222,6 @@ class ForwardEmail {
     const transporter = nodemailer.createTransport({
       ...transporterConfig,
       ...this.config.ssl,
-      secure: this.config.ssl.key && this.config.ssl.cert,
       host,
       name
     });

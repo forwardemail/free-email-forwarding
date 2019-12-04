@@ -8,7 +8,8 @@
       "instances": "max",
       "env_production": {
         "NODE_ENV": "production",
-        "SMTP_PORT": "3025"
+        "SMTP_PORT": "3025",
+        "IS_NOT_SECURE": "true"
       }
     },
     {
