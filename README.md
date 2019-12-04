@@ -63,7 +63,7 @@
 
 ## How Do I Get Started and Set Up Email Forwarding
 
-> <u>**IMPORTANT NOTE:**</u> Replace `niftylettuce@gmail.com` below with the email address you want to forward emails to:
+> <u>**IMPORTANT NOTE:**</u> Replace `niftylettuce@gmail.com` below with the email address you want to forward emails to.  Also the "TTL" value does not need to be 3600, it could be a lower or higher value.  Don't forget to see our section on [Issues and Debugging](#issues-and-debugging) or email [support@forwardemail.net](mailto:support@forwardemail.net) if you run into issues testing!
 
 **1.** Set the following DNS MX records on your domain name (having both is required):
 
@@ -183,7 +183,7 @@ As of December 3, 2019, the service now is powered using Cloudflare DNS and Glob
 
 The most probable cause of your issues with not receiving test emails or with configuration in general is due to DNS propagation and caching.
 
-Fortunately our DNS provider Cloudflare has a nice "Purge Cache" tool available for you to use at <https://1.1.1.1/purge-cache/>.
+Fortunately **our DNS provider Cloudflare has a nice "Purge Cache" tool available for you to use at:** <https://1.1.1.1/purge-cache/>.
 
 All you need to do is go to that link for both "MX" and "TXT" record types, enter your domain name, and click "Purge Cache".  You'll then need to wait a few minutes and try again!
 
