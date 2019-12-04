@@ -32,6 +32,16 @@
         "NODE_ENV": "production",
         "SMTP_PORT": "3587"
       }
+    },
+    {
+      "name": "proxy",
+      "script": "proxy.js",
+      "exec_mode": "cluster_mode",
+      "wait_ready": true,
+      "instances": "max",
+      "env_production": {
+        "NODE_ENV": "production"
+      }
     }
   ],
   "deploy": {
