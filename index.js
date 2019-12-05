@@ -445,15 +445,14 @@ class ForwardEmail {
         //
         // 5) if DKIM signature passed and was valid
         //
-        const dkim =
-          headers.getFirst('dkim-signature') === ''
-            ? true
-            : await this.validateDKIM(originalRaw);
-
-        if (!dkim)
-          throw new CustomError(
-            'The email you sent has an invalid DKIM signature'
-          );
+        //
+        // if and only if there was a `dkim-signature` or `x-google-dkim-signature` header
+        //
+        if (
+          headers.getFirst('dkim-signature') !== '' ||
+          headers.getFirst('x-google-dkim-signature') !== ''
+        )
+          await this.validateDKIM(originalRaw);
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
@@ -817,16 +816,37 @@ class ForwardEmail {
   }
 
   async validateDKIM(raw) {
+    let results = [];
     try {
-      const result = await verifyDKIM(raw);
-      return (
-        result && result.length > 0 && result.every(record => record.verified)
-      );
+      results = await verifyDKIM(raw);
     } catch (err) {
       logger.error(err);
       err.responseCode = 421;
       throw err;
     }
+
+    if (
+      !Array.isArray(results) ||
+      (Array.isArray(results) && results.length === 0) ||
+      (Array.isArray(results) &&
+        results.length > 0 &&
+        results.every(
+          result =>
+            result.verified ||
+            [NodeDKIM.NONE, NodeDKIM.OK].includes(result.status)
+        ))
+    )
+      return true;
+
+    const messages = results
+      .filter(result => _.isError(result.error))
+      .map(result => result.error.message);
+
+    if (messages.length === 0)
+      throw new CustomError('The email you sent has an invalid DKIM signature');
+
+    // join the messages together and make them unique
+    throw new CustomError(_.uniq(messages).join(', '));
   }
 
   async validateMX(address) {
