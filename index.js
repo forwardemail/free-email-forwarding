@@ -94,6 +94,12 @@ class ForwardEmail {
         logger,
         ...config.smtp
       },
+      blacklistedStr:
+        "Your mail server's IP address of %s is listed on the %s DNS blacklist (visit %s to submit a removal request and try again).",
+      dnsbl: {
+        domains: env.DNSBL_DOMAINS,
+        removals: env.DNSBL_REMOVALS
+      },
       exchanges: env.SMTP_EXCHANGE_DOMAINS,
       dkim: {
         domainName: env.DKIM_DOMAIN_NAME,
@@ -108,11 +114,19 @@ class ForwardEmail {
       ...config
     };
 
-    if (this.config.ssl.ca === null) delete this.config.ssl.ca;
-    // shared config automatically adds this
-    delete this.config.ssl.allowHTTP1;
-    if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
-    else this.config.ssl.secure = true;
+    if (
+      this.dnsbl &&
+      Array.isArray(this.dnsbl.domains) &&
+      Array.isArray(this.dnsbl.removals) &&
+      this.dnsbl.domains.length !== this.dnsbl.removals.length
+    )
+      throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS');
+
+    if (this.config.ssl) {
+      if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
+      else this.config.ssl.secure = true;
+    }
+
     this.config.smtp = {
       ...this.config.smtp,
       ...this.config.ssl
@@ -162,6 +176,7 @@ class ForwardEmail {
     this.parseFilter = this.parseFilter.bind(this);
     this.parseDomain = this.parseDomain.bind(this);
     this.onConnect = this.onConnect.bind(this);
+    this.checkBlacklists = this.checkBlacklists.bind(this);
     this.onData = this.onData.bind(this);
     this.validateSPF = this.validateSPF.bind(this);
     this.getDMARC = this.getDMARC.bind(this);
@@ -176,7 +191,9 @@ class ForwardEmail {
   }
 
   async listen(port) {
-    await util.promisify(this.server.listen).bind(this.server)(port);
+    await util.promisify(this.server.listen).bind(this.server)(
+      port || this.config.port
+    );
   }
 
   async close() {
@@ -254,7 +271,7 @@ class ForwardEmail {
     return address.includes('+') ? address.split('+')[1].split('@')[0] : '';
   }
 
-  parseDomain(address) {
+  parseDomain(address, isSender = true) {
     let domain = addressParser(address)[0].address.split('@')[1];
     domain = punycode.toASCII(domain);
 
@@ -271,12 +288,57 @@ class ForwardEmail {
     */
 
     // prevent disposable email addresses from being used
-    if (this.isDisposable(domain))
+    if (isSender && this.isDisposable(domain))
       throw new CustomError(
         `Disposable email address domain of ${domain} is not permitted`
       );
 
     return domain;
+  }
+
+  async checkBlacklists(ip) {
+    // if no blacklists are provided then return early
+    if (
+      !this.config.dnsbl ||
+      !this.config.dnsbl.domains ||
+      (Array.isArray(this.config.dnsbl.domains) &&
+        this.config.dnsbl.domains.length === 0)
+    ) {
+      logger.warn('No DNS blacklists were provided');
+      return false;
+    }
+
+    if (Array.isArray(this.config.dnsbl.domains)) {
+      const results = await dnsbl.batch(ip, this.config.dnsbl.domains, {
+        servers: this.config.dns
+      });
+      if (!Array.isArray(results) || results.length === 0) return false;
+      const blacklistedResults = results.filter(result => result.listed);
+      if (blacklistedResults.length === 0) return false;
+      return blacklistedResults
+        .map(result =>
+          util.format(
+            this.config.blacklistedStr,
+            ip,
+            result.blacklist,
+            this.config.dnsbl.removals[
+              this.config.dnsbl.domains.indexOf(result.blacklist)
+            ]
+          )
+        )
+        .join(' ');
+    }
+
+    const result = await dnsbl.lookup(ip, this.config.dnsbl.domains, {
+      servers: this.config.dns
+    });
+    if (!result) return false;
+    return util.format(
+      this.config.blacklistedStr,
+      ip,
+      this.config.dnsbl.domains,
+      this.config.dnsbl.removals
+    );
   }
 
   async onConnect(session, fn) {
@@ -294,17 +356,17 @@ class ForwardEmail {
     */
 
     // ensure that it's not on the DNS blacklist
+    // Spamhaus = zen.spamhaus.org
+    // SpamCop = bl.spamcop.net
+    // Barracuda = b.barracudacentral.org
+    // Lashback = ubl.unsubscore.com
+    // PSBL = psbl.surriel.com
     try {
-      const result = await dnsbl.lookup(session.remoteAddress, env.DNSBL, {
-        servers: this.config.dns
-      });
-      if (!result) return fn();
-      fn(
-        new CustomError(
-          `Your IP address of ${session.remoteAddress} is listed on the ${env.DNSBL} DNS Blacklist.  See https://www.spamhaus.org/query/ip/${session.remoteAddress} for more information.`,
-          554
-        )
-      );
+      const message = await this.checkBlacklists(session.remoteAddress);
+      if (!message) return fn();
+      const err = new CustomError(message, 554);
+      logger.error(err);
+      fn(err);
     } catch (err) {
       logger.error(err);
       fn();
@@ -456,11 +518,10 @@ class ForwardEmail {
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
-          env.NODE_ENV === 'test' ? env.SMTP_EXCHANGE_IPS[0] : ip.address();
-        const name =
           env.NODE_ENV === 'test'
-            ? env.SMTP_EXCHANGE_DOMAINS[0]
-            : await getFQDN(ipAddress);
+            ? await this.dns.lookupAsync(this.config.exchanges[0])
+            : ip.address();
+        const name = await getFQDN(ipAddress);
 
         //
         // 6) if SPF is valid
@@ -589,7 +650,10 @@ class ForwardEmail {
           recipient.addresses = recipient.addresses.filter(address => {
             if (!address.includes('+')) return true;
             return !recipient.addresses.includes(
-              `${this.parseUsername(address)}@${this.parseDomain(address)}`
+              `${this.parseUsername(address)}@${this.parseDomain(
+                address,
+                false
+              )}`
             );
           });
           return recipient;
@@ -750,7 +814,7 @@ class ForwardEmail {
         err.message = err.message.split('msg:')[1];
       }
 
-      err.message += `— if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
+      err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
       logger.error(err);
       fn(err);
     });
@@ -793,7 +857,7 @@ class ForwardEmail {
     if (!parsedDomain) return false;
     const entry = `_dmarc.${hostname}`;
     try {
-      const records = await dns.resolveTxtAsync(entry);
+      const records = await this.dns.resolveTxtAsync(entry);
       // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
       if (!_.isArray(records) || _.isEmpty(records)) return false;
       if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
@@ -852,7 +916,7 @@ class ForwardEmail {
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await dns.resolveMxAsync(domain);
+      const addresses = await this.dns.resolveMxAsync(domain);
       if (!addresses || addresses.length === 0)
         throw new CustomError(
           `DNS lookup for ${domain} did not return any valid MX records`
@@ -932,8 +996,8 @@ class ForwardEmail {
   // TODO: we should cache this recursive lookup for 2m or something
   // this returns the forwarding address for a given email address
   async getForwardingAddresses(address, recursive = []) {
-    const domain = this.parseDomain(address);
-    const records = await dns.resolveTxtAsync(domain);
+    const domain = this.parseDomain(address, false);
+    const records = await this.dns.resolveTxtAsync(domain);
 
     // dns TXT record must contain `forward-email=` prefix
     const validRecords = [];
@@ -1008,7 +1072,7 @@ class ForwardEmail {
         // (e.. the record is just "b.com" if it's not a valid email)
         globalForwardingAddresses.push(`${username}@${addresses[i]}`);
       } else {
-        const domain = this.parseDomain(addresses[i]);
+        const domain = this.parseDomain(addresses[i], false);
         if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
           globalForwardingAddresses.push(addresses[i]);
         }
@@ -1041,7 +1105,7 @@ class ForwardEmail {
         // prevent a double-lookup if user is using + symbols
         if (forwardingAddress.includes('+'))
           newRecursive.push(
-            `${this.parseUsername(address)}@${this.parseDomain(address)}`
+            `${this.parseUsername(address)}@${this.parseDomain(address, false)}`
           );
 
         const addresses = await this.getForwardingAddresses(
@@ -1096,7 +1160,7 @@ class ForwardEmail {
     return forwardingAddresses.map(forwardingAddress => {
       return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
         address
-      )}@${this.parseDomain(forwardingAddress)}`;
+      )}@${this.parseDomain(forwardingAddress, false)}`;
     });
   }
 
