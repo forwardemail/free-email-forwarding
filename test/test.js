@@ -165,14 +165,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -199,14 +192,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -234,14 +220,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -275,14 +254,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -309,14 +281,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -346,14 +311,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     /*
     t.deepEqual(info.envelope, ['niftylettuce@gmail.com']);
@@ -383,14 +341,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     /*
     t.deepEqual(info.envelope, ['niftylettuce@gmail.com']);
@@ -421,14 +372,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     /*
     t.deepEqual(info.envelope, [
@@ -464,14 +408,7 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>',
       attachments: [],
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -499,14 +436,7 @@ if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
       // <https://github.com/humantech/node-spamd/blob/master/test/spamd-tests.js#L13-L14>
       subject: 'Viagra, Cialis, Vicodin: buy medicines without prescription!',
       html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -605,14 +535,7 @@ if (!isCI)
       subject: 'test',
       text: 'test text',
       html: '<strong>test html</strong>',
-      dkim: {
-        domainName: 'forwardemail.net',
-        keySelector: 'default',
-        privateKey: fs.readFileSync(
-          path.join(__dirname, '..', 'dkim-private.key'),
-          'utf8'
-        )
-      }
+      dkim: t.context.forwardEmail.config.dkim
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -726,14 +649,7 @@ if (!isCI)
               subject: 'test',
               text: 'test text',
               html: '<strong>test html</strong>',
-              dkim: {
-                domainName: 'forwardemail.net',
-                keySelector: 'default',
-                privateKey: fs.readFileSync(
-                  path.join(__dirname, '..', 'dkim-private.key'),
-                  'utf8'
-                )
-              }
+              dkim: t.context.forwardEmail.config.dkim
             });
             const connection = new Client({  port, tls });
             connection.once('end', resolve);
