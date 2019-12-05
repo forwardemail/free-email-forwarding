@@ -6500,10 +6500,10 @@ nodemailer@5.0.0:
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.0.0.tgz#bcb409eca613114e85de42646d0ce7f1fa70b716"
   integrity sha512-XI4PI5L7GYcJyHkPcHlvPyRrYohNYBNRNbt1tU8PXNU3E1ADJC84a13V0vbL9AM431OP+ETacaGXAF8fGn1JvA==
 
-nodemailer@6.3.1:
-  version "6.3.1"
-  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.3.1.tgz#2784beebac6b9f014c424c54dbdcc5c4d1221346"
-  integrity sha512-j0BsSyaMlyadEDEypK/F+xlne2K5m6wzPYMXS/yxKI0s7jmT1kBx6GEKRVbZmyYfKOsjkeC/TiMVDJBI/w5gMQ==
+nodemailer@6.4.0:
+  version "6.4.0"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.0.tgz#91482ebc09d39156d933eb9e6159642cd27bf02c"
+  integrity sha512-UBqPOfQGD1cM3HnjhuQe+0u3DWx47WWK7lBjG5UtPnGOysr7oDK5lNCzcjK6zzeBSdTk4m1tGx1xNbWFZQmMNA==
 
 noop6@^1.0.1:
   version "1.0.8"
@@ -7469,10 +7469,10 @@ punycode@^2.1.0, punycode@^2.1.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
 
-python-spfcheck2@^0.0.4:
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.4.tgz#06b33c1105eb744ab955b63fee1927924c475f00"
-  integrity sha512-F6ZHw5f4pe+HsNjOLx/h7xB3WLQ9nbk7PuFu9ayViQCIboCmBVUZ/cM5WSaL0XPMKR1Del8/42iVuTNNMFHUkw==
+python-spfcheck2@^0.0.5:
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.5.tgz#bc080501172b792cd3b85f88d711bc149b12ac8c"
+  integrity sha512-nbzOI9vrfyxGoYwsZqVobFOAiDLO5uQkOQZLhZkT7GgOcDIqziwPzD3b72Fyhgz/kuYzX8PunIhpmYW60boYhg==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"
