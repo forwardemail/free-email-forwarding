@@ -26,9 +26,9 @@
   "dependencies": {
     "@ladjs/env": "^0.0.4",
     "@ladjs/graceful": "^1.0.0",
-    "@ladjs/proxy": "^1.0.2",
+    "@ladjs/proxy": "^1.0.3",
     "@ladjs/redis": "^1.0.3",
-    "@ladjs/shared-config": "^0.0.10",
+    "@ladjs/shared-config": "^1.0.0",
     "array-join-conjunction": "^1.0.0",
     "bluebird": "^3.7.2",
     "boolean": "^3.0.0",
@@ -47,11 +47,11 @@
     "mailin": "^3.0.4",
     "mailsplit": "^4.6.2",
     "ms": "^2.1.2",
-    "nodemailer": "6.4.0",
+    "nodemailer": "6.4",
     "parse-domain": "^2.3.4",
     "pino": "^5.14.0",
     "punycode": "^2.1.1",
-    "python-spfcheck2": "^0.0.5",
+    "python-spfcheck2": "^0.0.8",
     "ratelimiter": "^3.4.0",
     "signale": "^1.4.0",
     "smtp-server": "3.5.0",
@@ -134,10 +134,10 @@
     "url": "https://github.com/niftylettuce/forward-email"
   },
   "scripts": {
-    "ava": "cross-env NODE_ENV=test ava",
+    "ava": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava",
     "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
     "lint": "xo && remark . -qfo",
-    "nyc": "cross-env NODE_ENV=test nyc ava",
+    "nyc": "cross-env IS_NOT_SECURE=true NODE_ENV=test nyc ava",
     "test": "npm run lint && npm run ava",
     "test-coverage": "npm run lint && npm run nyc"
   },

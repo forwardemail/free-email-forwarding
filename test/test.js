@@ -23,9 +23,9 @@ const client = new IORedis();
 test.beforeEach(async t => {
   const keys = await client.keys('limit:*');
   if (keys.length > 0) await Promise.all(keys.map(key => client.del(key)));
-  const forwardEmail = new ForwardEmail();
   const port = await getPort();
-  await forwardEmail.listen(port);
+  const forwardEmail = new ForwardEmail({ port });
+  await forwardEmail.listen();
   t.context.forwardEmail = forwardEmail;
 });
 
@@ -66,7 +66,7 @@ test('rejects forwarding a non-FQDN email', async t => {
     streamTransport: true
   });
   const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
+  const connection = new Client({  port, tls });
   const info = await transporter.sendMail({
     from: 'ForwardEmail <from@forwardemail.net>',
     to: 'Niftylettuce <hello@127.0.0.1>',
@@ -678,6 +678,26 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
   });
 });
 
+test('ForwardEmail is not in DNS blacklists', async t => {
+  const ips = await Promise.all([
+    t.context.forwardEmail.dns.lookupAsync('forwardemail.net'),
+    t.context.forwardEmail.dns.lookupAsync('mx1.forwardemail.net'),
+    t.context.forwardEmail.dns.lookupAsync('mx2.forwardemail.net')
+  ]);
+  const [domain, mx1, mx2] = await Promise.all(
+    ips.map(ip => t.context.forwardEmail.checkBlacklists(ip))
+  );
+  t.is(domain, false);
+  t.is(mx1, false);
+  t.is(mx2, false);
+});
+
+const ip = '127.0.0.2';
+test(`${ip} is in DNS blacklists`, async t => {
+  const message = await t.context.forwardEmail.checkBlacklists(ip);
+  t.true(typeof message === 'string');
+});
+
 /*
 test.todo('rejects invalid DKIM signature');
 test.todo('accepts valid DKIM signature');
@@ -715,7 +735,7 @@ if (!isCI)
                 )
               }
             });
-            const connection = new Client({ port, tls });
+            const connection = new Client({  port, tls });
             connection.once('end', resolve);
             connection.connect(() => {
               connection.send(info.envelope, info.message, err => {

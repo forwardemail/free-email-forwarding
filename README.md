@@ -3,7 +3,7 @@
 </h1>
 <div align="center">
   <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
-  <a href="https://travis-ci.org/niftylettuce/forward-email"><img src="https://travis-ci.org/niftylettuce/forward-email.svg?branch=master" alt="build status" /></a>
+  <a href="https://travis-ci.com/forwardemail/free-email-forwarding"><img src="https://travis-ci.com/forwardemail/free-email-forwarding.svg?branch=master" alt="build status" /></a>
   <a href="https://codecov.io/github/forwardemail/free-email-forwarding"><img src="https://img.shields.io/codecov/c/github/forwardemail/free-email-forwarding/master.svg" alt="code coverage" /></a>
   <a href="https://github.com/sindresorhus/xo"><img src="https://img.shields.io/badge/code_style-XO-5ed9c7.svg" alt="code style" /></a>
   <a href="https://github.com/prettier/prettier"><img src="https://img.shields.io/badge/styled_with-prettier-ff69b4.svg" alt="styled with prettier" /></a>
@@ -493,7 +493,7 @@ Yes, absolutely.  For example if you're sending an email to `hello@niftylettuce.
 
 Per documentation and suggestions from Google at <https://support.google.com/a/answer/175365?hl=en>, along with best practice, including:
 
-1. DNSBL - we test senders IP's against the `zen.spamhaus.org` DNS blacklist
+1. DNSBL - we test senders IP's against the Spamhaus, SpamCop, Barracuda, Lashback, and PSBL blacklists [DNS blacklists][dns-blacklists], if any fail, then the sender is not permitted to send the message and is returned a detailed error message with instructions on how to de-list themselves from the specific blacklists they're listed under.
 
 2. SpamAssassin - using `spamc` client to check emails and automatically reject them if they're marked as spam
 
@@ -597,3 +597,5 @@ If you are seeking permission to use these trademarks, then please [contact us](
 [nodemailer]: https://github.com/nodemailer/nodemailer
 
 [tr-guide]: https://www.techrepublic.com/article/how-to-set-dns-nameservers-in-ubuntu-server-18-04/
+
+[dns-blacklists]: https://en.wikipedia.org/wiki/Domain_Name_System-based_Blackhole_List

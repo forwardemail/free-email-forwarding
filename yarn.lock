@@ -610,10 +610,10 @@
   dependencies:
     debug "^4.1.1"
 
-"@ladjs/proxy@^1.0.2":
-  version "1.0.2"
-  resolved "https://registry.yarnpkg.com/@ladjs/proxy/-/proxy-1.0.2.tgz#9b860a2b69734fd142da795036a62651d47e34ac"
-  integrity sha512-P8blmiRwWubZRQw3KfyB8je3/xxH46zFtLuG2cVP0w8jS7T0UQZ+NLQzY8P/gqVkGKwcdxvJFdR1ItGR6Jo9jg==
+"@ladjs/proxy@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/@ladjs/proxy/-/proxy-1.0.3.tgz#2d07ad9ad458b2dbe3ea4fd89e07dccb351eb657"
+  integrity sha512-lSkkzhIDHQ9YZ03Pjt7VASpq/hQM5FXptrK4wHNQVdwzUv4vAxuv3hcrLT4gRkN7xatJQPqUsRZmTpkYCNi27w==
   dependencies:
     finalhandler "^1.1.2"
     lodash "^4.17.15"
@@ -627,12 +627,13 @@
   dependencies:
     ioredis "^4.14.0"
 
-"@ladjs/shared-config@^0.0.10":
-  version "0.0.10"
-  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-0.0.10.tgz#8ddb528bf93918ad24258a03a9457346902e34af"
-  integrity sha512-2ZAHuPfOyIeRkc1s1u+AYxs56mPjLtEpSK3ELPn1tA0vst9Fw0l+ggOWvepLdlPF1Wh9orjImYSPU3w/oM0Mfw==
+"@ladjs/shared-config@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-1.0.0.tgz#59bd80f13d85efee68cebb624b6f6f974f551f12"
+  integrity sha512-GWvBRZHmBPp7r6AW2N4Yk9zTi4rc2Rbv993Y9aLXwWxRl3H8GYNRCnmsxTYDhfeD2GSzByoeVgUDanMMy/RgvA==
   dependencies:
-    boolean "^1.0.0"
+    boolean "^3.0.0"
+    is-string-and-not-blank "^0.0.2"
 
 "@marionebl/sander@^0.6.0":
   version "0.6.1"
@@ -1469,11 +1470,6 @@ blueimp-md5@^2.10.0:
   version "2.12.0"
   resolved "https://registry.yarnpkg.com/blueimp-md5/-/blueimp-md5-2.12.0.tgz#be7367938a889dec3ffbb71138617c117e9c130a"
   integrity sha512-zo+HIdIhzojv6F1siQPqPFROyVy7C50KzHv/k/Iz+BtvtVzSHXiMXOpq2wCfNkeBqdCv+V8XOV96tsEt2W/3rQ==
-
-boolean@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/boolean/-/boolean-1.0.0.tgz#45764b4aac187a050995b0a33d7579b6759f0dfd"
-  integrity sha512-IB1lgIywn37N9Aff8CciCblVpMUflgL42vyxPUH0IvaDdIi/QwBHKv1lq/HOkATHCfa7c4MbMYJ7Bo7hGuoI+w==
 
 boolean@^3.0.0:
   version "3.0.0"
@@ -2447,9 +2443,9 @@ defaults@^1.0.3:
     clone "^1.0.2"
 
 defer-to-connect@^1.0.1:
-  version "1.1.0"
-  resolved "https://registry.yarnpkg.com/defer-to-connect/-/defer-to-connect-1.1.0.tgz#b41bd7efa8508cef13f8456975f7a278c72833fd"
-  integrity sha512-WE2sZoctWm/v4smfCAdjYbrfS55JiMRdlY9ZubFhsYbteCK9+BvAx4YV7nPjYM6ZnX5BcoVKwfmyx9sIFTgQMQ==
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/defer-to-connect/-/defer-to-connect-1.1.1.tgz#88ae694b93f67b81815a2c8c769aef6574ac8f2f"
+  integrity sha512-J7thop4u3mRTkYRQ+Vpfwy2G5Ehoy82I14+14W4YMDLKdWloI9gSzRbV30s/NckQGVJtPkWNcW4oMAUigTdqiQ==
 
 define-properties@^1.1.2, define-properties@^1.1.3:
   version "1.1.3"
@@ -2761,9 +2757,9 @@ error-ex@^1.2.0, error-ex@^1.3.1:
     is-arrayish "^0.2.1"
 
 es-abstract@^1.12.0, es-abstract@^1.4.3, es-abstract@^1.5.1, es-abstract@^1.7.0:
-  version "1.16.2"
-  resolved "https://registry.yarnpkg.com/es-abstract/-/es-abstract-1.16.2.tgz#4e874331645e9925edef141e74fc4bd144669d34"
-  integrity sha512-jYo/J8XU2emLXl3OLwfwtuFfuF2w6DYPs+xy9ZfVyPkDcrauu6LYrw/q2TyCtrbc/KUdCiC5e9UajRhgNkVopA==
+  version "1.16.3"
+  resolved "https://registry.yarnpkg.com/es-abstract/-/es-abstract-1.16.3.tgz#52490d978f96ff9f89ec15b5cf244304a5bca161"
+  integrity sha512-WtY7Fx5LiOnSYgF5eg/1T+GONaGmpvpPdCpSnYij+U2gDTL0UPfWrhDw7b2IYb+9NQJsYpCA0wOQvZfsd6YwRw==
   dependencies:
     es-to-primitive "^1.2.1"
     function-bind "^1.1.1"
@@ -6500,7 +6496,7 @@ nodemailer@5.0.0:
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.0.0.tgz#bcb409eca613114e85de42646d0ce7f1fa70b716"
   integrity sha512-XI4PI5L7GYcJyHkPcHlvPyRrYohNYBNRNbt1tU8PXNU3E1ADJC84a13V0vbL9AM431OP+ETacaGXAF8fGn1JvA==
 
-nodemailer@6.4.0:
+nodemailer@6.4:
   version "6.4.0"
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.0.tgz#91482ebc09d39156d933eb9e6159642cd27bf02c"
   integrity sha512-UBqPOfQGD1cM3HnjhuQe+0u3DWx47WWK7lBjG5UtPnGOysr7oDK5lNCzcjK6zzeBSdTk4m1tGx1xNbWFZQmMNA==
@@ -7469,10 +7465,10 @@ punycode@^2.1.0, punycode@^2.1.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
 
-python-spfcheck2@^0.0.5:
-  version "0.0.5"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.5.tgz#bc080501172b792cd3b85f88d711bc149b12ac8c"
-  integrity sha512-nbzOI9vrfyxGoYwsZqVobFOAiDLO5uQkOQZLhZkT7GgOcDIqziwPzD3b72Fyhgz/kuYzX8PunIhpmYW60boYhg==
+python-spfcheck2@^0.0.8:
+  version "0.0.8"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.8.tgz#c3fe7e0f5d41e758dc9fba2eedd6c5462f16af1a"
+  integrity sha512-yDHaEj2G0Cd7i1jqx031nIqfKtMU4JqmY8HWLKLqi8EEtf5Wt23lRHwaMjaHHkxSvc1WCr7dbgDNe1Zv9ZI63Q==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"
