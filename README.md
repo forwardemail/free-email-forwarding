@@ -208,7 +208,7 @@ You'll also need the following dependencies installed:
 
 * [Redis][] (v4.x+) - this is a fast key-value store database used for rate-limiting and preventing spammers
 
-  > _NOTE_: You can pass `limiter: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ limiter: false });`
+  > _NOTE_: You can pass `rateLimit: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ rateLimit: false });`
 
   * Mac (via [brew][]): `brew install redis && brew services start redis`
   * Ubuntu:
