@@ -2557,6 +2557,24 @@ disposable-email-domains@^1.0.50:
   resolved "https://registry.yarnpkg.com/disposable-email-domains/-/disposable-email-domains-1.0.50.tgz#2134170aa98394101972610e5a7b69cdf79de015"
   integrity sha512-ScWM11YB4PWkPmMtW+Jqx2f5DbXWQpcjJB0TjuEFaoTag0wosZHDG1IdJGeA7Kyc/c+Wnpoh9D9cFf191lx2Bw==
 
+dkim-key@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/dkim-key/-/dkim-key-1.3.0.tgz#8d47fb44bc9f831e4c15135b3ef860a31f9c85d3"
+  integrity sha512-19+M28U4pucj6R5OfOBpWjNwUNouQUJBEN/w20MIwOVodF17kDMr03rQxvk0m8V+JRrx3x3DGyexvXgubjo5dw==
+
+dkim-signature@^1.3.0:
+  version "1.3.0"
+  resolved "https://registry.yarnpkg.com/dkim-signature/-/dkim-signature-1.3.0.tgz#aee5d45a8fcf8f79faa3a3a239e711eacd4de099"
+  integrity sha512-/NPCgG9L+k1+QhCWkGO6QlTavFg1AuhutYE197O/TsQb8OrJk52UJMMBL8eHzZ8Ei8SaUVCeoluJJunQrvz5Vg==
+
+dkim@^0.7.1:
+  version "0.7.1"
+  resolved "https://registry.yarnpkg.com/dkim/-/dkim-0.7.1.tgz#b0c8418788d2726086567ab8bd54e816eccd943d"
+  integrity sha512-jemASJq7bh9EzV62uS7UEg6wreuEn3Sl9A/7QWM2wOpPaOPaLDutNar8gpmRQ0g7M3NdtGq+fvpxn7vvBtZ4KQ==
+  dependencies:
+    dkim-key "^1.3.0"
+    dkim-signature "^1.3.0"
+
 dmarc-parse@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/dmarc-parse/-/dmarc-parse-1.0.2.tgz#77528fcdf78b888c48722856afac7e413b773b7b"
