@@ -113,7 +113,7 @@ class ForwardEmail {
         max: env.RATELIMIT_MAX ? parseInt(env.RATELIMIT_MAX, 10) : 100,
         prefix: env.RATELIMIT_PREFIX
           ? env.RATELIMIT_PREFIX
-          : `limit_${env.toLowerCase()}`
+          : `limit_${env.NODE_ENV.toLowerCase()}`
       },
       exchanges: env.SMTP_EXCHANGE_DOMAINS,
       dkim: {
