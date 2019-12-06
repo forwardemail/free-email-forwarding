@@ -510,7 +510,7 @@ Per documentation and suggestions from Google at <https://support.google.com/a/a
 
 6. FQDN - validates that senders SMTP connections are from FQDN (meaning no IP addresses, they must have a valid domain name resolved)
 
-7. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup
+7. TXT - through checking if the email address the sender is trying to send to has a TXT DNS record with a valid email forwarding setup. The SSL certificates (main domain name or alternative names) of all MX servers of the forwarding destination must match the MX entry.
 
 8. DMARC - we check if a DMARC record exists from the sender's FQDN, and if so, if it is `reject` or `quarantine` then we re-write the `From` of the email as a "friendly-from".  This means the `From` is set to `$originalName <no-reply@forwardemail.net>` (`$originalName` is the original From name, e.g. "John Doe" in "John Doe [john@domain.com](mailto:john@domain.com)").  Furthermore we set a `Reply-To` (if one is not already set) of the original sender's from address.
 
