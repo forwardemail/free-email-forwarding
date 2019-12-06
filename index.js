@@ -30,7 +30,7 @@ const { SMTPServer } = require('smtp-server');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 
-let mailUtilities = require('mailin/lib/mailUtilities.js');
+const mailUtilities = require('mailin/lib/mailUtilities.js');
 
 const {
   CustomError,
@@ -40,7 +40,10 @@ const {
   logger
 } = require('./helpers');
 
-mailUtilities = Promise.promisifyAll(mailUtilities);
+const lookupAsync = util.promisify(dns.lookup);
+const resolveTxtAsync = util.promisify(dns.resolveTxt);
+const resolveMxAsync = util.promisify(dns.resolveMx);
+const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
 
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
@@ -167,8 +170,7 @@ class ForwardEmail {
       logger.error(err);
     });
 
-    this.dns = Promise.promisifyAll(dns);
-    this.dns.setServers(this.config.dns);
+    dns.setServers(this.config.dns);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -379,11 +381,6 @@ class ForwardEmail {
 
   async onData(stream, session, fn) {
     //
-    // for debugging
-    //
-    let headers;
-
-    //
     // store an object of email addresses that bounced
     // with their associated error that occurred
     //
@@ -479,7 +476,7 @@ class ForwardEmail {
         //
         let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
-        ({ headers } = messageSplitter);
+        const { headers } = messageSplitter;
         const originalFrom = headers.getFirst('from');
 
         // parse the from address and set a parsed reply-to if necessary
@@ -502,7 +499,7 @@ class ForwardEmail {
         // TODO: we may also want to add clamav for attachment scanning
         let spamScore = 0;
         try {
-          spamScore = await mailUtilities.computeSpamScoreAsync(originalRaw);
+          spamScore = await computeSpamScoreAsync(originalRaw);
         } catch (err) {
           logger.error(err);
         }
@@ -529,10 +526,14 @@ class ForwardEmail {
           );
 
         // get the fully qualified domain name ("FQDN") of this server
-        const ipAddress =
-          env.NODE_ENV === 'test'
-            ? await this.dns.lookupAsync(this.config.exchanges[0])
-            : ip.address();
+        let ipAddress;
+        if (env.NODE_ENV === 'test') {
+          const obj = await lookupAsync(this.config.exchanges[0]);
+          ipAddress = obj.address;
+        } else {
+          ipAddress = ip.address();
+        }
+
         const name = await getFQDN(ipAddress);
 
         //
@@ -827,10 +828,7 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      logger.error(err, {
-        session,
-        headers: headers ? null : headers.build().toString()
-      });
+      logger.error(err, { session });
       fn(err);
     });
 
@@ -872,7 +870,7 @@ class ForwardEmail {
     if (!parsedDomain) return false;
     const entry = `_dmarc.${hostname}`;
     try {
-      const records = await this.dns.resolveTxtAsync(entry);
+      const records = await resolveTxtAsync(entry);
       // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
       if (!_.isArray(records) || _.isEmpty(records)) return false;
       if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
@@ -908,7 +906,7 @@ class ForwardEmail {
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await this.dns.resolveMxAsync(domain);
+      const addresses = await resolveMxAsync(domain);
       if (!addresses || addresses.length === 0)
         throw new CustomError(
           `DNS lookup for ${domain} did not return any valid MX records`
@@ -989,7 +987,7 @@ class ForwardEmail {
   // this returns the forwarding address for a given email address
   async getForwardingAddresses(address, recursive = []) {
     const domain = this.parseDomain(address, false);
-    const records = await this.dns.resolveTxtAsync(domain);
+    const records = await resolveTxtAsync(domain);
 
     // dns TXT record must contain `forward-email=` prefix
     const validRecords = [];

@@ -1,6 +1,8 @@
+const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const util = require('util');
 
 const Client = require('nodemailer/lib/smtp-connection');
 const IORedis = require('ioredis');
@@ -13,6 +15,8 @@ const nodemailer = require('nodemailer');
 const shell = require('shelljs');
 const test = require('ava');
 const uuid = require('uuid');
+
+const lookupAsync = util.promisify(dns.lookup);
 
 const ForwardEmail = require('..');
 
@@ -603,12 +607,12 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
 
 test('ForwardEmail is not in DNS blacklists', async t => {
   const ips = await Promise.all([
-    t.context.forwardEmail.dns.lookupAsync('forwardemail.net'),
-    t.context.forwardEmail.dns.lookupAsync('mx1.forwardemail.net'),
-    t.context.forwardEmail.dns.lookupAsync('mx2.forwardemail.net')
+    lookupAsync('forwardemail.net'),
+    lookupAsync('mx1.forwardemail.net'),
+    lookupAsync('mx2.forwardemail.net')
   ]);
   const [domain, mx1, mx2] = await Promise.all(
-    ips.map(ip => t.context.forwardEmail.checkBlacklists(ip))
+    ips.map(ip => t.context.forwardEmail.checkBlacklists(ip.address))
   );
   t.is(domain, false);
   t.is(mx1, false);
