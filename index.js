@@ -160,14 +160,12 @@ class ForwardEmail {
     );
 
     // setup rate limiting with redis
-    /*
     if (this.config.rateLimit) {
       this.limiter = {
         db: client,
         ...this.config.rateLimit
       };
     }
-    */
 
     // expose client
     this.client = client;
@@ -944,18 +942,28 @@ class ForwardEmail {
     return new Promise((resolve, reject) => {
       if (email === this.config.noReply || !this.limiter) return resolve();
       const id = email;
-      const limit = new Limiter({ id, ...this.limiter });
+      const limit = new Limiter({ ...this.limiter, id });
       limit.get((err, limit) => {
         if (err) {
           err.responseCode = 421;
           return reject(err);
         }
 
-        if (limit.remaining) return resolve();
+        if (limit.remaining) {
+          logger.info(
+            `Rate limit for ${email} is now ${limit.remaining - 1}/${
+              limit.total
+            }`
+          );
+          return resolve();
+        }
+
         const delta = (limit.reset * 1000 - Date.now()) | 0;
         reject(
           new CustomError(
-            `Rate limit exceeded, retry in ${ms(delta, { long: true })}`,
+            `Rate limit exceeded for ${id}, retry in ${ms(delta, {
+              long: true
+            })}`,
             451
           )
         );
