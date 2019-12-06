@@ -98,14 +98,18 @@ class ForwardEmail {
         "Your mail server's IP address of %s is listed on the %s DNS blacklist (visit %s to submit a removal request and try again).",
       dnsbl: {
         domains: env.DNSBL_DOMAINS,
-        removals: env.DNSBL_REMOVALS
+        removals: env.DNSBL_REMOVALS,
+        ...config.dnsbl
       },
       exchanges: env.SMTP_EXCHANGE_DOMAINS,
       dkim: {
         domainName: env.DKIM_DOMAIN_NAME,
         keySelector: env.DKIM_KEY_SELECTOR,
-        privateKey: fs.readFileSync(env.DKIM_PRIVATE_KEY_PATH, 'utf8'),
-        cacheDir: os.tmpdir()
+        privateKey: isSANB(env.DKIM_PRIVATE_KEY_PATH)
+          ? fs.readFileSync(env.DKIM_PRIVATE_KEY_PATH, 'utf8')
+          : undefined,
+        cacheDir: os.tmpdir(),
+        ...config.dkim
       },
       maxForwardedAddresses: env.MAX_FORWARDED_ADDRESSES,
       email: env.EMAIL_SUPPORT,
@@ -377,7 +381,7 @@ class ForwardEmail {
     //
     // for debugging
     //
-    let originalRaw;
+    let headers;
 
     //
     // store an object of email addresses that bounced
@@ -475,7 +479,7 @@ class ForwardEmail {
         //
         let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
-        const { headers } = messageSplitter;
+        ({ headers } = messageSplitter);
         const originalFrom = headers.getFirst('from');
 
         // parse the from address and set a parsed reply-to if necessary
@@ -486,7 +490,7 @@ class ForwardEmail {
             : fromAddress.address;
 
         // message body as a single Buffer (everything after the \r\n\r\n separator)
-        originalRaw = Buffer.concat([headers.build(), ...chunks]);
+        const originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
         //
         // 4) check for spam (score must be < 5)
@@ -823,7 +827,10 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      logger.error(err, { session, originalRaw });
+      logger.error(err, {
+        session,
+        headers: headers ? null : headers.build().toString()
+      });
       fn(err);
     });
 
