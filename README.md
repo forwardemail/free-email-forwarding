@@ -520,7 +520,7 @@ Yes! As of October 2, 2018 we have added this feature.  See [Send Mail As Using 
 
 ### Can I forward unlimited emails with this
 
-Practically yes - the only current restriction is that senders are limited to sending `200` emails per hour through the system.
+Practically yes - the only current restriction is that senders (by unique email address) are limited to sending `300` emails per hour through the system.
 
 If this limit is exceeded we send a `451` response code which tells the senders mail server to retry later.
 
