@@ -36,6 +36,7 @@
     "cabin": "^5.0.10",
     "common-tags": "^1.8.0",
     "disposable-email-domains": "^1.0.50",
+    "dkim": "^0.7.1",
     "dmarc-parse": "^1.0.2",
     "dnsbl": "^3.2.0",
     "get-fqdn": "^0.0.4",
