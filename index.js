@@ -137,7 +137,8 @@ class ForwardEmail {
         .getCiphers()
         .map(cipher => cipher.toUpperCase())
         .join(':');
-      this.config.ssl.secureOptions = crypto.constants.SSL_OP_NO_SSLv3;
+      this.config.ssl.secureOptions =
+        crypto.constants.SSL_OP_NO_SSLv3 | crypto.constants.SSL_OP_NO_SSLv2;
       delete this.config.ssl.allowHTTP1;
       if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
       else this.config.ssl.secure = true;
