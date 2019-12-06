@@ -865,9 +865,9 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      logger.error(err, log);
       const log = { session };
       if (originalRaw) log.email = originalRaw.toString();
+      logger.error(err, log);
       fn(err);
     });
 
