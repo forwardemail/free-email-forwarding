@@ -106,6 +106,15 @@ class ForwardEmail {
         removals: env.DNSBL_REMOVALS,
         ...config.dnsbl
       },
+      rateLimit: {
+        duration: env.RATELIMIT_DURATION
+          ? parseInt(env.RATELIMIT_DURATION, 10)
+          : 60000,
+        max: env.RATELIMIT_MAX ? parseInt(env.RATELIMIT_MAX, 10) : 100,
+        prefix: env.RATELIMIT_PREFIX
+          ? env.RATELIMIT_PREFIX
+          : `limit_${env.toLowerCase()}`
+      },
       exchanges: env.SMTP_EXCHANGE_DOMAINS,
       dkim: {
         domainName: env.DKIM_DOMAIN_NAME,
@@ -291,7 +300,9 @@ class ForwardEmail {
 
     // check against blacklist
     if (this.isBlacklisted(domain))
-      throw new CustomError('Blacklisted domains are not permitted');
+      throw new CustomError(
+        `The domain ${domain} is blacklisted by ${this.config.website}`
+      );
 
     // ensure fully qualified domain name
     /*
@@ -368,6 +379,20 @@ class ForwardEmail {
         )
       );
     */
+
+    // check against blacklist
+    if (
+      validator.isFQDN(session.clientHostname) &&
+      this.isBlacklisted(session.clientHostname)
+    )
+      throw new CustomError(
+        `The domain ${session.clientHostname} is blacklisted by ${this.config.website}`
+      );
+
+    if (this.isBlacklisted(session.remoteAddress))
+      throw new CustomError(
+        `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}`
+      );
 
     // ensure that it's not on the DNS blacklist
     // Spamhaus = zen.spamhaus.org
