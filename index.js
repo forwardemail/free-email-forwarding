@@ -413,6 +413,11 @@ class ForwardEmail {
 
   async onData(stream, session, fn) {
     //
+    // debugging
+    //
+    let originalRaw;
+
+    //
     // store an object of email addresses that bounced
     // with their associated error that occurred
     //
@@ -519,7 +524,7 @@ class ForwardEmail {
             : fromAddress.address;
 
         // message body as a single Buffer (everything after the \r\n\r\n separator)
-        const originalRaw = Buffer.concat([headers.build(), ...chunks]);
+        originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
         //
         // 4) check for spam (score must be < 5)
@@ -860,7 +865,9 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      logger.error(err, { session });
+      logger.error(err, log);
+      const log = { session };
+      if (originalRaw) log.email = originalRaw.toString();
       fn(err);
     });
 
