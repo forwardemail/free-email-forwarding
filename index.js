@@ -379,28 +379,27 @@ class ForwardEmail {
         )
       );
     */
-
-    // check against blacklist
-    if (
-      validator.isFQDN(session.clientHostname) &&
-      this.isBlacklisted(session.clientHostname)
-    )
-      throw new CustomError(
-        `The domain ${session.clientHostname} is blacklisted by ${this.config.website}`
-      );
-
-    if (this.isBlacklisted(session.remoteAddress))
-      throw new CustomError(
-        `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}`
-      );
-
-    // ensure that it's not on the DNS blacklist
-    // Spamhaus = zen.spamhaus.org
-    // SpamCop = bl.spamcop.net
-    // Barracuda = b.barracudacentral.org
-    // Lashback = ubl.unsubscore.com
-    // PSBL = psbl.surriel.com
     try {
+      // check against blacklist
+      if (
+        validator.isFQDN(session.clientHostname) &&
+        this.isBlacklisted(session.clientHostname)
+      )
+        throw new CustomError(
+          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}`
+        );
+
+      if (this.isBlacklisted(session.remoteAddress))
+        throw new CustomError(
+          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}`
+        );
+
+      // ensure that it's not on the DNS blacklist
+      // Spamhaus = zen.spamhaus.org
+      // SpamCop = bl.spamcop.net
+      // Barracuda = b.barracudacentral.org
+      // Lashback = ubl.unsubscore.com
+      // PSBL = psbl.surriel.com
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
