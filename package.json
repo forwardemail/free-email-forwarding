@@ -80,6 +80,12 @@
   "engines": {
     "node": ">=8.3"
   },
+  "files": [
+    "helpers/**/*",
+    ".env.defaults",
+    ".env.schema",
+    "index.js"
+  ],
   "homepage": "http://forwardemail.net",
   "husky": {
     "hooks": {
@@ -118,7 +124,7 @@
       "git add"
     ]
   },
-  "main": "smtp/index.js",
+  "main": "index.js",
   "prettier": {
     "singleQuote": true,
     "bracketSpacing": true,
