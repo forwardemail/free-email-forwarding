@@ -11,4 +11,5 @@ before_install:
 - openssl aes-256-cbc -K $encrypted_b4e0dcfb0aa3_key -iv $encrypted_b4e0dcfb0aa3_iv
   -in dkim-private.key.enc -out dkim-private.key -d
 install:
-  - export DKIM_PRIVATE_KEY_PATH="${TRAVIS_BUILD_DIR}/dkim-private.key"
+- export DKIM_PRIVATE_KEY_PATH="${TRAVIS_BUILD_DIR}/dkim-private.key"
+- yarn
