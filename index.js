@@ -5,13 +5,13 @@ const util = require('util');
 
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
-const NodeDKIM = require('dkim');
 const Promise = require('bluebird');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
+const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
@@ -31,8 +31,6 @@ const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 
 let mailUtilities = require('mailin/lib/mailUtilities.js');
-
-const verifyDKIM = util.promisify(NodeDKIM.verify).bind(NodeDKIM);
 
 const {
   CustomError,
@@ -94,6 +92,8 @@ class ForwardEmail {
         logger,
         ...config.smtp
       },
+      spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
+      blacklist: env.BLACKLIST,
       blacklistedStr:
         "Your mail server's IP address of %s is listed on the %s DNS blacklist (visit %s to submit a removal request and try again).",
       dnsbl: {
@@ -375,6 +375,11 @@ class ForwardEmail {
 
   async onData(stream, session, fn) {
     //
+    // for debugging
+    //
+    let originalRaw;
+
+    //
     // store an object of email addresses that bounced
     // with their associated error that occurred
     //
@@ -481,7 +486,7 @@ class ForwardEmail {
             : fromAddress.address;
 
         // message body as a single Buffer (everything after the \r\n\r\n separator)
-        const originalRaw = Buffer.concat([headers.build(), ...chunks]);
+        originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
         //
         // 4) check for spam (score must be < 5)
@@ -498,9 +503,9 @@ class ForwardEmail {
           logger.error(err);
         }
 
-        if (spamScore >= env.SPAM_SCORE_THRESHOLD)
+        if (spamScore >= this.config.spamScoreThreshold)
           throw new CustomError(
-            `Message detected as spam (spam score of ${spamScore} exceeds threshold of ${env.SPAM_SCORE_THRESHOLD})`,
+            `Message detected as spam (spam score of ${spamScore} exceeds threshold of ${this.config.spamScoreThreshold})`,
             554
           );
 
@@ -510,11 +515,14 @@ class ForwardEmail {
         //
         // if and only if there was a `dkim-signature` or `x-google-dkim-signature` header
         //
-        if (
-          headers.getFirst('dkim-signature') !== '' ||
-          headers.getFirst('x-google-dkim-signature') !== ''
-        )
-          await this.validateDKIM(originalRaw);
+        const dkim =
+          headers.getFirst('dkim-signature') === ''
+            ? true
+            : await this.validateDKIM(originalRaw);
+        if (!dkim)
+          throw new CustomError(
+            'Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.'
+          );
 
         // get the fully qualified domain name ("FQDN") of this server
         const ipAddress =
@@ -815,7 +823,7 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      logger.error(err);
+      logger.error(err, { session, originalRaw });
       fn(err);
     });
 
@@ -880,37 +888,14 @@ class ForwardEmail {
   }
 
   async validateDKIM(raw) {
-    let results = [];
     try {
-      results = await verifyDKIM(raw);
+      const result = await dkimVerify(raw);
+      return result;
     } catch (err) {
       logger.error(err);
       err.responseCode = 421;
       throw err;
     }
-
-    if (
-      !Array.isArray(results) ||
-      (Array.isArray(results) && results.length === 0) ||
-      (Array.isArray(results) &&
-        results.length > 0 &&
-        results.every(
-          result =>
-            result.verified ||
-            [NodeDKIM.NONE, NodeDKIM.OK].includes(result.status)
-        ))
-    )
-      return true;
-
-    const messages = results
-      .filter(result => _.isError(result.error))
-      .map(result => result.error.message);
-
-    if (messages.length === 0)
-      throw new CustomError('The email you sent has an invalid DKIM signature');
-
-    // join the messages together and make them unique
-    throw new CustomError(_.uniq(messages).join(', '));
   }
 
   async validateMX(address) {
@@ -964,8 +949,8 @@ class ForwardEmail {
   }
 
   isBlacklisted(domain) {
-    return Array.isArray(env.BLACKLIST)
-      ? env.BLACKLIST.includes(domain)
+    return Array.isArray(this.config.blacklist)
+      ? this.config.blacklist.includes(domain)
       : false;
   }
 
