@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
@@ -130,6 +131,8 @@ class ForwardEmail {
       throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS');
 
     if (this.config.ssl) {
+      this.config.ssl.minVersion = 'TLSv1';
+      this.config.ssl.secureOptions = crypto.constants.SSL_OP_NO_SSLv3;
       delete this.config.ssl.allowHTTP1;
       if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
       else this.config.ssl.secure = true;
