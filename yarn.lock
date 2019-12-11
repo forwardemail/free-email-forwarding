@@ -627,10 +627,10 @@
   dependencies:
     ioredis "^4.14.0"
 
-"@ladjs/shared-config@^1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-1.0.0.tgz#59bd80f13d85efee68cebb624b6f6f974f551f12"
-  integrity sha512-GWvBRZHmBPp7r6AW2N4Yk9zTi4rc2Rbv993Y9aLXwWxRl3H8GYNRCnmsxTYDhfeD2GSzByoeVgUDanMMy/RgvA==
+"@ladjs/shared-config@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-1.0.1.tgz#2ca13b366ab10c9d80c278b82e85c64c1e2c1250"
+  integrity sha512-qA1VvVVdksIOxRxXs/5WBtolHZ/iFLVhApjrJ1mp3xoYRcWMbxV2CftVsca2U8gX1dHk92vOmkwkkHHjm/fX3Q==
   dependencies:
     boolean "^3.0.0"
     is-string-and-not-blank "^0.0.2"
@@ -1585,10 +1585,10 @@ bytes@^3.1.0:
   resolved "https://registry.yarnpkg.com/bytes/-/bytes-3.1.0.tgz#f6cf7933a360e0588fa9fde85651cdc7f805d1f6"
   integrity sha512-zauLjrfCG+xvoyaqLoV8bLVXXNGC4JqlxFCutSDWA6fJrTo2ZuvLYTqZ7aHBLZSMOopbzwv8f+wZcVzfVTI2Dg==
 
-cabin@^5.0.10:
-  version "5.0.10"
-  resolved "https://registry.yarnpkg.com/cabin/-/cabin-5.0.10.tgz#df0e625163c2fdebf900c62aab582b9785c4db4b"
-  integrity sha512-xDQFSYLba+spRqeo2x3anZ0QDjiDfuyi+BaKNiDj9KhHlwiIg5HFj7shA6giJf8Utn/CuHHWo67x57+ZOwJ3AA==
+cabin@^5.0.13:
+  version "5.0.13"
+  resolved "https://registry.yarnpkg.com/cabin/-/cabin-5.0.13.tgz#b108647539cb28a9f760fdda653a7530b8558b4d"
+  integrity sha512-2jbj4rdy1r8UTUA5gUPIllaNOnqD1dgOp2vzlWMAD/i/GPXQo4cRugMCn3kI//pYcdkCHj/euOYQ7IO3czdmAg==
   dependencies:
     ansi-colors "^4.1.1"
     axe "^4.0.5"
@@ -5917,10 +5917,10 @@ mailparser@^0.5.1:
     mimelib "^0.2.19"
     uue "^3.0.0"
 
-mailsplit@^4.6.2:
-  version "4.6.2"
-  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.6.2.tgz#ce622cea460406035ff9f7d493ed00ea52a27aaa"
-  integrity sha512-7Bw2R0QfORXexGGQCEK64EeShHacUNyU5kV5F5sj4jPQB3ITe2v9KRqxD40wpuue6W/sBJlSNBZ0AypIeTGQMQ==
+mailsplit@^4.6.3:
+  version "4.6.3"
+  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.6.3.tgz#a037429047f7ede52b35ec6360e2ce1578a63d86"
+  integrity sha512-PEywoXeIJOtruNRobHw7/z8bgy1B9JNar5MkgGto0YOMqSo50jQV5SuZoz/7ZwFLd3KY/D3yEhY2UknX0KNHjQ==
   dependencies:
     libbase64 "1.2.1"
     libmime "4.2.1"
@@ -6496,10 +6496,10 @@ nodemailer@5.0.0:
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.0.0.tgz#bcb409eca613114e85de42646d0ce7f1fa70b716"
   integrity sha512-XI4PI5L7GYcJyHkPcHlvPyRrYohNYBNRNbt1tU8PXNU3E1ADJC84a13V0vbL9AM431OP+ETacaGXAF8fGn1JvA==
 
-nodemailer@^6.4.0:
-  version "6.4.0"
-  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.0.tgz#91482ebc09d39156d933eb9e6159642cd27bf02c"
-  integrity sha512-UBqPOfQGD1cM3HnjhuQe+0u3DWx47WWK7lBjG5UtPnGOysr7oDK5lNCzcjK6zzeBSdTk4m1tGx1xNbWFZQmMNA==
+nodemailer@^6.4.1:
+  version "6.4.1"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.1.tgz#f70b40355b7b08f1f80344b353970a4f8f664370"
+  integrity sha512-mSQAzMim8XIC1DemK9TifDTIgASfoJEllG5aC1mEtZeZ+FQyrSOdGBRth6JRA1ERzHQCET3QHVSd9Kc6mh356g==
 
 noop6@^1.0.1:
   version "1.0.8"
