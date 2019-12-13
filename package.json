@@ -51,7 +51,7 @@
     "pino": "^5.14.0",
     "punycode": "^2.1.1",
     "python-dkim-verify": "^1.0.1",
-    "python-spfcheck2": "^1.0.0",
+    "python-spfcheck2": "^1.0.1",
     "ratelimiter": "^3.4.0",
     "signale": "^1.4.0",
     "smtp-server": "3.5.0",
