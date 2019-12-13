@@ -7493,10 +7493,10 @@ python-dkim-verify@^1.0.1:
     semver "^6.3.0"
     shelljs "^0.8.3"
 
-python-spfcheck2@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-1.0.0.tgz#c0b8058545339644034b29ac9e36b675bcc1b55e"
-  integrity sha512-3ZL74Nltn6sTAHD26hQoBma5ew+ahdEeSvnCbeYROl6B7qhszi5hO0z6qvZnnPKXoGBwBp/tz+7HJuUZOHDO4Q==
+python-spfcheck2@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-1.0.1.tgz#fae8f05181bac23e59574e9272297daac61e7676"
+  integrity sha512-Td/XacmDNP3vLDX2vlr1IkLwRgi2TDIpXU7Sweb2afYl76gr+ImMPjMZ0LyUhA/1g86nigyhuYfWddr+t378XQ==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"
