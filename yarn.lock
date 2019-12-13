@@ -2570,24 +2570,6 @@ disposable-email-domains@^1.0.50:
   resolved "https://registry.yarnpkg.com/disposable-email-domains/-/disposable-email-domains-1.0.50.tgz#2134170aa98394101972610e5a7b69cdf79de015"
   integrity sha512-ScWM11YB4PWkPmMtW+Jqx2f5DbXWQpcjJB0TjuEFaoTag0wosZHDG1IdJGeA7Kyc/c+Wnpoh9D9cFf191lx2Bw==
 
-dkim-key@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/dkim-key/-/dkim-key-1.3.0.tgz#8d47fb44bc9f831e4c15135b3ef860a31f9c85d3"
-  integrity sha512-19+M28U4pucj6R5OfOBpWjNwUNouQUJBEN/w20MIwOVodF17kDMr03rQxvk0m8V+JRrx3x3DGyexvXgubjo5dw==
-
-dkim-signature@^1.3.0:
-  version "1.3.0"
-  resolved "https://registry.yarnpkg.com/dkim-signature/-/dkim-signature-1.3.0.tgz#aee5d45a8fcf8f79faa3a3a239e711eacd4de099"
-  integrity sha512-/NPCgG9L+k1+QhCWkGO6QlTavFg1AuhutYE197O/TsQb8OrJk52UJMMBL8eHzZ8Ei8SaUVCeoluJJunQrvz5Vg==
-
-dkim@^0.7.1:
-  version "0.7.1"
-  resolved "https://registry.yarnpkg.com/dkim/-/dkim-0.7.1.tgz#b0c8418788d2726086567ab8bd54e816eccd943d"
-  integrity sha512-jemASJq7bh9EzV62uS7UEg6wreuEn3Sl9A/7QWM2wOpPaOPaLDutNar8gpmRQ0g7M3NdtGq+fvpxn7vvBtZ4KQ==
-  dependencies:
-    dkim-key "^1.3.0"
-    dkim-signature "^1.3.0"
-
 dmarc-parse@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/dmarc-parse/-/dmarc-parse-1.0.2.tgz#77528fcdf78b888c48722856afac7e413b773b7b"
@@ -2725,6 +2707,11 @@ encodeurl@~1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/encodeurl/-/encodeurl-1.0.2.tgz#ad3ff4c86ec2d029322f5a02c3a9a606c95b3f59"
   integrity sha1-rT/0yG7C0CkyL1oCw6mmBslbP1k=
+
+encoding-japanese@1.0.30:
+  version "1.0.30"
+  resolved "https://registry.yarnpkg.com/encoding-japanese/-/encoding-japanese-1.0.30.tgz#537c4d62881767925d601acb4c79fb14db81703a"
+  integrity sha512-bd/DFLAoJetvv7ar/KIpE3CNO8wEuyrt9Xuw6nSMiZ+Vrz/Q21BPsMHvARL2Wz6IKHKXgb+DWZqtRg1vql9cBg==
 
 encoding@^0.1.11, encoding@~0.1.7:
   version "0.1.12"
@@ -4205,6 +4192,13 @@ iconv-lite@0.4.24, iconv-lite@^0.4.24, iconv-lite@^0.4.4, iconv-lite@~0.4.13:
   dependencies:
     safer-buffer ">= 2.1.2 < 3"
 
+iconv-lite@0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/iconv-lite/-/iconv-lite-0.5.0.tgz#59cdde0a2a297cc2aeb0c6445a195ee89f127550"
+  integrity sha512-NnEhI9hIEKHOzJ4f697DMz9IQEXr/MMJ5w64vN2/4Ai+wRnvV7SBrL0KLoRlwaKVghOc7LQ5YkPLuX146b6Ydw==
+  dependencies:
+    safer-buffer ">= 2.1.2 < 3"
+
 ignore-by-default@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/ignore-by-default/-/ignore-by-default-1.0.1.tgz#48ca6d72f6c6a3af00a9ad4ae6876be3889e2b09"
@@ -5541,18 +5535,19 @@ levn@^0.3.0, levn@~0.3.0:
     prelude-ls "~1.1.2"
     type-check "~0.3.2"
 
-libbase64@1.0.3:
-  version "1.0.3"
-  resolved "https://registry.yarnpkg.com/libbase64/-/libbase64-1.0.3.tgz#de3023234abeefeb9d49378804c8a94404f5c98c"
-  integrity sha512-ULQZAATVGTAgVNwP61R+MbbSGNBy1tVzWupB9kbE6p+VccWd+J+ICXgOwQic5Yqagzpu+oPZ8sI7yXdWJnPPkA==
+libbase64@1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/libbase64/-/libbase64-1.2.1.tgz#fb93bf4cb6d730f29b92155b6408d1bd2176a8c8"
+  integrity sha512-l+nePcPbIG1fNlqMzrh68MLkX/gTxk/+vdvAb388Ssi7UuUN31MI44w4Yf33mM3Cm4xDfw48mdf3rkdHszLNew==
 
-libmime@4.1.1:
-  version "4.1.1"
-  resolved "https://registry.yarnpkg.com/libmime/-/libmime-4.1.1.tgz#eb7a60c775ba78c3715ddaec5cd52596a047f8d1"
-  integrity sha512-HkOfBSj+l7pBOOucEgiI6PdbgHa8ljv+1rARzW743HQ51UP8gabMlcA2wAF3Dg1aeuMjHZ+LzAPYxM52IZsyGA==
+libmime@4.2.1:
+  version "4.2.1"
+  resolved "https://registry.yarnpkg.com/libmime/-/libmime-4.2.1.tgz#d21aa5db88b131af18bf5a3caa1013da2c21a9dd"
+  integrity sha512-09y7zjSc5im1aNsq815zgo4/G3DnIzym3aDOHsGq4Ee5vrX4PdgQRybAsztz9Rv0NhO+J5C0llEUloa3sUmjmA==
   dependencies:
-    iconv-lite "0.4.24"
-    libbase64 "1.0.3"
+    encoding-japanese "1.0.30"
+    iconv-lite "0.5.0"
+    libbase64 "1.2.1"
     libqp "1.1.0"
 
 libqp@1.1.0:
@@ -5935,13 +5930,13 @@ mailparser@^0.5.1:
     mimelib "^0.2.19"
     uue "^3.0.0"
 
-mailsplit@4.4:
-  version "4.4.1"
-  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.4.1.tgz#838603af3c1561e27aedd8599cec2a59c097faa6"
-  integrity sha512-AmWLEHQAg/zbNb1MdrPQS9VOzysHaU9IuoQV9kGU5fgjM5RCbgqVkZzp0+DhPep8sj8iHfbWkl16Nb1PbNlTYg==
+mailsplit@^4.6.3:
+  version "4.6.3"
+  resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-4.6.3.tgz#a037429047f7ede52b35ec6360e2ce1578a63d86"
+  integrity sha512-PEywoXeIJOtruNRobHw7/z8bgy1B9JNar5MkgGto0YOMqSo50jQV5SuZoz/7ZwFLd3KY/D3yEhY2UknX0KNHjQ==
   dependencies:
-    libbase64 "1.0.3"
-    libmime "4.1.1"
+    libbase64 "1.2.1"
+    libmime "4.2.1"
     libqp "1.1.0"
 
 make-dir@^1.0.0:
@@ -7490,18 +7485,18 @@ punycode@^2.1.0, punycode@^2.1.1:
   resolved "https://registry.yarnpkg.com/punycode/-/punycode-2.1.1.tgz#b58b010ac40c22c5657616c8d2c2c02c7bf479ec"
   integrity sha512-XRsRjdf+j5ml+y/6GKHPZbrF/8p2Yga0JPtdqTIY2Xe5ohJPD9saDJJLPvp9+NSBprVvevdXZybnj2cv8OEd0A==
 
-python-dkim-verify@^0.0.3:
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/python-dkim-verify/-/python-dkim-verify-0.0.3.tgz#f4be4838e37ca68f57c85916eabbcc30e408ca8e"
-  integrity sha512-CO7wHtQ4tztZ9qfR40NyRUqGwlHbyV4Pj9iYVKTeHz32zijZQDp3ZmM5f+Xx9KO8nv6qTEcP81kBqU1VoH3d6w==
+python-dkim-verify@^1.0.1:
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/python-dkim-verify/-/python-dkim-verify-1.0.1.tgz#c06ba0eed4bc0a11357913152fcf8598d78d5f58"
+  integrity sha512-jbiodhBo34fccRnmrNRhfTCw1qO4AbndbX9Fdi+rTF/IGfcbTetHIjvlh869K2MZ3DxnGUUFY63Z0ud4KNnfWA==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"
 
-python-spfcheck2@^0.0.8:
-  version "0.0.8"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-0.0.8.tgz#c3fe7e0f5d41e758dc9fba2eedd6c5462f16af1a"
-  integrity sha512-yDHaEj2G0Cd7i1jqx031nIqfKtMU4JqmY8HWLKLqi8EEtf5Wt23lRHwaMjaHHkxSvc1WCr7dbgDNe1Zv9ZI63Q==
+python-spfcheck2@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-1.0.0.tgz#c0b8058545339644034b29ac9e36b675bcc1b55e"
+  integrity sha512-3ZL74Nltn6sTAHD26hQoBma5ew+ahdEeSvnCbeYROl6B7qhszi5hO0z6qvZnnPKXoGBwBp/tz+7HJuUZOHDO4Q==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"

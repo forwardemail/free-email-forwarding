@@ -7,7 +7,6 @@ const util = require('util');
 
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
-const NodeDKIM = require('dkim');
 const Promise = require('bluebird');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
@@ -43,7 +42,6 @@ const {
   logger
 } = require('./helpers');
 
-const verifyDKIM = util.promisify(NodeDKIM.verify);
 const lookupAsync = util.promisify(dns.lookup);
 const resolveTxtAsync = util.promisify(dns.resolveTxt);
 const resolveMxAsync = util.promisify(dns.resolveMx);
@@ -559,6 +557,7 @@ class ForwardEmail {
           headers.getFirst('dkim-signature') === ''
             ? true
             : await this.validateDKIM(originalRaw);
+
         if (!dkim)
           throw new CustomError(
             'Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.'
@@ -936,26 +935,10 @@ class ForwardEmail {
   async validateDKIM(raw) {
     try {
       const pass = await dkimVerify(raw);
-      if (pass) return true;
-      // attempt to use fallback node DKIM library
-      const results = await verifyDKIM(raw);
-      if (
-        !Array.isArray(results) ||
-        (Array.isArray(results) && results.length === 0) ||
-        (Array.isArray(results) &&
-          results.length > 0 &&
-          results.every(
-            result =>
-              result.verified ||
-              [NodeDKIM.NONE, NodeDKIM.OK].includes(result.status)
-          ))
-      )
-        return true;
-      return false;
+      return pass;
     } catch (err) {
       logger.error(err);
-      err.message =
-        'Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.';
+      err.message = `Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.  Original error message: ${err.message}`;
       err.responseCode = 421;
       throw err;
     }
