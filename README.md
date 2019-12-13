@@ -226,7 +226,7 @@ You'll also need the following dependencies installed:
   * Ubuntu:
 
     ```sh
-    sudo apt-get -y install spamassassin spamc python3
+    sudo apt-get -y install spamassassin spamc python3 python3-pip
     ```
 
     > If you are using a `jessie` based version of Debian (e.g. Ubuntu 16.04+):
