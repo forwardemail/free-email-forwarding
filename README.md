@@ -493,7 +493,7 @@ Yes, absolutely.  For example if you're sending an email to `hello@niftylettuce.
 
 Per documentation and suggestions from Google at <https://support.google.com/a/answer/175365?hl=en>, along with best practice, including:
 
-1. DNSBL - we test senders IP's against the Spamhaus, SpamCop, Barracuda, Lashback, and PSBL blacklists [DNS blacklists][dns-blacklists], if any fail, then the sender is not permitted to send the message and is returned a detailed error message with instructions on how to de-list themselves from the specific blacklists they're listed under.
+1. DNSBL - we test senders IP's against the Spamhaus [DNS blacklists][dns-blacklists], if any fail, then the sender is not permitted to send the message and is returned a detailed error message with instructions on how to de-list themselves from the specific blacklists they're listed under.
 
 2. SpamAssassin - using `spamc` client to check emails and automatically reject them if they're marked as spam
 
