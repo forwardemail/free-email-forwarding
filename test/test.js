@@ -622,7 +622,7 @@ test('ForwardEmail is not in DNS blacklists', async t => {
 const ip = '127.0.0.2';
 test(`${ip} is in DNS blacklists`, async t => {
   const message = await t.context.forwardEmail.checkBlacklists(ip);
-  t.true(typeof message === 'string');
+  t.is(message, true);
 });
 
 /*
