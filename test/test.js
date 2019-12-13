@@ -619,12 +619,6 @@ test('ForwardEmail is not in DNS blacklists', async t => {
   t.is(mx2, false);
 });
 
-const ip = '127.0.0.2';
-test(`${ip} is in DNS blacklists`, async t => {
-  const message = await t.context.forwardEmail.checkBlacklists(ip);
-  t.is(message, true);
-});
-
 /*
 test.todo('rejects invalid DKIM signature');
 test.todo('accepts valid DKIM signature');
