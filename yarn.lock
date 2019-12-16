@@ -581,27 +581,14 @@
     "@types/istanbul-reports" "^1.1.1"
     "@types/yargs" "^13.0.0"
 
-"@ladjs/dotenv-extended@^3.0.0":
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/@ladjs/dotenv-extended/-/dotenv-extended-3.0.0.tgz#540500d4c93396cd2ce81603f564f6c6dad3f8ff"
-  integrity sha512-X2yNeI2cQpp1ZVvP/S8BjlTTsJ/TjjyrJXv/UQKP1/LxsC5/i1m2WemeM6riQlzSCDhRgNt73i+OjCRZKDo2JQ==
+"@ladjs/env@^0.0.7":
+  version "0.0.7"
+  resolved "https://registry.yarnpkg.com/@ladjs/env/-/env-0.0.7.tgz#27ad34c532df900e4c04fda6abf5220f9794ad38"
+  integrity sha512-ehO55o7Q6UmP0hNQqURwD/6kE/L1e4S9eBGIqoTrt/etnnqH+/epDJ8B7mw/KWJconahqMQP7D9eB003RrKSSQ==
   dependencies:
-    "@types/dotenv" "^4.0.0"
-    auto-parse "^1.3.0"
-    camelcase "^4.1.0"
-    cross-spawn "^5.1.0"
-    dotenv "^4.0.0"
-    is-windows "^1.0.0"
-    lodash "^4.3.0"
-
-"@ladjs/env@^0.0.4":
-  version "0.0.4"
-  resolved "https://registry.yarnpkg.com/@ladjs/env/-/env-0.0.4.tgz#65d8470751c64c2a292b8c0f7a85f91f05a3f25f"
-  integrity sha512-ZK0TsQcZNGlS6vdBUDg0SlZLf/yR/LEOFMoZ5sDZajA1RZvrVhwAJS+ILwx08ppByzL66mM0x/kIhaMJghbW3Q==
-  dependencies:
-    "@ladjs/dotenv-extended" "^3.0.0"
-    dotenv-parse-variables "^0.1.0"
-    mustache "^2.3.0"
+    dotenv-extended "^2.7.0"
+    dotenv-parse-variables "^0.2.3"
+    mustache "^3.1.0"
 
 "@ladjs/graceful@^1.0.0":
   version "1.0.0"
@@ -740,10 +727,10 @@
   resolved "https://registry.yarnpkg.com/@types/color-name/-/color-name-1.1.1.tgz#1c1261bbeaa10a8055bbc5d8ab84b7b2afc846a0"
   integrity sha512-rr+OQyAjxze7GgWrSaJwydHStIhHq2lvY3BOC2Mj7KnzI7XK0Uw1TOOdI9lDoajEbSWLiYgoo4f1R51erQfhPQ==
 
-"@types/dotenv@^4.0.0":
-  version "4.0.3"
-  resolved "https://registry.yarnpkg.com/@types/dotenv/-/dotenv-4.0.3.tgz#ebcfc40da7bc0728b705945b7db48485ec5b4b67"
-  integrity sha512-mmhpINC/HcLGQK5ikFJlLXINVvcxhlrV+ZOUJSN7/ottYl+8X4oSXzS9lBtDkmWAl96EGyGyLrNvk9zqdSH8Fw==
+"@types/dotenv@^6.1.1":
+  version "6.1.1"
+  resolved "https://registry.yarnpkg.com/@types/dotenv/-/dotenv-6.1.1.tgz#f7ce1cc4fe34f0a4373ba99fefa437b0bec54b46"
+  integrity sha512-ftQl3DtBvqHl9L16tpqqzA4YzCSXZfi7g8cQceTz5rOlYtk/IZbFjAv3mLOQlNIgOaylCQWQoBdDQHPgEBJPHg==
   dependencies:
     "@types/node" "*"
 
@@ -2258,7 +2245,7 @@ cross-spawn@^4:
     lru-cache "^4.0.1"
     which "^1.2.9"
 
-cross-spawn@^5.0.1, cross-spawn@^5.1.0:
+cross-spawn@^5.0.1:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-5.1.0.tgz#e8bd0efee58fcff6f8f94510a0a554bbfa235449"
   integrity sha1-6L0O/uWPz/b4+UUQoKVUu/ojVEk=
@@ -2278,7 +2265,7 @@ cross-spawn@^6.0.0, cross-spawn@^6.0.5:
     shebang-command "^1.2.0"
     which "^1.2.9"
 
-cross-spawn@^7.0.0:
+cross-spawn@^7.0.0, cross-spawn@^7.0.1:
   version "7.0.1"
   resolved "https://registry.yarnpkg.com/cross-spawn/-/cross-spawn-7.0.1.tgz#0ab56286e0f7c24e153d04cc2aa027e43a9a5d14"
   integrity sha512-u7v4o84SwFpD32Z8IIcPZ6z1/ie24O6RU3RbtL5Y316l3KuHVPx9ItBgWQ6VlfAFnRnTtMUrsQ9MUUTuEZjogg==
@@ -2628,17 +2615,28 @@ dot-prop@^5.1.0:
   dependencies:
     is-obj "^2.0.0"
 
-dotenv-parse-variables@^0.1.0:
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/dotenv-parse-variables/-/dotenv-parse-variables-0.1.0.tgz#0a70772c2008aad47ff546236f940a60c9b5cf40"
-  integrity sha512-nIyID7GqSBpqAUgkiPnTvVN1OajSYfAdhPnuJB8mAicUmkH09bqsdis+qPjTEGwuoY/lq0WHVlWGpTvFRJncOg==
+dotenv-extended@^2.7.0:
+  version "2.7.0"
+  resolved "https://registry.yarnpkg.com/dotenv-extended/-/dotenv-extended-2.7.0.tgz#117fb5239e8f0d7d0b5c349aac72507698c86b44"
+  integrity sha512-FFzoISb3oyCVpaXgbqAJbAJcPSizqsXzwD8Cfi9yvYVBU58gurr4TGTI5our1e9DJ0kLYLVOQhqtChfIAwPvKg==
   dependencies:
-    debug "^2.2.0"
+    "@types/dotenv" "^6.1.1"
+    auto-parse "^1.3.0"
+    camelcase "^5.3.1"
+    cross-spawn "^7.0.1"
+    dotenv "^8.2.0"
 
-dotenv@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-4.0.0.tgz#864ef1379aced55ce6f95debecdce179f7a0cd1d"
-  integrity sha1-hk7xN5rO1Vzm+V3r7NzhefegzR0=
+dotenv-parse-variables@^0.2.3:
+  version "0.2.3"
+  resolved "https://registry.yarnpkg.com/dotenv-parse-variables/-/dotenv-parse-variables-0.2.3.tgz#9f509c74b952f3c8dbfda6674fb060398d0ed7fc"
+  integrity sha512-cuog/uu2sD6AGTExLldBqN4kUWNjGG86cSpYGYgZrzgSiy37HkB3OOpMv7cTiQ7SKCMu8WryUS9P6lqwrh0pLg==
+  dependencies:
+    debug "^4.1.1"
+
+dotenv@^8.2.0:
+  version "8.2.0"
+  resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-8.2.0.tgz#97e619259ada750eea3e4ea3e26bceea5424b16a"
+  integrity sha512-8sJ78ElpbDJBHNeBzUbUVLsqKdccaa/BXF1uPTw3GrvQTBgrQrtObr2mUrE38vzYd8cEv+m/JBfDLioYcfXoaw==
 
 dotgitconfig@^1.0.1:
   version "1.0.1"
@@ -4852,7 +4850,7 @@ is-whitespace-character@^1.0.0:
   resolved "https://registry.yarnpkg.com/is-whitespace-character/-/is-whitespace-character-1.0.3.tgz#b3ad9546d916d7d3ffa78204bca0c26b56257fac"
   integrity sha512-SNPgMLz9JzPccD3nPctcj8sZlX9DAMJSKH8bP7Z6bohCwuNgX8xbWr1eTAYXX9Vpi/aSn8Y1akL9WgM3t43YNQ==
 
-is-windows@^1.0.0, is-windows@^1.0.2:
+is-windows@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/is-windows/-/is-windows-1.0.2.tgz#d1850eb9791ecd18e6182ce12a30f396634bb19d"
   integrity sha512-eXK1UInq2bPmjyX6e3VHIzMLobc4J94i4AWn+Hpq3OU5KkrRC96OAcR3PRJ/pGu6m8TRnBHP9dkXQVsT/COVIA==
@@ -5808,7 +5806,7 @@ lodash@^3.9.3:
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-3.10.1.tgz#5bf45e8e49ba4189e17d482789dfd15bd140b7b6"
   integrity sha1-W/Rejkm6QYnhfUgnid/RW9FAt7Y=
 
-lodash@^4.13.1, lodash@^4.17.11, lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15, lodash@^4.2.1, lodash@^4.3.0:
+lodash@^4.13.1, lodash@^4.17.11, lodash@^4.17.13, lodash@^4.17.14, lodash@^4.17.15, lodash@^4.2.1:
   version "4.17.15"
   resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.15.tgz#b447f6670a0455bbfeedd11392eff330ea097548"
   integrity sha512-8xOcRHvCjnocdS5cpwXQXVzmmh5e5+saE2QGoeQmbKmRS6J3VQppPOIt0MnmE+4xlZoumy0GPG0D0MVIQbNA1A==
@@ -6330,10 +6328,10 @@ multimatch@^4.0.0:
     arrify "^2.0.1"
     minimatch "^3.0.4"
 
-mustache@^2.3.0:
-  version "2.3.2"
-  resolved "https://registry.yarnpkg.com/mustache/-/mustache-2.3.2.tgz#a6d4d9c3f91d13359ab889a812954f9230a3d0c5"
-  integrity sha512-KpMNwdQsYz3O/SBS1qJ/o3sqUJ5wSb8gb0pul8CO0S56b9Y2ALm8zCfsjPXsqGFfoNBkDwZuZIAjhsZI03gYVQ==
+mustache@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/mustache/-/mustache-3.1.0.tgz#9fba26e7aefc5709f07ff585abb7e0abced6c372"
+  integrity sha512-3Bxq1R5LBZp7fbFPZzFe5WN4s0q3+gxZaZuZVY+QctYJiCiVgXHOTIC0/HgZuOPFt/6BQcx5u0H2CUOxT/RoGQ==
 
 mute-stream@0.0.8:
   version "0.0.8"
@@ -6509,10 +6507,10 @@ nodemailer@5.0.0:
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-5.0.0.tgz#bcb409eca613114e85de42646d0ce7f1fa70b716"
   integrity sha512-XI4PI5L7GYcJyHkPcHlvPyRrYohNYBNRNbt1tU8PXNU3E1ADJC84a13V0vbL9AM431OP+ETacaGXAF8fGn1JvA==
 
-nodemailer@6.4.0:
-  version "6.4.0"
-  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.0.tgz#91482ebc09d39156d933eb9e6159642cd27bf02c"
-  integrity sha512-UBqPOfQGD1cM3HnjhuQe+0u3DWx47WWK7lBjG5UtPnGOysr7oDK5lNCzcjK6zzeBSdTk4m1tGx1xNbWFZQmMNA==
+nodemailer@6.4.2:
+  version "6.4.2"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.2.tgz#7147550e32cdc37453380ab78d2074533966090a"
+  integrity sha512-g0n4nH1ONGvqYo1v72uSWvF/MRNnnq1LzmSzXb/6EPF3LFb51akOhgG3K2+aETAsJx90/Q5eFNTntu4vBCwyQQ==
 
 noop6@^1.0.1:
   version "1.0.8"
@@ -7286,10 +7284,10 @@ pino-std-serializers@^2.4.2:
   resolved "https://registry.yarnpkg.com/pino-std-serializers/-/pino-std-serializers-2.4.2.tgz#cb5e3e58c358b26f88969d7e619ae54bdfcc1ae1"
   integrity sha512-WaL504dO8eGs+vrK+j4BuQQq6GLKeCCcHaMB2ItygzVURcL1CycwNEUHTD/lHFHs/NL5qAz2UKrjYWXKSf4aMQ==
 
-pino@^5.14.0:
-  version "5.14.0"
-  resolved "https://registry.yarnpkg.com/pino/-/pino-5.14.0.tgz#eec56c6388797528e526f969ee022592cc538d4e"
-  integrity sha512-Vj1f2wAojTGesogT0hsA/ua8ALltCOBCcA1nkEoDfnTsVWpgBu5UVSY7OdjiGmrMOKHBm24nd3nKXzyPUYJ3ig==
+pino@^5.15.0:
+  version "5.15.0"
+  resolved "https://registry.yarnpkg.com/pino/-/pino-5.15.0.tgz#6703164ce74dd4786d44887cd33268e13fd463d8"
+  integrity sha512-7+FXMTA3H3sNP5+2miY2K9JKnAAW5GKuhHfNWsukFCsPprGQY3ctqpwbV74wAHW3Nl93cEEQ1G82MgOLM8P7TQ==
   dependencies:
     fast-redact "^2.0.0"
     fast-safe-stringify "^2.0.7"
@@ -7493,10 +7491,10 @@ python-dkim-verify@^1.0.1:
     semver "^6.3.0"
     shelljs "^0.8.3"
 
-python-spfcheck2@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-1.0.1.tgz#fae8f05181bac23e59574e9272297daac61e7676"
-  integrity sha512-Td/XacmDNP3vLDX2vlr1IkLwRgi2TDIpXU7Sweb2afYl76gr+ImMPjMZ0LyUhA/1g86nigyhuYfWddr+t378XQ==
+python-spfcheck2@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/python-spfcheck2/-/python-spfcheck2-1.0.2.tgz#69953a287b5cf639d930065b5501f100d05dbd97"
+  integrity sha512-BVlcsvIxQtZeC5WSxpVC86g8TmUBqdmq4UYfmnVlSqqfWb0rYN33nwQY7HUdgqdysjhgX9l7UBlptET+9+tQew==
   dependencies:
     semver "^6.3.0"
     shelljs "^0.8.3"
