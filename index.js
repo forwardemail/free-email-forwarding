@@ -514,7 +514,8 @@ class ForwardEmail {
         let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
-        const originalFrom = headers.getFirst('from');
+        const originalFrom =
+          headers.getFirst('from') || session.envelope.mailFrom.address;
 
         // parse the from address and set a parsed reply-to if necessary
         const fromAddress = addressParser(originalFrom)[0];
