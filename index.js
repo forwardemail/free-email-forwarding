@@ -514,8 +514,12 @@ class ForwardEmail {
         let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
-        const originalFrom =
-          headers.getFirst('from') || session.envelope.mailFrom.address;
+        const originalFrom = headers.getFirst('from');
+
+        if (!originalFrom)
+          throw new CustomError(
+            'Your message is not RFC 5322 compliant, please include a valid "From" header.'
+          );
 
         // parse the from address and set a parsed reply-to if necessary
         const fromAddress = addressParser(originalFrom)[0];
