@@ -933,7 +933,7 @@ class ForwardEmail {
       logger.error(err);
       // if there's an error then assume that we need to rewrite
       // with a friendly-from, for whatever reason
-      return true;
+      return false;
     }
   }
 
