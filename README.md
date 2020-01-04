@@ -35,7 +35,7 @@
 * [FAQ](#faq)
   * [Why did I create this service](#why-did-i-create-this-service)
   * [Why do my emails have `no-reply@forwardemail.net` as part of the FROM address](#why-do-my-emails-have-no-replyforwardemailnet-as-part-of-the-from-address)
-  * [Can I just use this mail forwarding service as a "fallback" or "fallover" MX server](#can-i-just-use-this-mail-forwarding-service-as-a-fallback-or-fallover-mx-server)
+  * [Can I just use this email forwarding service as a "fallback" or "fallover" MX server](#can-i-just-use-this-email-forwarding-service-as-a-fallback-or-fallover-mx-server)
   * [Can I forward emails to multiple recipients](#can-i-forward-emails-to-multiple-recipients)
   * [Can I have multiple global catch-all recipients](#can-i-have-multiple-global-catch-all-recipients)
   * [Is there a maximum limit on the number of email addresses I can forward to](#is-there-a-maximum-limit-on-the-number-of-email-addresses-i-can-forward-to)
@@ -379,7 +379,7 @@ This service solves all of these problems.
 
 This is to ensure that emails land in the inbox as opposed to the spam folder.  We DO add a custom "Reply-To" header, so when recipients click "Reply" on your email - they send their email to the correct address and name.  Once we implement ARC signatures (we are waiting on a majority of email providers to adopt it) then we should be able to remove the "Friendly From" rewrite, and your users will no longer see "no-reply" in the FROM.   Subscribe [to this GitHub issue](https://github.com/niftylettuce/forward-email/issues/137) for updates.  You will not need to do any re-configuration once this feature is added.
 
-### Can I just use this mail forwarding service as a "fallback" or "fallover" MX server
+### Can I just use this email forwarding service as a "fallback" or "fallover" MX server
 
 Absolutely.  If you use Google Business for email, and want to use our server as a fallback so your mail still gets delivered, then just specify the Google mail servers with a lower priority than our mail servers.  An example is provided below:
 
@@ -532,7 +532,7 @@ We use CloudFlare's privacy-first consumer DNS service (see [announcement here][
 
 The latest version, v2 (released on May 6, 2019) was a major rewrite from v1 and focuses on performance through streams.  [Nodemailer's][nodemailer] prolific author Andris Reinman ([@andris9](https://github.com/andris9)) helped us switch off using the `mailparser` library and use `mailsplit` instead with some custom transform logic to split the header and the body of the message without affecting the body.  This allows us to perform operations on headers very fast (such as security checks and for SPF/DKIM/DMARC compliance).
 
-**In other words, the latest version of this service services uses streams purely now and is lightning fast.**  The older version v1 also had some logic not in the most optimal order of operations – but now v2 does less memory/network intense operations first (and returns early if possible to send a response as quickly as possible to the SMTP client).
+**In other words, the latest version of this service uses streams purely now and is lightning fast.**  The older version v1 also had some logic not in the most optimal order of operations – but now v2 does less memory/network intense operations first (and returns early if possible to send a response as quickly as possible to the SMTP client).
 
 At no point in time do we write to disk or store emails – everything is done in-memory thanks to Node.js's streams and transforms! :tada:
 
