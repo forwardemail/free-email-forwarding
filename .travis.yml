@@ -3,6 +3,8 @@ node_js:
 - '8'
 - '10'
 - '12'
+- 'lts/*'
+- 'node'
 services:
 - redis-server
 script: npm run test-coverage
