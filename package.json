@@ -2,7 +2,7 @@
   "name": "forward-email",
   "description": "ForwardEmail is the best free email forwarding for custom domains at http://forwardemail.net",
   "version": "4.0.8",
-  "author": "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)",
+  "author": "Niftylettuce, LLC. <niftylettuce@gmail.com> (https://niftylettuce.com/)",
   "ava": {
     "serial": true,
     "failFast": true,
@@ -109,7 +109,7 @@
     "smtp",
     "source"
   ],
-  "license": "MIT",
+  "license": "Business Source License 1.1",
   "lint-staged": {
     "*.js": [
       "xo --fix",

@@ -553,7 +553,7 @@ If you are seeking permission to use these trademarks, then please [contact us](
 
 ## License
 
-[MIT](LICENSE) © [Nick Baugh](http://niftylettuce.com/)
+[Business Source License 1.1](LICENSE) © [Niftylettuce, LLC.](https://niftylettuce.com/)
 
 
 ## 
