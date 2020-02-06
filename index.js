@@ -17,6 +17,7 @@ const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
+const got = require('got');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
 const mailUtilities = require('mailin/lib/mailUtilities.js');
@@ -131,6 +132,8 @@ class ForwardEmail {
       website: env.WEBSITE_URL,
       recordPrefix: env.TXT_RECORD_PREFIX,
       whitelistedDisposableDomains: env.VANITY_DOMAINS,
+      lookupEndpoint: env.LOOKUP_ENDPOINT,
+      lookupSecrets: env.LOOKUP_SECRETS,
       ...config
     };
 
@@ -1061,6 +1064,9 @@ class ForwardEmail {
     // dns TXT record must contain `forward-email=` prefix
     const validRecords = [];
 
+    // verifications must start with `forward-email-site-verification=` prefix
+    const verifications = [];
+
     // add support for multi-line TXT records
     for (let i = 0; i < records.length; i++) {
       records[i] = records[i].join(''); // join chunks together
@@ -1068,6 +1074,37 @@ class ForwardEmail {
         validRecords.push(
           records[i].replace(`${this.config.recordPrefix}=`, '')
         );
+      if (
+        records[i].startsWith(`${this.config.recordPrefix}-site-verification=`)
+      )
+        verifications.push(
+          records[i].replace(
+            `${this.config.recordPrefix}-site-verification=`,
+            ''
+          )
+        );
+    }
+
+    if (verifications.length > 0) {
+      if (verifications.length > 1)
+        throw new CustomError(
+          `Domain ${domain} has multiple verification TXT records of "${this.config.recordPrefix}-site-verification" and should only have one`
+        );
+      // if there was a verification record then perform lookup
+      const { body } = await got.get(
+        `${this.config.lookupEndpoint}?verification_record=${verifications[0]}`,
+        {
+          responseType: 'json',
+          username: this.config.lookupSecrets[0]
+        }
+      );
+      // body is an Array of records that are formatted like TXT records
+      if (Array.isArray(body)) {
+        // combine with any existing TXT records (ensures graceful DNS propagation)
+        for (const element of body) {
+          validRecords.push(element);
+        }
+      }
     }
 
     // join multi-line TXT records together and replace double w/single commas
@@ -1079,7 +1116,7 @@ class ForwardEmail {
     // if the record was blank then throw an error
     if (!isSANB(record))
       throw new CustomError(
-        `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record`
+        `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record or has zero aliases configured`
       );
 
     // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
