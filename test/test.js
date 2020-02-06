@@ -619,6 +619,30 @@ test('ForwardEmail is not in DNS blacklists', async t => {
   t.is(mx2, false);
 });
 
+test('disabled emails are delivered to blackhole', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    from: '"Doe, John" <john.doe@forwardemail.net>',
+    to: 'disabled@niftylettuce.com',
+    subject: 'test',
+    text: 'test text',
+    html: '<strong>test html</strong>'
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
 /*
 test.todo('rejects invalid DKIM signature');
 test.todo('accepts valid DKIM signature');

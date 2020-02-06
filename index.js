@@ -7,7 +7,6 @@ const util = require('util');
 
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
-const Promise = require('bluebird');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
@@ -20,6 +19,7 @@ const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
+const mailUtilities = require('mailin/lib/mailUtilities.js');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
@@ -31,8 +31,6 @@ const wildcards = require('disposable-email-domains/wildcard.json');
 const { SMTPServer } = require('smtp-server');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
-
-const mailUtilities = require('mailin/lib/mailUtilities.js');
 
 const {
   CustomError,
@@ -78,11 +76,14 @@ class ForwardEmail {
     this.config = {
       ...sharedConfig('SMTP'),
       // TODO: eventually set 127.0.0.1 as DNS server
+      // BUT we would need to set up an API endpoint/functionality
+      // on our service at https://forwardemail.net that would clear
+      // the local dns cache at 127.0.0.1 after purging Cloudflare/Google
       // for both `dnsbl` and `dns` usage
-      // https://gist.github.com/zhurui1008/48130439a079a3c23920
+      // <https://gist.github.com/zhurui1008/48130439a079a3c23920>
+      // <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
       //
       // <https://blog.cloudflare.com/announcing-1111/>
-      // TODO: <https://github.com/niftylettuce/forward-email/issues/131#issuecomment-490484052>
       dns: env.DNS_PROVIDERS,
       noReply: env.EMAIL_NOREPLY,
       logger,
@@ -129,6 +130,7 @@ class ForwardEmail {
       email: env.EMAIL_SUPPORT,
       website: env.WEBSITE_URL,
       recordPrefix: env.TXT_RECORD_PREFIX,
+      whitelistedDisposableDomains: env.VANITY_DOMAINS,
       ...config
     };
 
@@ -370,8 +372,8 @@ class ForwardEmail {
     if (env.NODE_ENV === 'test') return fn();
 
     // TODO: implement stricter spam checking to alleviate this
-    // ensure it's a fully qualififed domain name
     /*
+    // ensure it's a fully qualififed domain name
     if (!validator.isFQDN(session.clientHostname))
       return fn(
         new CustomError(
@@ -379,6 +381,7 @@ class ForwardEmail {
         )
       );
     */
+
     try {
       // check against blacklist
       if (
@@ -669,6 +672,9 @@ class ForwardEmail {
               // get all forwarding addresses for this individual address
               const addresses = await this.getForwardingAddresses(to.address);
 
+              if (addresses === false)
+                return { address: to.address, addresses: [], ignored: true };
+
               // if we already rewrote headers no need to continue
               if (rewritten) return { address: to.address, addresses };
 
@@ -727,6 +733,8 @@ class ForwardEmail {
                     // `addresses` are already pre-sorted by lowest priority
                     return { to: address, host: addresses[0].exchange };
                   } catch (err) {
+                    // e.g. if the MX servers don't exist for recipient
+                    // then obviously there should be an error
                     logger.error(err);
                     errors.push({
                       address,
@@ -737,6 +745,7 @@ class ForwardEmail {
               );
               recipient.addresses = _.compact(recipient.addresses);
               if (!_.isEmpty(recipient.addresses)) return recipient;
+              if (errors.length === 0) return recipient;
               throw new Error(
                 errors.map(error => `${error.address}: ${error.err.message}`)
               );
@@ -790,6 +799,8 @@ class ForwardEmail {
           const accepted = [];
           await Promise.all(
             recipients.map(async recipient => {
+              // return early if recipient is ignored
+              if (recipient.ignored) return;
               const results = await this.processRecipient({
                 recipient,
                 name,
@@ -1016,6 +1027,8 @@ class ForwardEmail {
   }
 
   isDisposable(domain) {
+    if (this.config.whitelistedDisposableDomains.includes(domain)) return false;
+
     for (const d of domains) {
       if (d === domain) return true;
     }
@@ -1039,8 +1052,8 @@ class ForwardEmail {
     }
   }
 
-  // TODO: we should cache this recursive lookup for 2m or something
   // this returns the forwarding address for a given email address
+  // eslint-disable-next-line complexity
   async getForwardingAddresses(address, recursive = []) {
     const domain = this.parseDomain(address, false);
     const records = await resolveTxtAsync(domain);
@@ -1086,6 +1099,9 @@ class ForwardEmail {
         `${address} domain of ${domain} has zero forwarded addresses configured in the TXT record with "${this.config.recordPrefix}"`
       );
 
+    // store if address is ignored or not
+    let ignored = false;
+
     // store if we have a forwarding address or not
     let forwardingAddresses = [];
 
@@ -1110,20 +1126,27 @@ class ForwardEmail {
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
+        // check if we have a match (and if it is ignored)
+        if (addr[0].indexOf('!') === 0 && username === addr[0].slice(1)) {
+          ignored = true;
+          break;
+        }
 
-        // check if we have a match
         if (username === addr[0]) forwardingAddresses.push(addr[1]);
       } else if (validator.isFQDN(addresses[i])) {
         // allow domain alias forwarding
         // (e.. the record is just "b.com" if it's not a valid email)
         globalForwardingAddresses.push(`${username}@${addresses[i]}`);
-      } else {
+      } else if (validator.isEmail(addresses[i])) {
         const domain = this.parseDomain(addresses[i], false);
         if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
           globalForwardingAddresses.push(addresses[i]);
         }
       }
     }
+
+    // if it was ignored then return early with false indicating it's disabled
+    if (ignored) return false;
 
     // if we don't have a specific forwarding address try the global redirect
     if (
@@ -1143,9 +1166,12 @@ class ForwardEmail {
 
     // allow one recursive lookup on forwarding addresses
     const recursivelyForwardedAddresses = [];
-    await Promise.each(forwardingAddresses, async forwardingAddress => {
+
+    const len = forwardingAddresses.length;
+    for (let x = 0; x < len; x++) {
+      const forwardingAddress = forwardingAddresses[x];
       try {
-        if (recursive.includes(forwardingAddress)) return;
+        if (recursive.includes(forwardingAddress)) continue;
 
         const newRecursive = forwardingAddresses.concat(recursive);
         // prevent a double-lookup if user is using + symbols
@@ -1154,21 +1180,25 @@ class ForwardEmail {
             `${this.parseUsername(address)}@${this.parseDomain(address, false)}`
           );
 
+        // eslint-disable-next-line no-await-in-loop
         const addresses = await this.getForwardingAddresses(
           forwardingAddress,
           newRecursive
         );
+        // if address was ignored then skip adding it
+        if (addresses === false) continue;
+
         // if it was recursive then remove the original
         if (addresses.length > 0)
           recursivelyForwardedAddresses.push(forwardingAddress);
         // add the recursively forwarded addresses
-        addresses.forEach(address => {
-          forwardingAddresses.push(address);
-        });
+        for (const element of addresses) {
+          forwardingAddresses.push(element);
+        }
       } catch (err) {
         logger.error(err);
       }
-    });
+    }
 
     // make the forwarding addresses unique
     // and omit the addresses recursively forwarded
