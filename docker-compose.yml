@@ -1,0 +1,26 @@
+version: '3'
+services:
+  free-email-forwarding:
+    build: .
+    image: free-email-forwarding
+    hostname: mx1.example.com
+    environment:
+      - SMTP_REDIS_HOST=redis
+      - SMTP_SSL_KEY_PATH=/etc/letsencrypt/live/mx1.example.com/privkey.pem
+      - SMTP_SSL_CERT_PATH=/etc/letsencrypt/live/mx1.example.com/cert.pem
+      - SMTP_SSL_CA_PATH=/etc/letsencrypt/live/mx1.example.com/chain.pem
+      - SMTP_EXCHANGE_DOMAINS=mx1.example.com
+      - DKIM_DOMAIN_NAME=example.com
+      - EMAIL_NOREPLY=no-reply@example.com
+      - EMAIL_SUPPORT=support@example.com
+      - WEBSITE_URL=https://example.com
+    ports:
+      - 25:3025
+      - 465:3465
+      - 587:3587
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - ./dkim/:/app/dkim/
+
+  redis:
+    image: redis
