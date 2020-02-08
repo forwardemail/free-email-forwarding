@@ -144,6 +144,7 @@
     "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
     "lint": "xo && remark . -qfo",
     "nyc": "cross-env IS_NOT_SECURE=true NODE_ENV=test nyc ava",
+    "start": "pm2 startOrGracefulReload ecosystem.json --env production --update-env --attach",
     "test": "npm run lint && npm run ava",
     "test-coverage": "npm run lint && npm run nyc"
   },
