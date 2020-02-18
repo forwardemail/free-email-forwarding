@@ -5,7 +5,6 @@ const os = require('os');
 const tls = require('tls');
 const util = require('util');
 
-const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
@@ -13,7 +12,6 @@ const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
-const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
@@ -23,23 +21,17 @@ const isSANB = require('is-string-and-not-blank');
 const mailUtilities = require('mailin/lib/mailUtilities.js');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
-const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
 const sharedConfig = require('@ladjs/shared-config');
 const spfCheck2 = require('python-spfcheck2');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const { SMTPServer } = require('smtp-server');
+const { SRS } = require('sender-rewriting-scheme');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 
-const {
-  CustomError,
-  MessageSplitter,
-  createMessageID,
-  env,
-  logger
-} = require('./helpers');
+const { CustomError, MessageSplitter, env, logger } = require('./helpers');
 
 const lookupAsync = util.promisify(dns.lookup);
 const resolveTxtAsync = util.promisify(dns.resolveTxt);
@@ -134,6 +126,12 @@ class ForwardEmail {
       whitelistedDisposableDomains: env.VANITY_DOMAINS,
       lookupEndpoint: env.LOOKUP_ENDPOINT,
       lookupSecrets: env.LOOKUP_SECRETS,
+      srs: {
+        separator: '=',
+        secret: env.SRS_SECRET,
+        maxAge: 30
+      },
+      srsDomain: env.SRS_DOMAIN,
       ...config
     };
 
@@ -158,13 +156,14 @@ class ForwardEmail {
       else this.config.ssl.secure = true;
     }
 
+    // Sender Rewriting Schema ("SRS")
+    this.srs = new SRS(this.config.srs);
+
+    // SMTP Server
     this.config.smtp = {
       ...this.config.smtp,
       ...this.config.ssl
     };
-
-    // set up DKIM instance for signing messages
-    this.dkim = new DKIM(this.config.dkim);
 
     // initialize redis
     const client = new Redis(
@@ -199,7 +198,6 @@ class ForwardEmail {
     this.processRecipient = this.processRecipient.bind(this);
     this.processAddress = this.processAddress.bind(this);
     this.sendEmail = this.sendEmail.bind(this);
-    this.rewriteFriendlyFrom = this.rewriteFriendlyFrom.bind(this);
     this.parseUsername = this.parseUsername.bind(this);
     this.parseFilter = this.parseFilter.bind(this);
     this.parseDomain = this.parseDomain.bind(this);
@@ -207,7 +205,6 @@ class ForwardEmail {
     this.checkBlacklists = this.checkBlacklists.bind(this);
     this.onData = this.onData.bind(this);
     this.validateSPF = this.validateSPF.bind(this);
-    this.getDMARC = this.getDMARC.bind(this);
     this.validateDKIM = this.validateDKIM.bind(this);
     this.validateMX = this.validateMX.bind(this);
     this.validateRateLimit = this.validateRateLimit.bind(this);
@@ -234,11 +231,13 @@ class ForwardEmail {
     return Promise.all(
       addresses.map(({ to, host }) => {
         return this.processAddress(address, {
-          to,
           host,
           name,
-          from,
-          raw: this.dkim.sign(raw)
+          envelope: {
+            from: this.srs.forward(from, this.parseDomain(to, false)),
+            to
+          },
+          raw
         });
       })
     );
@@ -253,7 +252,10 @@ class ForwardEmail {
       // here we do some magic so that we push an error message
       // that has the end-recipient's email masked with the
       // original to address that we were trying to send to
-      err.message = err.message.replace(new RegExp(options.to, 'gi'), address);
+      err.message = err.message.replace(
+        new RegExp(options.envelope.to, 'gi'),
+        address
+      );
       logger.error(err);
       return {
         accepted: [],
@@ -266,22 +268,14 @@ class ForwardEmail {
   // TODO: eventually we can combine multiple recipients
   // that have the same MX records in the same envelope `to`
   sendEmail(options) {
-    const { to, host, name, from, raw } = options;
+    const { host, name, envelope, raw } = options;
     const transporter = nodemailer.createTransport({
       ...transporterConfig,
       ...this.config.ssl,
       host,
       name
     });
-    return transporter.sendMail({ envelope: { from, to }, raw });
-  }
-
-  rewriteFriendlyFrom(from) {
-    // preserve user's name
-    const { address, name } = addressParser(from)[0];
-    if (!name || name.trim() === '')
-      return `"${address}" <${this.config.noReply}>`;
-    return `"${name}" <${this.config.noReply}>`;
+    return transporter.sendMail({ envelope, raw });
   }
 
   parseUsername(address) {
@@ -459,7 +453,6 @@ class ForwardEmail {
       stream.once('end', () => fn(err));
     });
 
-    // eslint-disable-next-line complexity
     messageSplitter.once('end', async () => {
       //
       // we need to check the following:
@@ -470,15 +463,7 @@ class ForwardEmail {
       // 4) X check for spam (score must be < 5) (child process spam daemon)
       // 5) X if DKIM signature passed and was valid (child process python)
       // 6) X if SPF is valid (child process python)
-      // 7) X check for DMARC compliance (DNS lookup)
-      // 8) X reverse SPF check and rewrite with friendly-from (DNS lookup)
-      // 9) X rewrite message ID and lookup multiple recipients
-      // 10) X add our own DKIM signature and remove DKIM header (no bottleneck)
-      // 11) X send email
-      //
-      // future:
-      // 10) verify and sign with ARC
-      // <https://datatracker.ietf.org/doc/draft-ietf-dmarc-arc-usage/?include_text=1>
+      // 7) X send email
       //
       try {
         //
@@ -517,7 +502,6 @@ class ForwardEmail {
         //
         // store variables for use later
         //
-        let rewriteFriendlyFrom = false;
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
         const originalFrom = headers.getFirst('from');
@@ -526,13 +510,6 @@ class ForwardEmail {
           throw new CustomError(
             'Your message is not RFC 5322 compliant, please include a valid "From" header.'
           );
-
-        // parse the from address and set a parsed reply-to if necessary
-        const fromAddress = addressParser(originalFrom)[0];
-        const replyTo =
-          fromAddress.name && fromAddress.name.trim() !== ''
-            ? `"${fromAddress.name}" <${fromAddress.address}>`
-            : fromAddress.address;
 
         // message body as a single Buffer (everything after the \r\n\r\n separator)
         originalRaw = Buffer.concat([headers.build(), ...chunks]);
@@ -598,71 +575,6 @@ class ForwardEmail {
             `The email you sent has failed SPF validation with a result of "${spf}"`
           );
 
-        //
-        // 7) check for DMARC compliance
-        //
-        const fromDomain = session.envelope.mailFrom.address.split('@')[1];
-        const dmarcRecord = await this.getDMARC(fromDomain);
-        if (dmarcRecord) {
-          try {
-            const result = dmarcParse(dmarcRecord);
-            if (
-              !_.isObject(result) ||
-              !_.isObject(result.tags) ||
-              !_.isObject(result.tags.p) ||
-              !_.isString(result.tags.p.value)
-            )
-              throw new CustomError(
-                `Invalid DMARC parsed result for ${fromDomain}`
-              );
-            // if quarantine or reject then we need to rewrite w/friendly-from
-            if (
-              ['quarantine', 'reject'].includes(
-                result.tags.p.value.toLowerCase().trim()
-              )
-            ) {
-              rewriteFriendlyFrom = true;
-              // eslint-disable-next-line max-depth
-              if (headers.getFirst('reply-to') === '')
-                headers.update('Reply-To', replyTo);
-              headers.update('From', this.rewriteFriendlyFrom(originalFrom));
-            }
-          } catch (err) {
-            logger.error(err);
-          }
-        }
-
-        //
-        // 8) reverse SPF check and rewrite with friendly-from (DNS lookup)
-        //
-        if (!rewriteFriendlyFrom) {
-          const reverseSpf = await this.validateSPF(
-            // our server's current IP address
-            ipAddress,
-            // original from address
-            session.envelope.mailFrom.address,
-            // is to which exchange/FQDN without assuming it's the first
-            name
-          );
-
-          if (!['pass', 'neutral', 'none'].includes(reverseSpf)) {
-            rewriteFriendlyFrom = true;
-            if (headers.getFirst('reply-to') === '')
-              headers.update('Reply-To', originalFrom);
-            headers.update('From', this.rewriteFriendlyFrom(originalFrom));
-          }
-        }
-
-        //
-        // 9) rewrite message ID and lookup multiple recipients
-        //
-        let rewritten = false;
-
-        // TODO: message-id should be the same if the message gets retried
-        // that way duplicate messages sent in part due to failure will have
-        // the same re-created message id
-        const messageId = createMessageID(session);
-
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
             try {
@@ -677,22 +589,6 @@ class ForwardEmail {
 
               if (addresses === false)
                 return { address: to.address, addresses: [], ignored: true };
-
-              // if we already rewrote headers no need to continue
-              if (rewritten) return { address: to.address, addresses };
-
-              // Gmail won't show the message in the inbox if it's sending FROM
-              // the same address that gets forwarded TO using our service
-              // (we can assume that other mail providers do the same)
-              for (const address of addresses) {
-                if (rewritten) break;
-                const fromAddress = addressParser(originalFrom)[0].address;
-                if (address !== fromAddress) continue;
-                rewritten = true;
-                if (headers.getFirst('message-id') !== '')
-                  headers.update('In-Reply-To', headers.getFirst('message-id'));
-                headers.update('Message-ID', messageId);
-              }
 
               return { address: to.address, addresses };
             } catch (err) {
@@ -777,23 +673,16 @@ class ForwardEmail {
           );
         }
 
-        //
-        // 10) add our own DKIM signature and remove DKIM header (no bottleneck)
-        //
-
-        // remove existing signatures
-        headers.remove('dkim-signature');
-        headers.remove('x-google-dkim-signature');
-
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
         const raw = Buffer.concat([headers.build(), ...chunks]);
 
-        // set from address based if we had to do a friendly-from rewrite
-        const from = rewriteFriendlyFrom
-          ? this.config.noReply
-          : session.envelope.mailFrom.address;
+        // set from address using SRS
+        const from = this.srs.forward(
+          session.envelope.mailFrom.address,
+          this.config.srsDomain
+        );
 
         //
         // 11) send email
@@ -920,34 +809,6 @@ class ForwardEmail {
     } catch (err) {
       err.responseCode = 421;
       throw err;
-    }
-  }
-
-  async getDMARC(hostname) {
-    if (env.NODE_ENV === 'test') hostname = 'forwardemail.net';
-    const parsedDomain = parseDomain(hostname);
-    if (!parsedDomain) return false;
-    const entry = `_dmarc.${hostname}`;
-    try {
-      const records = await resolveTxtAsync(entry);
-      // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
-      if (!_.isArray(records) || _.isEmpty(records)) return false;
-      if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
-      // join together the record by space
-      return records[0].join(' ');
-    } catch (err) {
-      // recursively look up from subdomain to parent domain for record
-      if (_.isString(err.code) && err.code === 'ENOTFOUND') {
-        // no dmarc record exists so return `false`
-        if (!parsedDomain.subdomain) return false;
-        // otherwise attempt to lookup the parent domain's DMARC record instead
-        return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
-      }
-
-      logger.error(err);
-      // if there's an error then assume that we need to rewrite
-      // with a friendly-from, for whatever reason
-      return false;
     }
   }
 
