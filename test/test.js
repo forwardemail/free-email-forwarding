@@ -126,35 +126,6 @@ test('rejects forwarding a non-registered email address', async t => {
 });
 
 if (!isCI)
-  test('rewrites with friendly-from for failed DMARC validation', async t => {
-    // note that we have SPF but not DKIM on this email
-    // and DMARC for forwardemail.net requires BOTH to pass
-    const transporter = nodemailer.createTransport({
-      streamTransport: true
-    });
-    const { port } = t.context.forwardEmail.server.address();
-    const connection = new Client({ port, tls });
-    const info = await transporter.sendMail({
-      from: 'ForwardEmail <from@forwardemail.net>',
-      to: 'Niftylettuce <hello@niftylettuce.com>',
-      cc: 'cc@niftylettuce.com',
-      subject: 'test',
-      text: 'test text',
-      html: '<strong>test html</strong>',
-      attachments: []
-    });
-    return new Promise(resolve => {
-      connection.once('end', resolve);
-      connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
-          t.is(err, null);
-          connection.close();
-        });
-      });
-    });
-  });
-
-if (!isCI)
   test('forwards an email with DKIM and SPF', async t => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
@@ -405,7 +376,7 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: '"Doe, John" <john.doe@forwardemail.net>',
+      from: '"Doe, John" <john.doe@lipo.io>',
       to: 'Niftylettuce <hello@niftylettuce.com>',
       cc: 'cc@niftylettuce.com',
       subject: 'test',

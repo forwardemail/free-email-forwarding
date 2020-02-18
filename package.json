@@ -24,22 +24,21 @@
     "Nick Baugh <niftylettuce@gmail.com> (http://niftylettuce.com/)"
   ],
   "dependencies": {
-    "@ladjs/env": "^0.0.7",
+    "@ladjs/env": "^1.0.0",
     "@ladjs/graceful": "^1.0.0",
     "@ladjs/proxy": "^1.0.3",
     "@ladjs/redis": "^1.0.3",
     "@ladjs/shared-config": "^1.0.1",
     "array-join-conjunction": "^1.0.0",
-    "boolean": "^3.0.0",
+    "boolean": "^3.0.1",
     "bytes": "^3.1.0",
     "cabin": "^6.0.2",
     "common-tags": "^1.8.0",
-    "disposable-email-domains": "^1.0.51",
-    "dmarc-parse": "^1.0.2",
+    "disposable-email-domains": "^1.0.52",
     "dnsbl": "^3.2.0",
     "get-fqdn": "^0.0.4",
     "get-port": "^5.1.1",
-    "got": "^10.4.0",
+    "got": "^10.5.7",
     "ip": "^1.1.5",
     "is-string-and-not-blank": "^0.0.2",
     "lodash": "^4.17.15",
@@ -47,12 +46,12 @@
     "mailsplit": "^4.6.4",
     "ms": "^2.1.2",
     "nodemailer": "6.4.2",
-    "parse-domain": "^2.3.4",
     "pino": "^5.16.0",
     "punycode": "^2.1.1",
     "python-dkim-verify": "^1.0.1",
     "python-spfcheck2": "^1.0.2",
     "ratelimiter": "^3.4.0",
+    "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
     "smtp-server": "3.5.0",
     "validator": "^12.2.0"
@@ -61,7 +60,7 @@
     "@commitlint/cli": "^8.3.5",
     "@commitlint/config-conventional": "^8.3.4",
     "ava": "2.x",
-    "codecov": "^3.6.4",
+    "codecov": "^3.6.5",
     "cross-env": "6.x",
     "eslint": "^6.8.0",
     "eslint-config-xo-lass": "^1.0.3",
@@ -75,7 +74,7 @@
     "remark-preset-github": "^0.0.16",
     "shelljs": "^0.8.3",
     "uuid": "^3.4.0",
-    "xo": "^0.25.3"
+    "xo": "0.25"
   },
   "engines": {
     "node": ">=8.3"
