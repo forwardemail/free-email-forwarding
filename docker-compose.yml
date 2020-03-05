@@ -15,9 +15,9 @@ services:
       - EMAIL_SUPPORT=support@example.com
       - WEBSITE_URL=https://example.com
     ports:
-      - 25:3025
-      - 465:3465
-      - 587:3587
+      - 25:25
+      - 465:25
+      - 587:25
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt
       - ./dkim/:/app/dkim/

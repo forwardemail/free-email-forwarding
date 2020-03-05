@@ -1,33 +1,25 @@
 FROM node:lts-alpine
 
+ENV NODE_ENV production
+
 RUN \
-  apk update && \
   apk add --no-cache \
     python3 \
     && \
-  cp /usr/bin/python3 /usr/bin/python && \
-  pip3 install \
+  ln -s /usr/bin/python3 /usr/bin/python && \
+  pip3 install --no-cache-dir \
     pyspf \
     dnspython \
     dkimpy
 
 WORKDIR /app
 
-COPY package*.json ./
-COPY yarn.lock yarn.lock
+COPY package*.json yarn.lock ./
 
-RUN npm i -g pm2 && npx yarn --prod
+RUN npx yarn --prod
 
-COPY index.js index.js
-COPY app.js app.js
-COPY helpers/* ./helpers/
-COPY .env.* ./
-COPY ecosystem.json ecosystem.json
+COPY . .
 
-ENV NODE_ENV production
+EXPOSE 25 465 587
 
-EXPOSE 25
-EXPOSE 465
-EXPOSE 587
-
-CMD ["npm", "run", "start"]
+CMD ["node", "app.js"]
