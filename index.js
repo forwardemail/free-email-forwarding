@@ -20,7 +20,7 @@ const getFQDN = require('get-fqdn');
 const got = require('got');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
-const mailUtilities = require('mailin/lib/mailUtilities.js');
+// const mailUtilities = require('mailin/lib/mailUtilities.js');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
@@ -39,7 +39,18 @@ const { CustomError, MessageSplitter, env, logger } = require('./helpers');
 const lookupAsync = util.promisify(dns.lookup);
 const resolveTxtAsync = util.promisify(dns.resolveTxt);
 const resolveMxAsync = util.promisify(dns.resolveMx);
-const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
+// const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
+
+// omit ciphers according to hardenize
+// <https://www.hardenize.com/report/forwardemail.net/1585706984#email_tls>
+const OMITTED_CIPHERS = [
+  'TLS_RSA_WITH_AES_128_CBC_SHA',
+  'TLS_RSA_WITH_AES_128_CBC_SHA256',
+  'TLS_RSA_WITH_AES_128_GCM_SHA256',
+  'TLS_RSA_WITH_AES_256_CBC_SHA',
+  'TLS_RSA_WITH_AES_256_CBC_SHA256',
+  'TLS_RSA_WITH_AES_256_GCM_SHA384'
+];
 
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
@@ -147,13 +158,23 @@ class ForwardEmail {
       throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS');
 
     if (this.config.ssl) {
-      this.config.ssl.minVersion = 'TLSv1';
+      this.config.ssl.minVersion = 'TLSv1.2';
       this.config.ssl.ciphers = tls
         .getCiphers()
         .map(cipher => cipher.toUpperCase())
+        .filter(cipher => !OMITTED_CIPHERS.includes(cipher))
+        .concat(OMITTED_CIPHERS.map(cipher => `!${cipher}`))
         .join(':');
+
+      // <https://expeditedsecurity.com/blog/a-plus-node-js-ssl/>
+      this.config.ssl.honorCipherOrder = true;
+
+      // <https://tools.ietf.org/html/draft-ietf-tls-oldversions-deprecate-00#section-8>
       this.config.ssl.secureOptions =
-        crypto.constants.SSL_OP_NO_SSLv3 | crypto.constants.SSL_OP_NO_SSLv2;
+        crypto.constants.SSL_OP_NO_SSLv2 |
+        crypto.constants.SSL_OP_NO_SSLv3 |
+        crypto.constants.SSL_OP_NO_TLSv1 |
+        crypto.constants.SSL_OP_NO_TLSv11;
       delete this.config.ssl.allowHTTP1;
       if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
       else this.config.ssl.secure = true;
@@ -204,6 +225,7 @@ class ForwardEmail {
     this.processRecipient = this.processRecipient.bind(this);
     this.processAddress = this.processAddress.bind(this);
     this.sendEmail = this.sendEmail.bind(this);
+    this.rewriteFriendlyFrom = this.rewriteFriendlyFrom.bind(this);
     this.parseUsername = this.parseUsername.bind(this);
     this.parseFilter = this.parseFilter.bind(this);
     this.parseDomain = this.parseDomain.bind(this);
@@ -283,6 +305,14 @@ class ForwardEmail {
       name
     });
     return transporter.sendMail({ envelope, raw });
+  }
+
+  rewriteFriendlyFrom(from) {
+    // preserve user's name
+    const { address, name } = addressParser(from)[0];
+    if (!name || name.trim() === '')
+      return `"${address}" <${this.config.noReply}>`;
+    return `"${name}" <${this.config.noReply}>`;
   }
 
   parseUsername(address) {
@@ -468,12 +498,14 @@ class ForwardEmail {
       // 1) X if email file size exceeds the limit (no bottleneck)
       // 2) X ensure all email headers were parsed
       // 3) X prevent replies to no-reply@forwardemail.net (no bottleneck)
-      // 4) X check for spam (score must be < 5) (child process spam daemon)
+      // 4) O check for spam (score must be < 5) (child process spam daemon)
       // 5) X if SPF is valid (child process python)
       // 6) X check for DMARC compliance
-      // 7) X clean up recipients
-      // 8) X add our own DKIM signature and remove DKIM header (no bottleneck)
-      // 9) X send email
+      // 7) X conditionally rewrite with friendly from if DMARC were to fail
+      // 8) X clean up recipients
+      // 9) X add our own DKIM signature
+      // 10) X set from address using SRS
+      // 11) X send email
       //
       try {
         //
@@ -521,6 +553,13 @@ class ForwardEmail {
             'Your message is not RFC 5322 compliant, please include a valid "From" header.'
           );
 
+        // parse the from address and set a parsed reply-to if necessary
+        const fromAddress = addressParser(originalFrom)[0];
+        const replyTo =
+          fromAddress.name && fromAddress.name.trim() !== ''
+            ? `"${fromAddress.name}" <${fromAddress.address}>`
+            : fromAddress.address;
+
         // parse the domain of the RFC5322.From address
         const fromDomain = this.parseDomain(originalFrom);
         const parsedFromDomain = parseDomain(fromDomain);
@@ -536,6 +575,7 @@ class ForwardEmail {
         // // note that this package name is published with several key updates
         //
         // TODO: we may also want to add clamav for attachment scanning
+        /*
         let spamScore = 0;
         try {
           spamScore = await computeSpamScoreAsync(originalRaw);
@@ -548,6 +588,7 @@ class ForwardEmail {
             `Message detected as spam (spam score of ${spamScore} exceeds threshold of ${this.config.spamScoreThreshold})`,
             554
           );
+        */
 
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
@@ -784,6 +825,28 @@ class ForwardEmail {
 
               // if both DKIM and SPF fails then fail DMARC policy
               if (!hasPassingDKIM && !hasPassingSPF) dmarcPass = false;
+
+              //
+              // 7) conditionally rewrite with friendly from if DMARC were to fail
+              //
+              // we have to do this because if DKIM fails BUT SPF passes
+              // then when we forward the message along, the DMARC SPF check
+              // would fail on the FROM (e.g. message@netflix.com)
+              // and the new SPF check would be against @forwardemail.net due to SRS
+              // which would fail DMARC since the SPF check would be netflix.com versus forwardemail.net
+              //
+              if (!hasPassingDKIM && hasPassingSPF) {
+                //
+                // TODO: if the DKIM signature signs the Reply-To and the From
+                // then we will probably want to remove it since it won't be valid anymore
+                //
+                // TODO: have to investigate more if some mail clients/servers reject failing DKIM messages
+                //
+                if (headers.getFirst('reply-to') === '')
+                  headers.update('Reply-To', replyTo);
+                headers.update('From', this.rewriteFriendlyFrom(originalFrom));
+              }
+
               /* eslint-enable max-depth */
             }
           } catch (err) {
@@ -899,26 +962,22 @@ class ForwardEmail {
         }
 
         //
-        // 8) add our own DKIM signature and remove DKIM header (no bottleneck)
+        // 9) add our own DKIM signature
         //
-
-        // remove existing signatures
-        headers.remove('dkim-signature');
-        headers.remove('x-google-dkim-signature');
 
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
         const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
 
-        // set from address using SRS
+        // 10) set from address using SRS
         const from = this.srs.forward(
           session.envelope.mailFrom.address,
           this.config.srsDomain
         );
 
         //
-        // 9) send email
+        // 11) send email
         //
         try {
           const accepted = [];

@@ -43,7 +43,6 @@
     "ip": "^1.1.5",
     "is-string-and-not-blank": "^0.0.2",
     "lodash": "^4.17.15",
-    "mailin": "^3.0.4",
     "mailsplit": "^4.6.4",
     "ms": "^2.1.2",
     "nodemailer": "6.4.2",
