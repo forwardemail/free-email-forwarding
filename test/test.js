@@ -14,7 +14,7 @@ const isCI = require('is-ci');
 const nodemailer = require('nodemailer');
 const shell = require('shelljs');
 const test = require('ava');
-const uuid = require('uuid');
+const { v4 } = require('uuid');
 
 const lookupAsync = util.promisify(dns.lookup);
 
@@ -126,7 +126,7 @@ test('rejects forwarding a non-registered email address', async t => {
 });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF', async t => {
+  test('rejects an email with failing SPF', async t => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -141,6 +141,65 @@ if (!isCI)
       html: '<strong>test html</strong>',
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
+    });
+    return new Promise(resolve => {
+      connection.once('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          t.is(err.responseCode, 550);
+          t.regex(
+            err.message,
+            /The email you sent has failed SPF validation with a result of "fail"/
+          );
+          connection.close();
+        });
+      });
+    });
+  });
+
+if (!isCI)
+  test('forwards an email with DKIM and without SPF (no DMARC)', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      // NOTE: this is forwardMAIL.net not forwardEMAIL.net (I have registered both)
+      from: 'Example <from@forwardmail.net>',
+      to: 'Niftylettuce <hello@niftylettuce.com>',
+      subject: 'forwards an email with DKIM and without SPF (no DMARC)',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: [],
+      dkim: t.context.forwardEmail.config.dkim
+    });
+    return new Promise(resolve => {
+      connection.once('end', resolve);
+      connection.connect(() => {
+        connection.send(info.envelope, info.message, err => {
+          t.is(err, null);
+          connection.close();
+        });
+      });
+    });
+  });
+
+if (!isCI)
+  test('forwards an email without DKIM nor SPF (no DMARC)', async t => {
+    const transporter = nodemailer.createTransport({
+      streamTransport: true
+    });
+    const { port } = t.context.forwardEmail.server.address();
+    const connection = new Client({ port, tls });
+    const info = await transporter.sendMail({
+      // NOTE: this is forwardMAIL.net not forwardEMAIL.net (I have registered both)
+      from: 'Example <from@forwardmail.net>',
+      to: 'Niftylettuce <hello@niftylettuce.com>',
+      subject: 'forwards an email without DKIM nor SPF (no DMARC)',
+      text: 'test text',
+      html: '<strong>test html</strong>',
+      attachments: []
     });
     return new Promise(resolve => {
       connection.once('end', resolve);
@@ -462,7 +521,7 @@ test('rejects a file over the limit', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
-  const filePath = path.join(os.tmpdir(), uuid());
+  const filePath = path.join(os.tmpdir(), v4());
   const size = bytes('26mb');
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
