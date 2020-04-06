@@ -76,7 +76,7 @@
     "remark-preset-github": "^1.0.0",
     "shelljs": "^0.8.3",
     "uuid": "^7.0.3",
-    "xo": "0.27"
+    "xo": "0.25"
   },
   "engines": {
     "node": ">=8.3"
