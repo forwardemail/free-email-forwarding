@@ -5,6 +5,7 @@ const os = require('os');
 const tls = require('tls');
 const util = require('util');
 
+const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
@@ -12,6 +13,7 @@ const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
+const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
@@ -21,6 +23,7 @@ const isSANB = require('is-string-and-not-blank');
 const mailUtilities = require('mailin/lib/mailUtilities.js');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
+const parseDomain = require('parse-domain');
 const punycode = require('punycode/');
 const sharedConfig = require('@ladjs/shared-config');
 const spfCheck2 = require('python-spfcheck2');
@@ -165,6 +168,9 @@ class ForwardEmail {
       ...this.config.ssl
     };
 
+    // set up DKIM instance for signing messages
+    this.dkim = new DKIM(this.config.dkim);
+
     // initialize redis
     const client = new Redis(
       this.config.redis,
@@ -205,6 +211,7 @@ class ForwardEmail {
     this.checkBlacklists = this.checkBlacklists.bind(this);
     this.onData = this.onData.bind(this);
     this.validateSPF = this.validateSPF.bind(this);
+    this.getDMARC = this.getDMARC.bind(this);
     this.validateDKIM = this.validateDKIM.bind(this);
     this.validateMX = this.validateMX.bind(this);
     this.validateRateLimit = this.validateRateLimit.bind(this);
@@ -234,7 +241,7 @@ class ForwardEmail {
           host,
           name,
           envelope: {
-            from: this.srs.forward(from, this.parseDomain(to, false)),
+            from,
             to
           },
           raw
@@ -453,6 +460,7 @@ class ForwardEmail {
       stream.once('end', () => fn(err));
     });
 
+    // eslint-disable-next-line complexity
     messageSplitter.once('end', async () => {
       //
       // we need to check the following:
@@ -461,9 +469,11 @@ class ForwardEmail {
       // 2) X ensure all email headers were parsed
       // 3) X prevent replies to no-reply@forwardemail.net (no bottleneck)
       // 4) X check for spam (score must be < 5) (child process spam daemon)
-      // 5) X if DKIM signature passed and was valid (child process python)
-      // 6) X if SPF is valid (child process python)
-      // 7) X send email
+      // 5) X if SPF is valid (child process python)
+      // 6) X check for DMARC compliance
+      // 7) X clean up recipients
+      // 8) X add our own DKIM signature and remove DKIM header (no bottleneck)
+      // 9) X send email
       //
       try {
         //
@@ -511,6 +521,10 @@ class ForwardEmail {
             'Your message is not RFC 5322 compliant, please include a valid "From" header.'
           );
 
+        // parse the domain of the RFC5322.From address
+        const fromDomain = this.parseDomain(originalFrom);
+        const parsedFromDomain = parseDomain(fromDomain);
+
         // message body as a single Buffer (everything after the \r\n\r\n separator)
         originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
@@ -535,22 +549,6 @@ class ForwardEmail {
             554
           );
 
-        //
-        // 5) if DKIM signature passed and was valid
-        //
-        //
-        // if and only if there was a `dkim-signature` or `x-google-dkim-signature` header
-        //
-        const dkim =
-          headers.getFirst('dkim-signature') === ''
-            ? true
-            : await this.validateDKIM(originalRaw);
-
-        if (!dkim)
-          throw new CustomError(
-            'Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.'
-          );
-
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
@@ -563,18 +561,245 @@ class ForwardEmail {
         const name = await getFQDN(ipAddress);
 
         //
-        // 6) if SPF is valid
+        // 5) if SPF is valid
         //
         const spf = await this.validateSPF(
-          env.NODE_ENV === 'test' ? ipAddress : session.remoteAddress,
+          session.remoteAddress,
           session.envelope.mailFrom.address,
-          env.NODE_ENV === 'test' ? name : session.clientHostname
+          session.clientHostname
         );
         if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
           throw new CustomError(
             `The email you sent has failed SPF validation with a result of "${spf}"`
           );
 
+        //
+        // 6) check for DMARC compliance
+        //
+        // this section was written in accordance with "11.3.  Determine Handling Policy"
+        // <https://dmarc.org/draft-dmarc-base-00-01.html#receiver_policy>
+        //
+        // DMARC authentication pass =
+        // (SPF authentication pass AND SPF identifier alignment)
+        // OR (DKIM authentication pass AND DKIM identifier alignment)
+        //
+        // Note that our implementation doesn't abide by any percentage thresholds
+        // or send a DMARC report email to anyone at the moment
+        // (since we don't store logs we can't implement a threshold to begin with)
+        //
+        const dmarcRecord = await this.getDMARC(fromDomain);
+        let dmarcPass = true;
+        if (dmarcRecord) {
+          try {
+            const result = dmarcParse(dmarcRecord.record);
+            if (
+              !_.isObject(result) ||
+              !_.isObject(result.tags) ||
+              !_.isObject(result.tags.p) ||
+              !_.isString(result.tags.p.value)
+            )
+              throw new CustomError(
+                `Invalid DMARC parsed result for ${fromDomain}`
+              );
+
+            let quarantineOrReject = ['quarantine', 'reject'].includes(
+              result.tags.p.value
+            );
+
+            // if the sp value indicates that subdomains should not be quarantined or rejected then set to false
+            // dmarcRecord.hostname indicates the DMARC TXT hostname record found
+            // handle result.tags.sp IF it exists and if domain doesn't match
+            if (
+              dmarcRecord.hostname !== fromDomain &&
+              _.isObject(result.tags.sp) &&
+              _.isString(result.tags.sp.value) &&
+              result.tags.sp.value === 'none'
+            )
+              quarantineOrReject = false;
+
+            // if quarantine or reject
+            if (quarantineOrReject) {
+              /*
+              // <https://dmarc.org/draft-dmarc-base-00-01.html#dmarc_format>
+              adkim:
+              (plain-text; OPTIONAL, default is "r".) Indicates whether or not strict DKIM identifier alignment is required by the Domain Owner.
+              If and only if the value of the string is "s", strict mode is in use. See Section 4.2.1 for details.
+              aspf:
+              (plain-text; OPTIONAL, default is "r".) Indicates whether or not strict SPF identifier alignment is required by the Domain Owner.
+              If and only if the value of the string is "s", strict mode is in use. See Section 4.2.2 for details.
+
+              // <https://dmarc.org/draft-dmarc-base-00-01.html#id_alignment_element>
+              4.2.1.  DKIM-authenticated Identifiers
+              DMARC provides the option of applying DKIM in a strict mode or a relaxed mode {R2}.
+
+              In relaxed mode, the Organizational Domain of the [DKIM]-authenticated signing domain (taken from the value of the "d=" tag in the signature)
+              and that of the RFC5322.From domain must be equal. In strict mode, only an exact match is considered to produce identifier alignment.
+
+              To illustrate, in relaxed mode, if a validated DKIM signature successfully verifies with a "d=" domain of "example.com", and the RFC5322.From
+              domain is "alerts@news.example.com", the DKIM "d=" domain and the RFC5322.From domain are considered to be "in alignment". In strict mode, this test would fail.
+
+              However, a DKIM signature bearing a value of "d=com" would never allow an "in alignment" result as "com" should appear on all public suffix lists, and therefore cannot be an Organizational Domain.
+
+              Identifier alignment is required to prevent abuse by phishers that send DKIM-signed email using an arbitrary "d=" domain (such as a Cousin Domain) to pass authentication checks.
+
+              4.2.2.  SPF-authenticated Identifiers
+              DMARC provides the option of applying SPF in a strict mode or a relaxed mode {R2}.
+
+              In relaxed mode, the [SPF]-authenticated RFC5321.MailFrom (commonly called the "envelope sender") domain and RFC5322.From domain must match or share the same Organizational Domain.
+              The SPF-authenticated RFC5321.MailFrom domain may be a parent domain or child domain of the RFC5322.From domain. In strict mode, only an exact DNS domain match is considered to produce identifier alignment.
+
+              For example, if a message passes an SPF check with an RFC5321.MailFrom domain of "cbg.bounces.example.com", and the address portion of the RFC5322.From field
+              contains "payments@example.com", the Authenticated RFC5321.MailFrom domain identifier and the RFC5322.From domain are considered to be "in alignment" in relaxed mode, but not in strict mode.
+
+              For purposes of identifier alignment, in relaxed mode, Organizational Domains of RFC5321.MailFrom domains that are a parent domain of the RFC5322.From domain
+              are acceptable as many large organizations perform more efficient bounce processing by mapping the RFC5321.MailFrom domain to specific mailstreams.
+              */
+              let aspf = 'r';
+              /* eslint-disable max-depth */
+              if (
+                _.isObject(result.tags.aspf) &&
+                _.isString(result.tags.aspf.value)
+              )
+                aspf = result.tags.aspf.value;
+
+              // ensure SPF matches s or r
+              let hasPassingSPF = false;
+
+              // only test if SPF passed to begin with
+              if (spf === 'pass') {
+                const envelopeFromDomain = this.parseDomain(
+                  session.envelope.mailFrom.address
+                );
+                const parsedEnvelopeFromDomain = parseDomain(
+                  envelopeFromDomain
+                );
+
+                // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
+                if (
+                  aspf === 'r' &&
+                  parsedEnvelopeFromDomain.domain === parsedFromDomain.domain
+                ) {
+                  hasPassingSPF = true;
+                } else if (aspf === 's' && envelopeFromDomain === fromDomain) {
+                  // MAIL FROM envelope domain must match exactly FROM domain in strict mode
+                  hasPassingSPF = true;
+                }
+              }
+
+              //
+              // inspired by dmarc-parse
+              // <https://github.com/softvu/dmarc-parse/blob/master/index.js>
+              //
+              /*
+              What is the difference between the "Mail From" and "From Header", aren't they the same?
+              In email, like in real mail, there is the concept of an envelope containing the message.
+
+              The envelope will have three pieces of identification information, the host greeting, the "MAIL FROM:" return address and the "RCPT TO:" list of recipient addresses.
+              The message content comprises a set of header fields and a body. The body, in turn can be simple text or can be a structured, multi-media "MIME" object of attachments. The set of header fields can be quite extensive, but typically at least include: "Subject:" "Date:" the "To:" and "From:".
+              The "MAIL FROM" command specifies the address of the recipient for return notices if any problems occur with the delivery of the message, such as non-delivery notices.
+
+              The "From:" header field indicates who is the author of the message.
+
+              The technical notation for referring to components of email information is: RFC5321.MailFrom and RFC5322.
+              From according to the IETF RFCs where the field is defined and the specific field being referenced.
+
+              All this information can be spoofed. DMARC protects the domain name of the RFC5322:From field against spoofing.
+              */
+
+              // ensure DKIM matches s or r
+              /*
+              DKIM-Signature: v=1; a=rsa-sha256; d=example.com; s=news;
+              c=relaxed/relaxed; q=dns/txt; t=1126524832; x=1149015927;
+              h=from:to:subject:date:keywords:keywords;
+              bh=MHIzKDU2Nzf3MDEyNzR1Njc5OTAyMjM0MUY3ODlqBLP=;
+              b=hyjCnOfAKDdLZdKIc9G1q7LoDWlEniSbzc+yuU2zGrtruF00ldcF
+              VoG4WTHNiYwG
+              */
+              /*
+              > parseDomain('foobaz.beep.com')
+              { tld: 'com', domain: 'beep', subdomain: 'foobaz' }
+              > parseDomain('beep.com')
+              { tld: 'com', domain: 'beep', subdomain: '' }
+              */
+
+              // note that the dkim verify python function only verifies first
+              // dkim-signature header found, not all headers found
+              // (which will conflict with DMARC since DMARC can pass alignment for any DKIM signature)
+              // so we have to pass an index for each
+              //
+              // Note that a single email can contain multiple DKIM signatures, and it
+              // is considered to be a DMARC "pass" if any DKIM signature is aligned
+              // and verifies.
+              //
+              let hasPassingDKIM = false;
+
+              if (!hasPassingSPF) {
+                let adkim = 'r';
+                if (
+                  _.isObject(result.tags.adkim) &&
+                  _.isString(result.tags.adkim.value)
+                )
+                  adkim = result.tags.adkim.value;
+                const dkimSignatures = headers.get('dkim-signature');
+                for (const [i, dkimSignature] of dkimSignatures.entries()) {
+                  // eslint-disable-next-line no-await-in-loop
+                  const isValidDKIM = await this.validateDKIM(originalRaw, i);
+                  if (!isValidDKIM) continue;
+                  const dkimTerms = dkimSignature
+                    .split(/;/)
+                    .map(t => t.trim())
+                    .filter(x => x !== '');
+                  const dkimRules = dkimTerms.map(x =>
+                    x.split(/[=]/).map(p => p.trim())
+                  );
+                  for (const rule of dkimRules) {
+                    // term = d
+                    // value = example.com
+                    const [term, value] = rule;
+                    if (term !== 'd') continue;
+
+                    const dkimParsedDomain = parseDomain(value);
+
+                    // relaxed mode means the domain can be a subdomain
+                    if (
+                      adkim === 'r' &&
+                      dkimParsedDomain.domain === parsedFromDomain.domain
+                    ) {
+                      hasPassingDKIM = true;
+                      break;
+                    }
+
+                    // strict mode means the domain must be exact match
+                    if (adkim === 's' && value === fromDomain) {
+                      hasPassingDKIM = true;
+                      break;
+                    }
+
+                    break;
+                  }
+
+                  if (hasPassingDKIM) break;
+                }
+              }
+
+              // if both DKIM and SPF fails then fail DMARC policy
+              if (!hasPassingDKIM && !hasPassingSPF) dmarcPass = false;
+              /* eslint-enable max-depth */
+            }
+          } catch (err) {
+            logger.error(err);
+          }
+        }
+
+        // throw an error if dmarc did not pass
+        if (!dmarcPass)
+          throw new CustomError(
+            `Unauthenticated email from ${fromDomain} is not accepted due to domain's DMARC policy. See https://dmarc.org to learn more about the DMARC initiative.`
+          );
+
+        //
+        // 7) clean up recipients
+        //
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
             try {
@@ -673,10 +898,18 @@ class ForwardEmail {
           );
         }
 
+        //
+        // 8) add our own DKIM signature and remove DKIM header (no bottleneck)
+        //
+
+        // remove existing signatures
+        headers.remove('dkim-signature');
+        headers.remove('x-google-dkim-signature');
+
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
-        const raw = Buffer.concat([headers.build(), ...chunks]);
+        const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
 
         // set from address using SRS
         const from = this.srs.forward(
@@ -685,7 +918,7 @@ class ForwardEmail {
         );
 
         //
-        // 11) send email
+        // 9) send email
         //
         try {
           const accepted = [];
@@ -812,9 +1045,35 @@ class ForwardEmail {
     }
   }
 
-  async validateDKIM(raw) {
+  async getDMARC(hostname) {
+    // if (env.NODE_ENV === 'test') hostname = 'forwardemail.net';
+    const parsedDomain = parseDomain(hostname);
+    if (!parsedDomain) return false;
+    const entry = `_dmarc.${hostname}`;
     try {
-      const pass = await dkimVerify(raw);
+      const records = await resolveTxtAsync(entry);
+      // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
+      if (!_.isArray(records) || _.isEmpty(records)) return false;
+      if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
+      // join together the record by space
+      return { hostname, record: records[0].join(' ') };
+    } catch (err) {
+      // recursively look up from subdomain to parent domain for record
+      if (_.isString(err.code) && err.code === 'ENOTFOUND') {
+        // no dmarc record exists so return `false`
+        if (!parsedDomain.subdomain) return false;
+        // otherwise attempt to lookup the parent domain's DMARC record instead
+        return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
+      }
+
+      logger.error(err);
+      return false;
+    }
+  }
+
+  async validateDKIM(raw, index) {
+    try {
+      const pass = await dkimVerify(raw, index);
       return pass;
     } catch (err) {
       logger.error(err);
@@ -952,19 +1211,23 @@ class ForwardEmail {
           `Domain ${domain} has multiple verification TXT records of "${this.config.recordPrefix}-site-verification" and should only have one`
         );
       // if there was a verification record then perform lookup
-      const { body } = await got.get(
-        `${this.config.lookupEndpoint}?verification_record=${verifications[0]}`,
-        {
-          responseType: 'json',
-          username: this.config.lookupSecrets[0]
+      try {
+        const { body } = await got.get(
+          `${this.config.lookupEndpoint}?verification_record=${verifications[0]}`,
+          {
+            responseType: 'json',
+            username: this.config.lookupSecrets[0]
+          }
+        );
+        // body is an Array of records that are formatted like TXT records
+        if (Array.isArray(body)) {
+          // combine with any existing TXT records (ensures graceful DNS propagation)
+          for (const element of body) {
+            validRecords.push(element);
+          }
         }
-      );
-      // body is an Array of records that are formatted like TXT records
-      if (Array.isArray(body)) {
-        // combine with any existing TXT records (ensures graceful DNS propagation)
-        for (const element of body) {
-          validRecords.push(element);
-        }
+      } catch (err) {
+        logger.error(err);
       }
     }
 
