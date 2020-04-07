@@ -1275,16 +1275,15 @@ class ForwardEmail {
   // this returns either the reversed SRS address
   // or the address that was passed to this function
   checkSRS(address) {
-    if (/^SRS/i.test(address)) {
-      try {
-        const reversed = this.srs.reverse(session.envelope.mailFrom.address);
-        if (_.isNull(reversed))
-          throw new Error(`Invalid SRS reversed address for ${address}`);
-        return reversed;
-      } catch (err) {
-        logger.error(err);
-        return address;
-      }
+    if (!/^SRS/i.test(address)) return address;
+    try {
+      const reversed = this.srs.reverse(address);
+      if (_.isNull(reversed))
+        throw new Error(`Invalid SRS reversed address for ${address}`);
+      return reversed;
+    } catch (err) {
+      logger.error(err);
+      return address;
     }
   }
 
