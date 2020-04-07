@@ -35,25 +35,6 @@ You'll also need the following dependencies installed:
 
   > If you ever need to completely wipe rate-limiting records, run `redis-cli` and then type the command `FLUSHALL`
 
-* [SpamAssassin][] - this is used to scan emails for spam (if it is not installed/detected it will not be used)
-
-  * Ubuntu:
-
-    ```sh
-    sudo apt-get -y install spamassassin spamc python3 python3-pip
-    ```
-
-    > If you are using a `jessie` based version of Debian (e.g. Ubuntu 16.04+):
-
-    ```sh
-    systemctl enable spamassassin.service
-    ```
-
-    > This is due to the bug identified here: <https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=764438>
-    >
-    > You **must** follow the remainder of instructions here to enable it and setup automatic rule updating:
-    > <https://www.digitalocean.com/community/tutorials/how-to-install-and-setup-spamassassin-on-ubuntu-12-04>
-
 * [ufw][] - recommended for security on Ubuntu server
 
   * Ubuntu:
@@ -165,7 +146,7 @@ See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more ins
 [Business Source License 1.1](LICENSE) © [Niftylettuce, LLC.](https://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 
@@ -182,8 +163,6 @@ See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more ins
 [ufw]: https://help.ubuntu.com/community/UFW
 
 [pm2]: https://github.com/Unitech/pm2
-
-[spamassassin]: https://spamassassin.apache.org/
 
 [authbind]: https://en.wikipedia.org/wiki/Authbind
 

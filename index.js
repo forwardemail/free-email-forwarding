@@ -166,8 +166,9 @@ class ForwardEmail {
         .concat(OMITTED_CIPHERS.map(cipher => `!${cipher}`))
         .join(':');
 
+      // NOTE: when turning this on hardenize reported not many certs available
       // <https://expeditedsecurity.com/blog/a-plus-node-js-ssl/>
-      this.config.ssl.honorCipherOrder = true;
+      // this.config.ssl.honorCipherOrder = true;
 
       // <https://tools.ietf.org/html/draft-ietf-tls-oldversions-deprecate-00#section-8>
       this.config.ssl.secureOptions =
@@ -239,6 +240,7 @@ class ForwardEmail {
     this.validateRateLimit = this.validateRateLimit.bind(this);
     this.isBlacklisted = this.isBlacklisted.bind(this);
     this.isDisposable = this.isDisposable.bind(this);
+    this.checkSRS = this.checkSRS.bind(this);
     this.onMailFrom = this.onMailFrom.bind(this);
     this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
     this.onRcptTo = this.onRcptTo.bind(this);
@@ -497,15 +499,16 @@ class ForwardEmail {
       //
       // 1) X if email file size exceeds the limit (no bottleneck)
       // 2) X ensure all email headers were parsed
-      // 3) X prevent replies to no-reply@forwardemail.net (no bottleneck)
-      // 4) O check for spam (score must be < 5) (child process spam daemon)
-      // 5) X if SPF is valid (child process python)
-      // 6) X check for DMARC compliance
-      // 7) X conditionally rewrite with friendly from if DMARC were to fail
-      // 8) X clean up recipients
-      // 9) X add our own DKIM signature
-      // 10) X set from address using SRS
-      // 11) X send email
+      // 3) X reverse SRS bounces
+      // 4) X prevent replies to no-reply@forwardemail.net (no bottleneck)
+      // 5) O check for spam (score must be < 5) (child process spam daemon)
+      // 6) X if SPF is valid (child process python)
+      // 7) X check for DMARC compliance
+      // 8) X conditionally rewrite with friendly from if DMARC were to fail
+      // 9) X clean up recipients
+      // 10) X add our own DKIM signature
+      // 11) X set from address using SRS
+      // 12) X send email
       //
       try {
         //
@@ -529,7 +532,40 @@ class ForwardEmail {
           );
 
         //
-        // 3) prevent replies to no-reply@forwardemail.net
+        // store variables for use later
+        //
+        // headers object (includes the \r\n\r\n header and body separator)
+        const { headers } = messageSplitter;
+
+        //
+        // 3) reverse SRS bounces
+        //
+
+        /*
+        // check envelope from
+        session.envelope.mailFrom.address = this.checkSRS(
+          session.envelope.mailFrom.address
+        );
+
+        // check "To:" header
+        const originalTo = headers.getFirst('to');
+        if (!originalTo)
+          throw new CustomError(
+            'Your message is not RFC 5322 compliant, please include a valid "To" header.'
+          );
+        headers.update('to', this.checkSRS(originalTo));
+        */
+
+        //
+        // rewrite envelope rcpt to
+        //
+        session.envelope.rcptTo = session.envelope.rcptTo.map(to => ({
+          ...to,
+          address: this.checkSRS(to.address)
+        }));
+
+        //
+        // 4) prevent replies to no-reply@forwardemail.net
         //
         if (
           _.every(
@@ -540,12 +576,6 @@ class ForwardEmail {
           throw new CustomError(
             oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
           );
-
-        //
-        // store variables for use later
-        //
-        // headers object (includes the \r\n\r\n header and body separator)
-        const { headers } = messageSplitter;
         const originalFrom = headers.getFirst('from');
 
         if (!originalFrom)
@@ -568,7 +598,7 @@ class ForwardEmail {
         originalRaw = Buffer.concat([headers.build(), ...chunks]);
 
         //
-        // 4) check for spam (score must be < 5)
+        // 5) check for spam (score must be < 5)
         //
         // TODO: we need to replace the spam block below with implementation
         // // of `pdf-spamc-stream` from https://github.com/streamtOtO/spamc-stream
@@ -602,7 +632,7 @@ class ForwardEmail {
         const name = await getFQDN(ipAddress);
 
         //
-        // 5) if SPF is valid
+        // 6) if SPF is valid
         //
         const spf = await this.validateSPF(
           session.remoteAddress,
@@ -615,7 +645,7 @@ class ForwardEmail {
           );
 
         //
-        // 6) check for DMARC compliance
+        // 7) check for DMARC compliance
         //
         // this section was written in accordance with "11.3.  Determine Handling Policy"
         // <https://dmarc.org/draft-dmarc-base-00-01.html#receiver_policy>
@@ -782,6 +812,7 @@ class ForwardEmail {
                 )
                   adkim = result.tags.adkim.value;
                 const dkimSignatures = headers.get('dkim-signature');
+                // const updatedTo = headers.getFirst('to') !== originalTo;
                 for (const [i, dkimSignature] of dkimSignatures.entries()) {
                   // eslint-disable-next-line no-await-in-loop
                   const isValidDKIM = await this.validateDKIM(originalRaw, i);
@@ -797,6 +828,25 @@ class ForwardEmail {
                     // term = d
                     // value = example.com
                     const [term, value] = rule;
+
+                    /*
+                    // if we wrote the original "To:" header
+                    // and the DKIM-Signature signs the "To:" header
+                    // then we should consider this to be a failing signature
+                    // since the server we're forwarding to will fail this
+                    // as it will fail the DKIM test with them
+                    if (term === 'h' && updatedTo) {
+                      const isToSigned = value
+                        .split(':')
+                        .some(h => h.trim().toLowerCase() === 'to');
+                      if (isToSigned) {
+                        // in case "d" rule was already checked and passed
+                        hasPassingDKIM = false;
+                        break;
+                      }
+                    }
+                    */
+
                     if (term !== 'd') continue;
 
                     const dkimParsedDomain = parseDomain(value);
@@ -827,7 +877,7 @@ class ForwardEmail {
               if (!hasPassingDKIM && !hasPassingSPF) dmarcPass = false;
 
               //
-              // 7) conditionally rewrite with friendly from if DMARC were to fail
+              // 8) conditionally rewrite with friendly from if DMARC were to fail
               //
               // we have to do this because if DKIM fails BUT SPF passes
               // then when we forward the message along, the DMARC SPF check
@@ -843,8 +893,8 @@ class ForwardEmail {
                 // TODO: have to investigate more if some mail clients/servers reject failing DKIM messages
                 //
                 if (headers.getFirst('reply-to') === '')
-                  headers.update('Reply-To', replyTo);
-                headers.update('From', this.rewriteFriendlyFrom(originalFrom));
+                  headers.update('reply-to', replyTo);
+                headers.update('from', this.rewriteFriendlyFrom(originalFrom));
               }
 
               /* eslint-enable max-depth */
@@ -861,7 +911,7 @@ class ForwardEmail {
           );
 
         //
-        // 7) clean up recipients
+        // 9) clean up recipients
         //
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
@@ -962,7 +1012,7 @@ class ForwardEmail {
         }
 
         //
-        // 9) add our own DKIM signature
+        // 10) add our own DKIM signature
         //
 
         // join headers object and body into a full rfc822 formatted email
@@ -970,14 +1020,14 @@ class ForwardEmail {
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
         const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
 
-        // 10) set from address using SRS
+        // 11) set from address using SRS
         const from = this.srs.forward(
           session.envelope.mailFrom.address,
           this.config.srsDomain
         );
 
         //
-        // 11) send email
+        // 12) send email
         //
         try {
           const accepted = [];
@@ -1222,6 +1272,22 @@ class ForwardEmail {
     return false;
   }
 
+  // this returns either the reversed SRS address
+  // or the address that was passed to this function
+  checkSRS(address) {
+    if (/^SRS/i.test(address)) {
+      try {
+        const reversed = this.srs.reverse(session.envelope.mailFrom.address);
+        if (_.isNull(reversed))
+          throw new Error(`Invalid SRS reversed address for ${address}`);
+        return reversed;
+      } catch (err) {
+        logger.error(err);
+        return address;
+      }
+    }
+  }
+
   async onMailFrom(address, session, fn) {
     try {
       await Promise.all([
@@ -1462,6 +1528,9 @@ class ForwardEmail {
 
   async onRcptTo(address, session, fn) {
     try {
+      // attempt reverse SRS here
+      address.address = this.checkSRS(address.address);
+
       // validate forwarding address by looking up TXT record `forward-email=`
       await this.getForwardingAddresses(address.address);
 
