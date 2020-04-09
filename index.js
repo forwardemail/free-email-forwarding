@@ -41,16 +41,32 @@ const resolveTxtAsync = util.promisify(dns.resolveTxt);
 const resolveMxAsync = util.promisify(dns.resolveMx);
 // const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
 
+//
 // omit ciphers according to hardenize
 // <https://www.hardenize.com/report/forwardemail.net/1585706984#email_tls>
+//
+// Special thanks to Fedor Indutny <https://github.com/indutny> for their help with TLS configuration
+//
+// The mapping to Node.js cipher names is slightly different so this list is manually curated
+//
 const OMITTED_CIPHERS = [
-  'TLS_RSA_WITH_AES_128_CBC_SHA',
-  'TLS_RSA_WITH_AES_128_CBC_SHA256',
-  'TLS_RSA_WITH_AES_128_GCM_SHA256',
-  'TLS_RSA_WITH_AES_256_CBC_SHA',
-  'TLS_RSA_WITH_AES_256_CBC_SHA256',
-  'TLS_RSA_WITH_AES_256_GCM_SHA384'
+  // TLS_RSA_WITH_AES_128_CBC_SHA
+  'aes128-sha',
+  // TLS_RSA_WITH_AES_128_CBC_SHA256
+  'aes128-sha256',
+  // TLS_RSA_WITH_AES_128_GCM_SHA256
+  'tls_aes_128_gcm_sha256',
+  // TLS_RSA_WITH_AES_256_CBC_SHA
+  'aes256-sha',
+  // TLS_RSA_WITH_AES_256_CBC_SHA256
+  'aes256-sha256',
+  // TLS_RSA_WITH_AES_256_GCM_SHA384
+  'tls_aes_256_gcm_sha384'
 ];
+
+const CIPHERS = `${tls.DEFAULT_CIPHERS}:${OMITTED_CIPHERS.map(
+  cipher => `!${cipher.toUpperCase()}`
+).join(':')}`;
 
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
@@ -159,16 +175,12 @@ class ForwardEmail {
 
     if (this.config.ssl) {
       this.config.ssl.minVersion = 'TLSv1.2';
-      this.config.ssl.ciphers = tls
-        .getCiphers()
-        .map(cipher => cipher.toUpperCase())
-        .filter(cipher => !OMITTED_CIPHERS.includes(cipher))
-        .concat(OMITTED_CIPHERS.map(cipher => `!${cipher}`))
-        .join(':');
-
-      // NOTE: when turning this on hardenize reported not many certs available
+      this.config.ssl.ciphers = CIPHERS;
+      //
+      // should be automatic per `tls.createServer()` but just in case
       // <https://expeditedsecurity.com/blog/a-plus-node-js-ssl/>
-      // this.config.ssl.honorCipherOrder = true;
+      //
+      this.config.ssl.honorCipherOrder = true;
 
       // <https://tools.ietf.org/html/draft-ietf-tls-oldversions-deprecate-00#section-8>
       this.config.ssl.secureOptions =
