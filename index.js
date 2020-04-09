@@ -55,13 +55,13 @@ const OMITTED_CIPHERS = [
   // TLS_RSA_WITH_AES_128_CBC_SHA256
   'aes128-sha256',
   // TLS_RSA_WITH_AES_128_GCM_SHA256
-  'tls_aes_128_gcm_sha256',
+  'aes128-gcm-sha256',
   // TLS_RSA_WITH_AES_256_CBC_SHA
   'aes256-sha',
   // TLS_RSA_WITH_AES_256_CBC_SHA256
   'aes256-sha256',
   // TLS_RSA_WITH_AES_256_GCM_SHA384
-  'tls_aes_256_gcm_sha384'
+  'aes128-gcm-sha384'
 ];
 
 const CIPHERS = `${tls.DEFAULT_CIPHERS}:${OMITTED_CIPHERS.map(
@@ -118,7 +118,7 @@ class ForwardEmail {
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
         logInfo: !env.IS_SILENT,
-        logger,
+        logger: !env.IS_SILENT, // doesn't seem to be bunyan compatible
         ...config.smtp
       },
       spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
