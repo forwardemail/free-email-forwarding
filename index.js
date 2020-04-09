@@ -34,7 +34,13 @@ const { SRS } = require('sender-rewriting-scheme');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 
-const { CustomError, MessageSplitter, env, logger } = require('./helpers');
+const {
+  CustomError,
+  MessageSplitter,
+  createMessageID,
+  env,
+  logger
+} = require('./helpers');
 
 const lookupAsync = util.promisify(dns.lookup);
 const resolveTxtAsync = util.promisify(dns.resolveTxt);
@@ -553,7 +559,7 @@ class ForwardEmail {
       // 6) X if SPF is valid (child process python)
       // 7) X check for DMARC compliance
       // 8) X conditionally rewrite with friendly from if DMARC were to fail
-      // 9) X clean up recipients
+      // 9) X rewrite message ID and lookup multiple recipients
       // 10) X add our own DKIM signature
       // 11) X set from address using SRS
       // 12) X send email
@@ -959,8 +965,9 @@ class ForwardEmail {
           );
 
         //
-        // 9) clean up recipients
+        // 9) rewrite message ID and lookup multiple recipients
         //
+        let rewritten = false;
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
             try {
@@ -975,6 +982,22 @@ class ForwardEmail {
 
               if (addresses === false)
                 return { address: to.address, addresses: [], ignored: true };
+
+              // if we already rewrote headers no need to continue
+              if (rewritten) return { address: to.address, addresses };
+
+              // Gmail won't show the message in the inbox if it's sending FROM
+              // the same address that gets forwarded TO using our service
+              // (we can assume that other mail providers do the same)
+              for (const address of addresses) {
+                if (rewritten) break;
+                const fromAddress = addressParser(originalFrom)[0].address;
+                if (address !== fromAddress) continue;
+                rewritten = true;
+                if (headers.getFirst('message-id') !== '')
+                  headers.update('in-reply-to', headers.getFirst('message-id'));
+                headers.update('message-id', createMessageID(session));
+              }
 
               return { address: to.address, addresses };
             } catch (err) {
