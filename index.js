@@ -182,6 +182,14 @@ class ForwardEmail {
       //
       this.config.ssl.honorCipherOrder = true;
 
+      //
+      // perfect forward secrecy with tls requires `dhparam`
+      // https://nodejs.org/api/tls.html#tls_perfect_forward_secrecy
+      // `openssl dhparam -outform PEM -out dhparam.pem 2048`
+      //
+      if (isSANB(env.DHPARAM_KEY_PATH))
+        this.config.ssl.dhparam = fs.readFileSync(env.DHPARAM_KEY_PATH, 'utf8');
+
       // <https://tools.ietf.org/html/draft-ietf-tls-oldversions-deprecate-00#section-8>
       this.config.ssl.secureOptions =
         crypto.constants.SSL_OP_NO_SSLv2 |
