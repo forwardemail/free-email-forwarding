@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
-const tls = require('tls');
+// const tls = require('tls');
 const util = require('util');
 
 const DKIM = require('nodemailer/lib/dkim');
@@ -41,6 +41,7 @@ const resolveTxtAsync = util.promisify(dns.resolveTxt);
 const resolveMxAsync = util.promisify(dns.resolveMx);
 // const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
 
+/*
 //
 // omit ciphers according to hardenize
 // <https://www.hardenize.com/report/forwardemail.net/1585706984#email_tls>
@@ -67,6 +68,33 @@ const OMITTED_CIPHERS = [
 const CIPHERS = `${tls.DEFAULT_CIPHERS}:${OMITTED_CIPHERS.map(
   cipher => `!${cipher.toUpperCase()}`
 ).join(':')}`;
+*/
+
+// From Fedor:
+const CIPHERS = [
+  'ECDHE-RSA-CHACHA20-POLY1305',
+  'ECDHE-RSA-AES256-GCM-SHA384',
+  'DHE-RSA-AES256-GCM-SHA384',
+  'ECDHE-RSA-AES128-GCM-SHA256',
+  'DHE-RSA-AES128-GCM-SHA256',
+  'ECDHE-RSA-AES256-SHA384',
+  'ECDHE-RSA-AES128-SHA256',
+  'DHE-RSA-AES256-SHA256',
+  'DHE-RSA-AES128-SHA256',
+  'DHE-RSA-CHACHA20-POLY1305',
+  'AES256-GCM-SHA384',
+  'AES128-GCM-SHA256',
+  'AES256-SHA256',
+  'AES128-SHA256',
+
+  // SHA128 is lame
+  'ECDHE-RSA-AES256-SHA',
+  'ECDHE-RSA-AES128-SHA',
+  'DHE-RSA-AES256-SHA',
+  'DHE-RSA-AES128-SHA',
+  'AES256-SHA',
+  'AES128-SHA'
+].join(':');
 
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
