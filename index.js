@@ -941,14 +941,15 @@ class ForwardEmail {
               //
               if (!hasPassingDKIM && hasPassingSPF) {
                 //
-                // TODO: if the DKIM signature signs the Reply-To and the From
+                // if the DKIM signature signs the Reply-To and the From
                 // then we will probably want to remove it since it won't be valid anymore
-                //
-                // TODO: have to investigate more if some mail clients/servers reject failing DKIM messages
                 //
                 if (headers.getFirst('reply-to') === '')
                   headers.update('reply-to', replyTo);
                 headers.update('from', this.rewriteFriendlyFrom(originalFrom));
+                // delete dkim signatures
+                headers.remove('dkim-signature');
+                headers.remove('x-google-dkim-signature');
               }
 
               /* eslint-enable max-depth */
