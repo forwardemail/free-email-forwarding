@@ -28,13 +28,13 @@
     "@ladjs/graceful": "^1.0.0",
     "@ladjs/proxy": "^1.0.3",
     "@ladjs/redis": "^1.0.3",
-    "@ladjs/shared-config": "^1.0.1",
+    "@ladjs/shared-config": "^1.0.5",
     "array-join-conjunction": "^1.0.0",
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
-    "cabin": "^6.1.0",
+    "cabin": "^6.1.1",
     "common-tags": "^1.8.0",
-    "disposable-email-domains": "^1.0.53",
+    "disposable-email-domains": "^1.0.54",
     "dmarc-parse": "^1.1.0",
     "dnsbl": "^3.2.0",
     "get-fqdn": "^0.0.4",
@@ -47,7 +47,7 @@
     "ms": "^2.1.2",
     "nodemailer": "6.4.2",
     "parse-domain": "^2.3.4",
-    "pino": "^6.0.0",
+    "pino": "^6.2.0",
     "punycode": "^2.1.1",
     "python-dkim-verify": "^1.0.2",
     "python-spfcheck2": "^1.0.3",
@@ -67,10 +67,10 @@
     "eslint-config-xo-lass": "^1.0.3",
     "fixpack": "^3.0.6",
     "husky": "3.x",
-    "ioredis": "^4.16.1",
+    "ioredis": "^4.16.2",
     "is-ci": "^2.0.0",
-    "lint-staged": "^10.1.1",
-    "nyc": "^15.0.0",
+    "lint-staged": "^10.1.5",
+    "nyc": "^15.0.1",
     "remark-cli": "^8.0.0",
     "remark-preset-github": "^1.0.0",
     "shelljs": "^0.8.3",
@@ -110,20 +110,6 @@
     "source"
   ],
   "license": "Business Source License 1.1",
-  "lint-staged": {
-    "*.js": [
-      "xo --fix",
-      "git add"
-    ],
-    "*.md": [
-      "remark . -qfo",
-      "git add"
-    ],
-    "package.json": [
-      "fixpack",
-      "git add"
-    ]
-  },
   "main": "index.js",
   "prettier": {
     "singleQuote": true,

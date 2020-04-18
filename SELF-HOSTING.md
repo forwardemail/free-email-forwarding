@@ -146,7 +146,7 @@ See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more ins
 [Business Source License 1.1](LICENSE) © [Niftylettuce, LLC.](https://niftylettuce.com/)
 
 
-##
+## 
 
 [npm]: https://www.npmjs.com/
 
