@@ -298,6 +298,9 @@ class ForwardEmail {
     this.onMailFrom = this.onMailFrom.bind(this);
     this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
     this.onRcptTo = this.onRcptTo.bind(this);
+    this.conditionallyRemoveSignatures = this.conditionallyRemoveSignatures.bind(
+      this
+    );
   }
 
   async listen(port) {
@@ -590,6 +593,9 @@ class ForwardEmail {
         //
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
+        const messageId = headers.getFirst('message-id');
+        const replyTo = headers.getFirst('reply-to');
+        const inReplyTo = headers.getFirst('in-reply-to');
 
         //
         // 3) reverse SRS bounces
@@ -636,13 +642,6 @@ class ForwardEmail {
           throw new CustomError(
             'Your message is not RFC 5322 compliant, please include a valid "From" header.'
           );
-
-        // parse the from address and set a parsed reply-to if necessary
-        const fromAddress = addressParser(originalFrom)[0];
-        const replyTo =
-          fromAddress.name && fromAddress.name.trim() !== ''
-            ? `"${fromAddress.name}" <${fromAddress.address}>`
-            : fromAddress.address;
 
         // parse the domain of the RFC5322.From address
         const fromDomain = this.parseDomain(originalFrom);
@@ -727,6 +726,8 @@ class ForwardEmail {
                 `Invalid DMARC parsed result for ${fromDomain}`
               );
 
+            // TODO: we shouldn't completely reject if it was quarantine
+            // instead we should just add a spam header or something
             let quarantineOrReject = ['quarantine', 'reject'].includes(
               result.tags.p.value
             );
@@ -865,64 +866,41 @@ class ForwardEmail {
                   _.isString(result.tags.adkim.value)
                 )
                   adkim = result.tags.adkim.value;
-                const dkimSignatures = headers.get('dkim-signature');
+                const signatures = headers.get('dkim-signature');
                 // const updatedTo = headers.getFirst('to') !== originalTo;
-                for (const [i, dkimSignature] of dkimSignatures.entries()) {
+                for (const [i, signature] of signatures.entries()) {
                   // eslint-disable-next-line no-await-in-loop
                   const isValidDKIM = await this.validateDKIM(originalRaw, i);
                   if (!isValidDKIM) continue;
-                  const dkimTerms = dkimSignature
+                  const terms = signature
                     .split(/;/)
                     .map(t => t.trim())
-                    .filter(x => x !== '');
-                  const dkimRules = dkimTerms.map(x =>
-                    x.split(/[=]/).map(p => p.trim())
+                    .filter(t => t !== '');
+                  const rules = terms.map(t =>
+                    t.split(/[=]/).map(r => r.trim())
                   );
-                  for (const rule of dkimRules) {
+                  for (const rule of rules) {
                     // term = d
                     // value = example.com
                     const [term, value] = rule;
 
-                    /*
-                    // if we wrote the original "To:" header
-                    // and the DKIM-Signature signs the "To:" header
-                    // then we should consider this to be a failing signature
-                    // since the server we're forwarding to will fail this
-                    // as it will fail the DKIM test with them
-                    if (term === 'h' && updatedTo) {
-                      const isToSigned = value
-                        .split(':')
-                        .some(h => h.trim().toLowerCase() === 'to');
-                      if (isToSigned) {
-                        // in case "d" rule was already checked and passed
-                        hasPassingDKIM = false;
-                        break;
-                      }
-                    }
-                    */
-
                     if (term !== 'd') continue;
-
                     const dkimParsedDomain = parseDomain(value);
 
                     // relaxed mode means the domain can be a subdomain
+                    // strict mode means the domain must be exact match
                     if (
-                      adkim === 'r' &&
-                      dkimParsedDomain.domain === parsedFromDomain.domain
+                      (adkim === 'r' &&
+                        dkimParsedDomain.domain === parsedFromDomain.domain) ||
+                      (adkim === 's' && value === fromDomain)
                     ) {
                       hasPassingDKIM = true;
                       break;
                     }
-
-                    // strict mode means the domain must be exact match
-                    if (adkim === 's' && value === fromDomain) {
-                      hasPassingDKIM = true;
-                      break;
-                    }
-
-                    break;
                   }
 
+                  // if at least one signature passes DKIM then it
+                  // is to be considered passing DKIM check for DMARC
                   if (hasPassingDKIM) break;
                 }
               }
@@ -944,12 +922,20 @@ class ForwardEmail {
                 // if the DKIM signature signs the Reply-To and the From
                 // then we will probably want to remove it since it won't be valid anymore
                 //
-                if (headers.getFirst('reply-to') === '')
-                  headers.update('reply-to', replyTo);
+                const changes = ['from', 'x-original-from'];
                 headers.update('from', this.rewriteFriendlyFrom(originalFrom));
-                // delete dkim signatures
-                headers.remove('dkim-signature');
-                headers.remove('x-google-dkim-signature');
+                headers.update('x-original-from', originalFrom);
+                //
+                // if there was an original reply-to on the email
+                // then we don't want to modify it of course
+                //
+                if (!replyTo) {
+                  changes.push('reply-to');
+                  headers.update('reply-to', originalFrom);
+                }
+
+                // conditionally remove signatures necessary
+                this.conditionallyRemoveSignatures(headers, changes);
               }
 
               /* eslint-enable max-depth */
@@ -987,7 +973,6 @@ class ForwardEmail {
               // if we already rewrote headers no need to continue
               if (rewritten) return { address: to.address, addresses };
 
-              // Gmail won't show the message in the inbox if it's sending FROM
               // the same address that gets forwarded TO using our service
               // (we can assume that other mail providers do the same)
               for (const address of addresses) {
@@ -995,9 +980,26 @@ class ForwardEmail {
                 const fromAddress = addressParser(originalFrom)[0].address;
                 if (address !== fromAddress) continue;
                 rewritten = true;
-                if (headers.getFirst('message-id') !== '')
-                  headers.update('in-reply-to', headers.getFirst('message-id'));
-                headers.update('message-id', createMessageID(session));
+
+                //
+                // if there was no message id then we don't need to add one
+                // otherwise if there was one, then we need to consider dkim
+                // and any passing signatures had had a changed header
+                // need removed (we keep track of changed headers below)
+                //
+                if (messageId) {
+                  const changes = ['message-id', 'x-original-message-id'];
+                  headers.update('message-id', createMessageID(session));
+                  headers.update('x-original-message-id', messageId);
+                  // don't modify the reply-to if it was already set
+                  if (!inReplyTo) {
+                    changes.push('in-reply-to');
+                    headers.update('in-reply-to', messageId);
+                  }
+
+                  // conditionally remove signatures necessary
+                  this.conditionallyRemoveSignatures(headers, changes);
+                }
               }
 
               return { address: to.address, addresses };
@@ -1621,6 +1623,62 @@ class ForwardEmail {
       );
     } catch (err) {
       fn(err);
+    }
+  }
+
+  conditionallyRemoveSignatures(headers, changes) {
+    //
+    // Note that we always remove the "X-Google-DKIM-Signature" header
+    // if there is at least one change passed, as I believe that
+    // Google wil flag this as spam and result in a 421 connection timeout
+    // if it is not removed otherwise, and there was a rewrite done
+    //
+    // Return early if no changes
+    if (changes.length === 0) return;
+
+    // Always remove X-Google-DKIM-Signature
+    headers.remove('x-google-dkim-signature');
+
+    //
+    // Right now it's not easy to delete a header by its index
+    // therefore I filed a GitHub issue with mailsplit package for this
+    //
+    // <https://github.com/andris9/mailsplit/issues/8>
+    //
+    // So our alternative is to just delete all the DKIM signatures
+    // and then add them back at the end of the header lines (length + 1)
+    // so that the `headers.add` method will call `lines.push`
+    // <https://github.com/andris9/mailsplit/blob/master/lib/headers.js#L107>
+    //
+
+    // Get all signatures as an Array
+    const signatures = headers.get('dkim-signature');
+
+    // Remove all DKIM-Signatures (we add back the ones that are not affected)
+    headers.remove('dkim-signature');
+
+    // Note that we don't validate the signature, we just check its headers
+    // And we don't specifically because `this.validateDKIM` could throw error
+    for (const signature of signatures) {
+      const terms = signature
+        .split(/;/)
+        .map(t => t.trim())
+        .filter(t => t !== '');
+      const rules = terms.map(t => t.split(/[=]/).map(r => r.trim()));
+      for (const rule of rules) {
+        // term = d
+        // value = example.com
+        //
+        const [term, value] = rule;
+        if (term !== 'h') continue;
+        const signedHeaders = value
+          .split(':')
+          .map(h => h.trim().toLowerCase())
+          .filter(h => h !== '');
+        if (signedHeaders.length === 0) continue;
+        if (signedHeaders.every(h => !changes.includes(h)))
+          headers.add('dkim-signature', signature, headers.lines.length + 1);
+      }
     }
   }
 }
