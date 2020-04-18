@@ -713,6 +713,7 @@ class ForwardEmail {
         //
         const dmarcRecord = await this.getDMARC(fromDomain);
         let dmarcPass = true;
+        let reject = false;
         if (dmarcRecord) {
           try {
             const result = dmarcParse(dmarcRecord.record);
@@ -726,11 +727,9 @@ class ForwardEmail {
                 `Invalid DMARC parsed result for ${fromDomain}`
               );
 
-            // TODO: we shouldn't completely reject if it was quarantine
+            // we shouldn't completely reject if it was quarantine
             // instead we should just add a spam header or something
-            let quarantineOrReject = ['quarantine', 'reject'].includes(
-              result.tags.p.value
-            );
+            reject = result.tags.p.value === 'reject';
 
             // if the sp value indicates that subdomains should not be quarantined or rejected then set to false
             // dmarcRecord.hostname indicates the DMARC TXT hostname record found
@@ -741,11 +740,9 @@ class ForwardEmail {
               _.isString(result.tags.sp.value) &&
               result.tags.sp.value === 'none'
             )
-              quarantineOrReject = false;
+              reject = false;
 
-            // if quarantine or reject
-            if (quarantineOrReject) {
-              /*
+            /*
               // <https://dmarc.org/draft-dmarc-base-00-01.html#dmarc_format>
               adkim:
               (plain-text; OPTIONAL, default is "r".) Indicates whether or not strict DKIM identifier alignment is required by the Domain Owner.
@@ -780,43 +777,41 @@ class ForwardEmail {
               For purposes of identifier alignment, in relaxed mode, Organizational Domains of RFC5321.MailFrom domains that are a parent domain of the RFC5322.From domain
               are acceptable as many large organizations perform more efficient bounce processing by mapping the RFC5321.MailFrom domain to specific mailstreams.
               */
-              let aspf = 'r';
-              /* eslint-disable max-depth */
+            let aspf = 'r';
+            /* eslint-disable max-depth */
+            if (
+              _.isObject(result.tags.aspf) &&
+              _.isString(result.tags.aspf.value)
+            )
+              aspf = result.tags.aspf.value;
+
+            // ensure SPF matches s or r
+            let hasPassingSPF = false;
+
+            // only test if SPF passed to begin with
+            if (spf === 'pass') {
+              const envelopeFromDomain = this.parseDomain(
+                session.envelope.mailFrom.address
+              );
+              const parsedEnvelopeFromDomain = parseDomain(envelopeFromDomain);
+
+              // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
               if (
-                _.isObject(result.tags.aspf) &&
-                _.isString(result.tags.aspf.value)
-              )
-                aspf = result.tags.aspf.value;
-
-              // ensure SPF matches s or r
-              let hasPassingSPF = false;
-
-              // only test if SPF passed to begin with
-              if (spf === 'pass') {
-                const envelopeFromDomain = this.parseDomain(
-                  session.envelope.mailFrom.address
-                );
-                const parsedEnvelopeFromDomain = parseDomain(
-                  envelopeFromDomain
-                );
-
-                // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
-                if (
-                  aspf === 'r' &&
-                  parsedEnvelopeFromDomain.domain === parsedFromDomain.domain
-                ) {
-                  hasPassingSPF = true;
-                } else if (aspf === 's' && envelopeFromDomain === fromDomain) {
-                  // MAIL FROM envelope domain must match exactly FROM domain in strict mode
-                  hasPassingSPF = true;
-                }
+                aspf === 'r' &&
+                parsedEnvelopeFromDomain.domain === parsedFromDomain.domain
+              ) {
+                hasPassingSPF = true;
+              } else if (aspf === 's' && envelopeFromDomain === fromDomain) {
+                // MAIL FROM envelope domain must match exactly FROM domain in strict mode
+                hasPassingSPF = true;
               }
+            }
 
-              //
-              // inspired by dmarc-parse
-              // <https://github.com/softvu/dmarc-parse/blob/master/index.js>
-              //
-              /*
+            //
+            // inspired by dmarc-parse
+            // <https://github.com/softvu/dmarc-parse/blob/master/index.js>
+            //
+            /*
               What is the difference between the "Mail From" and "From Header", aren't they the same?
               In email, like in real mail, there is the concept of an envelope containing the message.
 
@@ -832,8 +827,8 @@ class ForwardEmail {
               All this information can be spoofed. DMARC protects the domain name of the RFC5322:From field against spoofing.
               */
 
-              // ensure DKIM matches s or r
-              /*
+            // ensure DKIM matches s or r
+            /*
               DKIM-Signature: v=1; a=rsa-sha256; d=example.com; s=news;
               c=relaxed/relaxed; q=dns/txt; t=1126524832; x=1149015927;
               h=from:to:subject:date:keywords:keywords;
@@ -841,112 +836,110 @@ class ForwardEmail {
               b=hyjCnOfAKDdLZdKIc9G1q7LoDWlEniSbzc+yuU2zGrtruF00ldcF
               VoG4WTHNiYwG
               */
-              /*
+            /*
               > parseDomain('foobaz.beep.com')
               { tld: 'com', domain: 'beep', subdomain: 'foobaz' }
               > parseDomain('beep.com')
               { tld: 'com', domain: 'beep', subdomain: '' }
               */
 
-              // note that the dkim verify python function only verifies first
-              // dkim-signature header found, not all headers found
-              // (which will conflict with DMARC since DMARC can pass alignment for any DKIM signature)
-              // so we have to pass an index for each
-              //
-              // Note that a single email can contain multiple DKIM signatures, and it
-              // is considered to be a DMARC "pass" if any DKIM signature is aligned
-              // and verifies.
-              //
-              let hasPassingDKIM = false;
+            // note that the dkim verify python function only verifies first
+            // dkim-signature header found, not all headers found
+            // (which will conflict with DMARC since DMARC can pass alignment for any DKIM signature)
+            // so we have to pass an index for each
+            //
+            // Note that a single email can contain multiple DKIM signatures, and it
+            // is considered to be a DMARC "pass" if any DKIM signature is aligned
+            // and verifies.
+            //
+            let hasPassingDKIM = false;
 
-              if (!hasPassingSPF) {
-                let adkim = 'r';
-                if (
-                  _.isObject(result.tags.adkim) &&
-                  _.isString(result.tags.adkim.value)
-                )
-                  adkim = result.tags.adkim.value;
-                const signatures = headers.get('dkim-signature');
-                // const updatedTo = headers.getFirst('to') !== originalTo;
-                for (const [i, signature] of signatures.entries()) {
-                  // eslint-disable-next-line no-await-in-loop
-                  const isValidDKIM = await this.validateDKIM(originalRaw, i);
-                  if (!isValidDKIM) continue;
-                  const terms = signature
-                    .split(/;/)
-                    .map(t => t.trim())
-                    .filter(t => t !== '');
-                  const rules = terms.map(t =>
-                    t.split(/[=]/).map(r => r.trim())
-                  );
-                  for (const rule of rules) {
-                    // term = d
-                    // value = example.com
-                    const [term, value] = rule;
+            if (!hasPassingSPF) {
+              let adkim = 'r';
+              if (
+                _.isObject(result.tags.adkim) &&
+                _.isString(result.tags.adkim.value)
+              )
+                adkim = result.tags.adkim.value;
+              const signatures = headers.get('dkim-signature');
+              // const updatedTo = headers.getFirst('to') !== originalTo;
+              for (const [i, signature] of signatures.entries()) {
+                // eslint-disable-next-line no-await-in-loop
+                const isValidDKIM = await this.validateDKIM(originalRaw, i);
+                if (!isValidDKIM) continue;
+                const terms = signature
+                  .split(/;/)
+                  .map(t => t.trim())
+                  .filter(t => t !== '');
+                const rules = terms.map(t => t.split(/[=]/).map(r => r.trim()));
+                for (const rule of rules) {
+                  // term = d
+                  // value = example.com
+                  const [term, value] = rule;
 
-                    if (term !== 'd') continue;
-                    const dkimParsedDomain = parseDomain(value);
+                  if (term !== 'd') continue;
+                  const dkimParsedDomain = parseDomain(value);
 
-                    // relaxed mode means the domain can be a subdomain
-                    // strict mode means the domain must be exact match
-                    if (
-                      (adkim === 'r' &&
-                        dkimParsedDomain.domain === parsedFromDomain.domain) ||
-                      (adkim === 's' && value === fromDomain)
-                    ) {
-                      hasPassingDKIM = true;
-                      break;
-                    }
+                  // relaxed mode means the domain can be a subdomain
+                  // strict mode means the domain must be exact match
+                  if (
+                    (adkim === 'r' &&
+                      dkimParsedDomain.domain === parsedFromDomain.domain) ||
+                    (adkim === 's' && value === fromDomain)
+                  ) {
+                    hasPassingDKIM = true;
+                    break;
                   }
-
-                  // if at least one signature passes DKIM then it
-                  // is to be considered passing DKIM check for DMARC
-                  if (hasPassingDKIM) break;
-                }
-              }
-
-              // if both DKIM and SPF fails then fail DMARC policy
-              if (!hasPassingDKIM && !hasPassingSPF) dmarcPass = false;
-
-              //
-              // 8) conditionally rewrite with friendly from if DMARC were to fail
-              //
-              // we have to do this because if DKIM fails BUT SPF passes
-              // then when we forward the message along, the DMARC SPF check
-              // would fail on the FROM (e.g. message@netflix.com)
-              // and the new SPF check would be against @forwardemail.net due to SRS
-              // which would fail DMARC since the SPF check would be netflix.com versus forwardemail.net
-              //
-              if (!hasPassingDKIM && hasPassingSPF) {
-                //
-                // if the DKIM signature signs the Reply-To and the From
-                // then we will probably want to remove it since it won't be valid anymore
-                //
-                const changes = ['from', 'x-original-from'];
-                headers.update('from', this.rewriteFriendlyFrom(originalFrom));
-                headers.update('x-original-from', originalFrom);
-                //
-                // if there was an original reply-to on the email
-                // then we don't want to modify it of course
-                //
-                if (!replyTo) {
-                  changes.push('reply-to');
-                  headers.update('reply-to', originalFrom);
                 }
 
-                // conditionally remove signatures necessary
-                this.conditionallyRemoveSignatures(headers, changes);
+                // if at least one signature passes DKIM then it
+                // is to be considered passing DKIM check for DMARC
+                if (hasPassingDKIM) break;
               }
-
-              /* eslint-enable max-depth */
             }
+
+            // if both DKIM and SPF fails then fail DMARC policy
+            if (!hasPassingDKIM && !hasPassingSPF) dmarcPass = false;
+
+            //
+            // 8) conditionally rewrite with friendly from if DMARC were to fail
+            //
+            // we have to do this because if DKIM fails BUT SPF passes
+            // then when we forward the message along, the DMARC SPF check
+            // would fail on the FROM (e.g. message@netflix.com)
+            // and the new SPF check would be against @forwardemail.net due to SRS
+            // which would fail DMARC since the SPF check would be netflix.com versus forwardemail.net
+            //
+            if (!hasPassingDKIM && hasPassingSPF) {
+              //
+              // if the DKIM signature signs the Reply-To and the From
+              // then we will probably want to remove it since it won't be valid anymore
+              //
+              const changes = ['from', 'x-original-from'];
+              headers.update('From', this.rewriteFriendlyFrom(originalFrom));
+              headers.update('X-Original-From', originalFrom);
+              //
+              // if there was an original reply-to on the email
+              // then we don't want to modify it of course
+              //
+              if (!replyTo) {
+                changes.push('reply-to');
+                headers.update('Reply-To', originalFrom);
+              }
+
+              // conditionally remove signatures necessary
+              this.conditionallyRemoveSignatures(headers, changes);
+            }
+
+            /* eslint-enable max-depth */
           } catch (err) {
             logger.error(err);
           }
         }
 
         // throw an error if dmarc did not pass
-        if (!dmarcPass)
+        // and we it was a reject policy
+        if (!dmarcPass && reject)
           throw new CustomError(
             `Unauthenticated email from ${fromDomain} is not accepted due to domain's DMARC policy. See https://dmarc.org to learn more about the DMARC initiative.`
           );
@@ -989,12 +982,12 @@ class ForwardEmail {
                 //
                 if (messageId) {
                   const changes = ['message-id', 'x-original-message-id'];
-                  headers.update('message-id', createMessageID(session));
-                  headers.update('x-original-message-id', messageId);
+                  headers.update('Message-ID', createMessageID(session));
+                  headers.update('X-Original-Message-ID', messageId);
                   // don't modify the reply-to if it was already set
                   if (!inReplyTo) {
                     changes.push('in-reply-to');
-                    headers.update('in-reply-to', messageId);
+                    headers.update('In-Reply-To', messageId);
                   }
 
                   // conditionally remove signatures necessary
