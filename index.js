@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
-const os = require('os');
 // const tls = require('tls');
 const util = require('util');
 
@@ -180,7 +179,49 @@ class ForwardEmail {
         privateKey: isSANB(env.DKIM_PRIVATE_KEY_PATH)
           ? fs.readFileSync(env.DKIM_PRIVATE_KEY_PATH, 'utf8')
           : undefined,
-        cacheDir: os.tmpdir(),
+        //
+        // TODO: Add Feedback-ID for Google (?)
+        //
+        // Feedback-ID added before signed (assuming they want it signed?)
+        // (5-15 characters, unique across mail stream for each SenderId)
+        // Feedback-ID: a:b:c:SenderId (a,b,c are optional)
+        // <https://support.google.com/mail/answer/6254652?hl=en>
+        //
+        // This header must also be stripped from the email (replaced)
+        //
+        // <https://github.com/nodemailer/nodemailer/blob/11121b88c58259a0374d8b22ec6509c43d1656cb/lib/dkim/sign.js#L22
+        /*
+        headerFieldNames: [
+          'From',
+          'Sender',
+          'Reply-To',
+          'Subject',
+          'Date',
+          'Message-ID',
+          'To',
+          'Cc',
+          'MIME-Version',
+          'Content-Type',
+          'Content-Transfer-Encoding',
+          'Content-ID',
+          'Content-Description',
+          'Resent-Date',
+          'Resent-From',
+          'Resent-Sender',
+          'Resent-To',
+          'Resent-Cc',
+          'Resent-Message-ID',
+          'In-Reply-To',
+          'References',
+          'List-Id',
+          'List-Help',
+          'List-Unsubscribe',
+          'List-Subscribe',
+          'List-Post',
+          'List-Owner',
+          'List-Archive'
+        ].join(':'),
+        */
         ...config.dkim
       },
       maxForwardedAddresses: env.MAX_FORWARDED_ADDRESSES,
