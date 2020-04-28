@@ -951,7 +951,7 @@ class ForwardEmail {
             // and the new SPF check would be against @forwardemail.net due to SRS
             // which would fail DMARC since the SPF check would be netflix.com versus forwardemail.net
             //
-            if (!hasPassingDKIM && hasPassingSPF) {
+            if (reject && !hasPassingDKIM && hasPassingSPF) {
               //
               // if the DKIM signature signs the Reply-To and the From
               // then we will probably want to remove it since it won't be valid anymore
