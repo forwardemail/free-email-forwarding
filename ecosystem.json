@@ -56,7 +56,7 @@
       "ref": "origin/master",
       "repo": "git@github.com:niftylettuce/forward-email.git",
       "path": "/var/www/production",
-      "pre-deploy-local": "git reset --hard",
+      "pre-setup": "git reset --hard",
       "post-deploy":
         "yarn && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
     }
