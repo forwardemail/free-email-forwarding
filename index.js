@@ -642,11 +642,19 @@ class ForwardEmail {
         // 3) reverse SRS bounces
         //
 
+        // <https://www.oreilly.com/library/view/programming-internet-email/9780596802585/ch02s04.html>
+        // <https://tools.ietf.org/html/rfc822
+        // TODO: either To, BCC are required on the message
         /*
-        // check envelope from
-        session.envelope.mailFrom.address = this.checkSRS(
-          session.envelope.mailFrom.address
-        );
+        A.3.1.  Minimum required
+
+          Date:     26 Aug 76 1429 EDT        Date:     26 Aug 76 1429 EDT
+          From:     Jones@Registry.Org   or   From:     Jones@Registry.Org
+          Bcc:                                To:       Smith@Registry.Org
+
+             Note that the "Bcc" field may be empty, while the  "To"  field
+             is required to have at least one address.
+        */
 
         // check "To:" header
         const originalTo = headers.getFirst('to');
@@ -655,7 +663,6 @@ class ForwardEmail {
             'Your message is not RFC 5322 compliant, please include a valid "To" header.'
           );
         headers.update('to', this.checkSRS(originalTo));
-        */
 
         //
         // rewrite envelope rcpt to
