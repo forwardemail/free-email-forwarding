@@ -118,7 +118,8 @@ const transporterConfig = {
   logger,
   direct: true,
   opportunisticTLS: true,
-  port: 25,
+  // this can be overridden now
+  // port: 25,
   tls: {
     rejectUnauthorized: env.NODE_ENV !== 'test'
   },
@@ -162,15 +163,6 @@ class ForwardEmail {
         domains: env.DNSBL_DOMAINS,
         removals: env.DNSBL_REMOVALS,
         ...config.dnsbl
-      },
-      rateLimit: {
-        duration: env.RATELIMIT_DURATION
-          ? parseInt(env.RATELIMIT_DURATION, 10)
-          : 60000,
-        max: env.RATELIMIT_MAX ? parseInt(env.RATELIMIT_MAX, 10) : 100,
-        prefix: env.RATELIMIT_PREFIX
-          ? env.RATELIMIT_PREFIX
-          : `limit_${env.NODE_ENV.toLowerCase()}`
       },
       exchanges: env.SMTP_EXCHANGE_DOMAINS,
       dkim: {
@@ -229,8 +221,8 @@ class ForwardEmail {
       website: env.WEBSITE_URL,
       recordPrefix: env.TXT_RECORD_PREFIX,
       whitelistedDisposableDomains: env.VANITY_DOMAINS,
-      lookupEndpoint: env.LOOKUP_ENDPOINT,
-      lookupSecrets: env.LOOKUP_SECRETS,
+      apiEndpoint: env.API_ENDPOINT,
+      apiSecrets: env.API_SECRETS,
       srs: {
         separator: '=',
         secret: env.SRS_SECRET,
@@ -356,7 +348,7 @@ class ForwardEmail {
 
   processRecipient(options) {
     const { recipient, name, from, raw } = options;
-    const { address, addresses } = recipient;
+    const { address, addresses, port } = recipient;
     return Promise.all(
       addresses.map(({ to, host }) => {
         return this.processAddress(address, {
@@ -366,7 +358,8 @@ class ForwardEmail {
             from,
             to
           },
-          raw
+          raw,
+          port
         });
       })
     );
@@ -397,13 +390,15 @@ class ForwardEmail {
   // TODO: eventually we can combine multiple recipients
   // that have the same MX records in the same envelope `to`
   sendEmail(options) {
-    const { host, name, envelope, raw } = options;
+    const { host, name, envelope, raw, port } = options;
     const transporter = nodemailer.createTransport({
       ...transporterConfig,
       ...this.config.ssl,
+      port: parseInt(port, 10),
       host,
       name
     });
+    logger.debug('sendEmail', { envelope, port, host, name, raw });
     return transporter.sendMail({ envelope, raw });
   }
 
@@ -1011,8 +1006,35 @@ class ForwardEmail {
               if (addresses === false)
                 return { address: to.address, addresses: [], ignored: true };
 
+              // lookup the port (e.g. if `forward-email-port=` or custom set on the domain)
+              let port = '25';
+              try {
+                const domain = this.parseDomain(to.address, false);
+                const { body } = await got.get(
+                  `${this.config.apiEndpoint}/v1/port?domain=${domain}`,
+                  {
+                    responseType: 'json',
+                    username: this.config.apiSecrets[0]
+                  }
+                );
+                // body is an Object with `port` Number (a valid port number, defaults to 25)
+                if (
+                  _.isObject(body) &&
+                  isSANB(body.port) &&
+                  validator.isPort(body.port) &&
+                  body.port !== '25'
+                ) {
+                  port = body.port;
+                  logger.debug(`Custom port for ${to.address} detected`, {
+                    port
+                  });
+                }
+              } catch (err) {
+                logger.error(err);
+              }
+
               // if we already rewrote headers no need to continue
-              if (rewritten) return { address: to.address, addresses };
+              if (rewritten) return { address: to.address, addresses, port };
 
               // the same address that gets forwarded TO using our service
               // (we can assume that other mail providers do the same)
@@ -1043,7 +1065,7 @@ class ForwardEmail {
                 }
               }
 
-              return { address: to.address, addresses };
+              return { address: to.address, addresses, port };
             } catch (err) {
               logger.error(err);
               bounces.push({
@@ -1135,11 +1157,15 @@ class ForwardEmail {
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
         const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
 
+        //
         // 11) set from address using SRS
+        //
         const from = this.srs.forward(
           session.envelope.mailFrom.address,
           this.config.srsDomain
         );
+
+        logger.debug('recipients', { recipients });
 
         //
         // 12) send email
@@ -1452,10 +1478,10 @@ class ForwardEmail {
       // if there was a verification record then perform lookup
       try {
         const { body } = await got.get(
-          `${this.config.lookupEndpoint}?verification_record=${verifications[0]}`,
+          `${this.config.apiEndpoint}/v1/lookup?verification_record=${verifications[0]}`,
           {
             responseType: 'json',
-            username: this.config.lookupSecrets[0]
+            username: this.config.apiSecrets[0]
           }
         );
         // body is an Array of records that are formatted like TXT records
@@ -1622,6 +1648,7 @@ class ForwardEmail {
     // test:h.com
     // ...
 
+    // TODO: lookup here to determine max forwarded addresses on the domain
     // if max number of forwarding addresses exceeded
     if (forwardingAddresses.length > this.config.maxForwardedAddresses)
       throw new CustomError(
