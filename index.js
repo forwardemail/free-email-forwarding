@@ -4,6 +4,7 @@ const fs = require('fs');
 // const tls = require('tls');
 const util = require('util');
 
+// const mailUtilities = require('mailin/lib/mailUtilities.js');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const Redis = require('@ladjs/redis');
@@ -16,16 +17,16 @@ const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
-const got = require('got');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
-// const mailUtilities = require('mailin/lib/mailUtilities.js');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
+const pkg = require('./package');
 const punycode = require('punycode/');
 const sharedConfig = require('@ladjs/shared-config');
 const spfCheck2 = require('python-spfcheck2');
+const superagent = require('superagent');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
 const { SMTPServer } = require('smtp-server');
@@ -123,9 +124,9 @@ const transporterConfig = {
   tls: {
     rejectUnauthorized: env.NODE_ENV !== 'test'
   },
-  connectionTimeout: ms('5s'),
-  greetingTimeout: ms('5s'),
-  socketTimeout: 0
+  connectionTimeout: ms('10s'),
+  greetingTimeout: ms('10s'),
+  socketTimeout: ms('10s')
 };
 
 class ForwardEmail {
@@ -229,6 +230,8 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
+      timeout: 5000,
+      retry: 3,
       ...config
     };
 
@@ -1010,13 +1013,16 @@ class ForwardEmail {
               let port = '25';
               try {
                 const domain = this.parseDomain(to.address, false);
-                const { body } = await got.get(
-                  `${this.config.apiEndpoint}/v1/port?domain=${domain}`,
-                  {
-                    responseType: 'json',
-                    username: this.config.apiSecrets[0]
-                  }
-                );
+
+                const { body } = await superagent
+                  .get(`${this.config.apiEndpoint}/v1/port?domain=${domain}`)
+                  .set('accept', 'json')
+                  .set('User-Agent', `forward-email/${pkg.version}`)
+                  .auth(this.config.apiSecrets[0])
+                  .timeout(this.config.timeout)
+                  .retry(this.config.retry)
+                  .send();
+
                 // body is an Object with `port` Number (a valid port number, defaults to 25)
                 if (
                   _.isObject(body) &&
@@ -1477,13 +1483,17 @@ class ForwardEmail {
         );
       // if there was a verification record then perform lookup
       try {
-        const { body } = await got.get(
-          `${this.config.apiEndpoint}/v1/lookup?verification_record=${verifications[0]}`,
-          {
-            responseType: 'json',
-            username: this.config.apiSecrets[0]
-          }
-        );
+        const { body } = await superagent
+          .get(
+            `${this.config.apiEndpoint}/v1/lookup?verification_record=${verifications[0]}`
+          )
+          .set('accept', 'json')
+          .set('User-Agent', `forward-email/${pkg.version}`)
+          .auth(this.config.apiSecrets[0])
+          .timeout(this.config.timeout)
+          .retry(this.config.retry)
+          .send();
+
         // body is an Array of records that are formatted like TXT records
         if (Array.isArray(body)) {
           // combine with any existing TXT records (ensures graceful DNS propagation)
@@ -1492,6 +1502,7 @@ class ForwardEmail {
           }
         }
       } catch (err) {
+        console.error(err);
         logger.error(err);
       }
     }
