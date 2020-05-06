@@ -58,7 +58,7 @@
       "path": "/var/www/production",
       "pre-deploy": "git reset --hard",
       "post-deploy":
-        "yarn && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
+        "yarn install --production && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
     }
   }
 }
