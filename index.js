@@ -1502,7 +1502,6 @@ class ForwardEmail {
           }
         }
       } catch (err) {
-        console.error(err);
         logger.error(err);
       }
     }
