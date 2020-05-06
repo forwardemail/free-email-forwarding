@@ -7,8 +7,9 @@
     "serial": true,
     "failFast": true,
     "verbose": true,
-    "helpers": [
-      "test/helpers/**/*"
+    "files": [
+      "test/**/*",
+      "!test/helpers"
     ]
   },
   "bugs": {
@@ -28,18 +29,18 @@
     "@ladjs/graceful": "^1.0.0",
     "@ladjs/proxy": "^1.0.3",
     "@ladjs/redis": "^1.0.3",
-    "@ladjs/shared-config": "^1.0.6",
+    "@ladjs/shared-config": "^2.0.0",
     "array-join-conjunction": "^1.0.0",
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
     "cabin": "^6.1.1",
     "common-tags": "^1.8.0",
     "disposable-email-domains": "^1.0.54",
-    "dmarc-parse": "^1.1.0",
+    "dmarc-parse": "^1.2.1",
     "dnsbl": "^3.2.0",
     "get-fqdn": "^0.0.4",
     "get-port": "^5.1.1",
-    "got": "^11.0.2",
+    "got": "^11.1.1",
     "ip": "^1.1.5",
     "is-string-and-not-blank": "^0.0.2",
     "lodash": "^4.17.15",
@@ -60,21 +61,21 @@
   "devDependencies": {
     "@commitlint/cli": "^8.3.5",
     "@commitlint/config-conventional": "^8.3.4",
-    "ava": "2.x",
+    "ava": "^3.8.1",
     "codecov": "^3.6.5",
-    "cross-env": "6.x",
+    "cross-env": "^7.0.2",
     "eslint": "^6.8.0",
     "eslint-config-xo-lass": "^1.0.3",
     "fixpack": "^3.0.6",
-    "husky": "3.x",
+    "husky": "^4.2.5",
     "ioredis": "^4.16.3",
     "is-ci": "^2.0.0",
-    "lint-staged": "^10.1.7",
+    "lint-staged": "^10.2.2",
     "nyc": "^15.0.1",
     "remark-cli": "^8.0.0",
     "remark-preset-github": "^1.0.0",
     "shelljs": "^0.8.4",
-    "uuid": "^7.0.3",
+    "uuid": "^8.0.0",
     "xo": "0.25"
   },
   "engines": {
