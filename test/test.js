@@ -607,6 +607,31 @@ test('rejects a disposable email sender', async t => {
   });
 });
 
+test('tests verification record', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    from: 'foo@forwardemail.net',
+    to: 'test@spamchecker.net',
+    subject: 'test',
+    text: 'test text',
+    html: '<strong>test html</strong>'
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        console.log('info', info, 'err', err);
+        t.is(err.responseCode, 550);
+        connection.close();
+      });
+    });
+  });
+});
+
 test('rejects an email to no-reply@forwardemail.net', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
