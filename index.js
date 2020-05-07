@@ -1555,20 +1555,29 @@ class ForwardEmail {
       if (addresses[i].includes(':')) {
         const addr = addresses[i].split(':');
 
-        if (addr.length !== 2 || !validator.isEmail(addr[1]))
-          throw new CustomError(
-            `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
-          );
-
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
         // check if we have a match (and if it is ignored)
-        if (addr[0].indexOf('!') === 0 && username === addr[0].slice(1)) {
+        if (
+          _.isString(addr[0]) &&
+          addr[0].indexOf('!') === 0 &&
+          username === addr[0].slice(1)
+        ) {
           ignored = true;
           break;
         }
 
-        if (username === addr[0]) forwardingAddresses.push(addr[1]);
+        if (
+          addr.length !== 2 ||
+          !_.isString(addr[1]) ||
+          !validator.isEmail(addr[1])
+        )
+          throw new CustomError(
+            `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
+          );
+
+        if (_.isString(addr[0]) && username === addr[0])
+          forwardingAddresses.push(addr[1]);
       } else if (validator.isFQDN(addresses[i])) {
         // allow domain alias forwarding
         // (e.. the record is just "b.com" if it's not a valid email)
