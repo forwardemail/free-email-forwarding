@@ -399,14 +399,12 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: 'ForwardEmail <from@forwardemail.net>',
+      from: 'test <test@spamscanner.net>',
       to: 'Niftylettuce <hello@niftylettuce.com>',
       cc: 'cc@niftylettuce.com',
       subject: 'test',
       text: 'test text',
-      html: '<strong>test html</strong>',
-      attachments: [],
-      dkim: t.context.forwardEmail.config.dkim
+      html: '<strong>test html</strong>'
     });
     /*
     t.deepEqual(info.envelope, [
@@ -624,7 +622,6 @@ test('tests verification record', async t => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
-        console.log('info', info, 'err', err);
         t.is(err.responseCode, 550);
         connection.close();
       });
@@ -682,7 +679,7 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: '"Doe, John" <john.doe@forwardemail.net>',
+      from: 'test@spamchecker.net',
       to: 'disabled@niftylettuce.com',
       subject: 'test',
       text: 'test text',
