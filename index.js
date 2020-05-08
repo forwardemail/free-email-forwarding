@@ -116,7 +116,6 @@ const CODES_TO_RESPONSE_CODES = {
 const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 const transporterConfig = {
   debug: !env.IS_SILENT,
-  logger,
   direct: true,
   opportunisticTLS: true,
   // this can be overridden now
@@ -124,9 +123,9 @@ const transporterConfig = {
   tls: {
     rejectUnauthorized: env.NODE_ENV !== 'test'
   },
-  connectionTimeout: ms('10s'),
-  greetingTimeout: ms('10s'),
-  socketTimeout: ms('10s')
+  connectionTimeout: ms('1m'),
+  greetingTimeout: ms('1m'),
+  socketTimeout: ms('1m')
 };
 
 class ForwardEmail {
@@ -286,7 +285,7 @@ class ForwardEmail {
     // initialize redis
     const client = new Redis(
       this.config.redis,
-      logger,
+      this.config.logger,
       this.config.redisMonitor
     );
 
@@ -306,7 +305,7 @@ class ForwardEmail {
     // <https://github.com/nodemailer/smtp-server/issues/135>
     this.server.address = this.server.server.address.bind(this.server.server);
     this.server.on('error', err => {
-      logger.error(err);
+      this.config.logger.error(err);
     });
 
     dns.setServers(this.config.dns);
@@ -339,9 +338,10 @@ class ForwardEmail {
     );
   }
 
-  async listen(port) {
+  async listen(port, ...args) {
     await util.promisify(this.server.listen).bind(this.server)(
-      port || this.config.port
+      port || this.config.port,
+      ...args
     );
   }
 
@@ -351,57 +351,56 @@ class ForwardEmail {
 
   processRecipient(options) {
     const { recipient, name, from, raw } = options;
-    const { address, addresses, port } = recipient;
-    return Promise.all(
-      addresses.map(({ to, host }) => {
-        return this.processAddress(address, {
-          host,
-          name,
-          envelope: {
-            from,
-            to
-          },
-          raw,
-          port
-        });
-      })
-    );
+    return this.processAddress(recipient.replacements, {
+      host: recipient.host,
+      name,
+      envelope: {
+        from,
+        to: recipient.to.join(', ')
+      },
+      raw,
+      port: recipient.port
+    });
   }
 
-  async processAddress(address, options) {
+  async processAddress(replacements, options) {
     try {
       const info = await this.sendEmail(options);
-      logger.log(info);
+      this.config.logger.log(info);
       return info;
     } catch (err) {
+      this.config.logger.error(err);
       // here we do some magic so that we push an error message
       // that has the end-recipient's email masked with the
       // original to address that we were trying to send to
-      err.message = err.message.replace(
-        new RegExp(options.envelope.to, 'gi'),
-        address
-      );
-      logger.error(err);
+      for (const address of Object.keys(replacements)) {
+        err.message = err.message.replace(
+          new RegExp(address, 'gi'),
+          replacements[address]
+        );
+      }
+
       return {
         accepted: [],
-        rejected: [address],
+        // TODO: in future handle this `options.port`
+        // and also handle it in `13) send email`
+        rejected: [options.host],
         rejectedErrors: [err]
       };
     }
   }
 
-  // TODO: eventually we can combine multiple recipients
-  // that have the same MX records in the same envelope `to`
+  // we have already combined multiple recipients with same host+port mx combo
   sendEmail(options) {
     const { host, name, envelope, raw, port } = options;
     const transporter = nodemailer.createTransport({
       ...transporterConfig,
       ...this.config.ssl,
       port: parseInt(port, 10),
+      logger: this.config.logger,
       host,
       name
     });
-    logger.debug('sendEmail', { envelope, port, host, name, raw });
     return transporter.sendMail({ envelope, raw });
   }
 
@@ -463,7 +462,7 @@ class ForwardEmail {
       (Array.isArray(this.config.dnsbl.domains) &&
         this.config.dnsbl.domains.length === 0)
     ) {
-      logger.warn('No DNS blacklists were provided');
+      this.config.logger.warn('No DNS blacklists were provided');
       return false;
     }
 
@@ -538,10 +537,10 @@ class ForwardEmail {
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
-      logger.error(err);
+      this.config.logger.error(err);
       fn(err);
     } catch (err) {
-      logger.error(err);
+      this.config.logger.error(err);
       fn();
     }
   }
@@ -604,7 +603,8 @@ class ForwardEmail {
       // 9) X rewrite message ID and lookup multiple recipients
       // 10) X add our own DKIM signature
       // 11) X set from address using SRS
-      // 12) X send email
+      // 12) X normalize recipients by host and without "+" symbols
+      // 13) X send email
       //
       try {
         //
@@ -709,7 +709,7 @@ class ForwardEmail {
         try {
           spamScore = await computeSpamScoreAsync(originalRaw);
         } catch (err) {
-          logger.error(err);
+          this.config.logger.error(err);
         }
 
         if (spamScore >= this.config.spamScoreThreshold)
@@ -979,7 +979,7 @@ class ForwardEmail {
 
             /* eslint-enable max-depth */
           } catch (err) {
-            logger.error(err);
+            this.config.logger.error(err);
           }
         }
 
@@ -1031,12 +1031,15 @@ class ForwardEmail {
                   body.port !== '25'
                 ) {
                   port = body.port;
-                  logger.debug(`Custom port for ${to.address} detected`, {
-                    port
-                  });
+                  this.config.logger.debug(
+                    `Custom port for ${to.address} detected`,
+                    {
+                      port
+                    }
+                  );
                 }
               } catch (err) {
-                logger.error(err);
+                this.config.logger.error(err);
               }
 
               // if we already rewrote headers no need to continue
@@ -1073,7 +1076,7 @@ class ForwardEmail {
 
               return { address: to.address, addresses, port };
             } catch (err) {
-              logger.error(err);
+              this.config.logger.error(err);
               bounces.push({
                 address: to.address,
                 err
@@ -1115,7 +1118,7 @@ class ForwardEmail {
                   } catch (err) {
                     // e.g. if the MX servers don't exist for recipient
                     // then obviously there should be an error
-                    logger.error(err);
+                    this.config.logger.error(err);
                     errors.push({
                       address,
                       err
@@ -1130,7 +1133,7 @@ class ForwardEmail {
                 errors.map(error => `${error.address}: ${error.err.message}`)
               );
             } catch (err) {
-              logger.error(err);
+              this.config.logger.error(err);
               bounces.push({
                 address: recipient.address,
                 err
@@ -1171,43 +1174,65 @@ class ForwardEmail {
           this.config.srsDomain
         );
 
-        logger.debug('recipients', { recipients });
+        //
+        // 12) normalize recipients by host and without "+" symbols
+        //
+        const normalized = [];
+
+        for (const recipient of recipients) {
+          // if it's ignored then don't bother
+          if (recipient.ignored) continue;
+          for (const address of recipient.addresses) {
+            // get normalized form without `+` symbol
+            const normal = `${this.parseUsername(
+              address.to
+            )}@${this.parseDomain(address.to, false)}`;
+            const match = normalized.find(
+              r => r.host === address.host && r.port === recipient.port
+            );
+            if (match) {
+              if (!match.to.includes(normal)) match.to.push(normal);
+              if (!match.replacements[recipient.address])
+                match.replacements[recipient.address] = normal;
+            } else {
+              const replacements = {};
+              replacements[recipient.address] = normal;
+              normalized.push({
+                host: address.host,
+                port: recipient.port,
+                to: [normal],
+                replacements
+              });
+            }
+          }
+        }
 
         //
-        // 12) send email
+        // 13) send email
         //
         try {
           const accepted = [];
-          await Promise.all(
-            recipients.map(async recipient => {
-              // return early if recipient is ignored
-              if (recipient.ignored) return;
-              const results = await this.processRecipient({
-                recipient,
-                name,
-                from,
-                raw
+          const mapper = async recipient => {
+            const result = await this.processRecipient({
+              recipient,
+              name,
+              from,
+              raw
+            });
+            if (result.accepted.length > 0) accepted.push(recipient.address);
+            if (result.rejected.length === 0) return;
+            for (let x = 0; x < result.rejected.length; x++) {
+              const err = result.rejectedErrors[x];
+              bounces.push({
+                // TODO: in future handle this port: recipient.port
+                // and also handle it in `async processAddress(replacements, opts)`
+                host: recipient.host,
+                err
               });
-              for (const element of results) {
-                // TODO: a@a.com -> b@b.com + c@c.com when c@c.com fails
-                // it will still say a@a.com is successful
-                // but it will be confusing because the b@b.com will be
-                // masked to a@a.com and the end user will see that there
-                // was both a success and a failure for the same address
-                // (perhaps we indicate this user has email forwarded?)
-                if (element.accepted.length > 0)
-                  accepted.push(recipient.address);
-                if (element.rejected.length === 0) continue;
-                for (let x = 0; x < element.rejected.length; x++) {
-                  const err = element.rejectedErrors[x];
-                  bounces.push({
-                    address: recipient.address,
-                    err
-                  });
-                }
-              }
-            })
-          );
+            }
+          };
+
+          await Promise.all(normalized.map(mapper));
 
           if (bounces.length === 0) return fn();
 
@@ -1237,14 +1262,16 @@ class ForwardEmail {
 
           for (const element of bounces) {
             messages.push(
-              `Error for ${element.address} of "${element.err.message}"`
+              `Error for ${element.host || element.address} of "${
+                element.err.message
+              }"`
             );
           }
 
           // join the messages together and make them unique
           const err = new CustomError(_.uniq(messages).join(', '), code);
 
-          logger.error(err);
+          this.config.logger.error(err);
 
           fn(err);
         } catch (err) {
@@ -1263,9 +1290,8 @@ class ForwardEmail {
       }
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      const log = { session };
-      if (originalRaw) log.email = originalRaw.toString();
-      logger.error(err, log);
+      // if (originalRaw) meta.email = originalRaw.toString();
+      this.config.logger.error(err, { session });
       fn(err);
     });
 
@@ -1322,7 +1348,7 @@ class ForwardEmail {
         return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
       }
 
-      logger.error(err);
+      this.config.logger.error(err);
       return false;
     }
   }
@@ -1332,7 +1358,7 @@ class ForwardEmail {
       const pass = await dkimVerify(raw, index);
       return pass;
     } catch (err) {
-      logger.error(err);
+      this.config.logger.error(err);
       err.message = `Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.  Original error message: ${err.message}`;
       err.responseCode = 421;
       throw err;
@@ -1378,7 +1404,7 @@ class ForwardEmail {
         }
 
         if (limit.remaining) {
-          logger.info(
+          this.config.logger.info(
             `Rate limit for ${email} is now ${limit.remaining - 1}/${
               limit.total
             }`
@@ -1429,7 +1455,7 @@ class ForwardEmail {
         throw new Error(`Invalid SRS reversed address for ${address}`);
       return reversed;
     } catch (err) {
-      logger.error(err);
+      this.config.logger.error(err);
       return address;
     }
   }
@@ -1502,7 +1528,7 @@ class ForwardEmail {
           }
         }
       } catch (err) {
-        logger.error(err);
+        this.config.logger.error(err);
       }
     }
 
@@ -1641,7 +1667,7 @@ class ForwardEmail {
           forwardingAddresses.push(element);
         }
       } catch (err) {
-        logger.error(err);
+        this.config.logger.error(err);
       }
     }
 
