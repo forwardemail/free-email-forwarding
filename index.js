@@ -1201,23 +1201,24 @@ class ForwardEmail {
           if (recipient.ignored) continue;
           for (const address of recipient.addresses) {
             // get normalized form without `+` symbol
-            const normal = `${this.parseUsername(
-              address.to
-            )}@${this.parseDomain(address.to, false)}`;
+            // const normal = `${this.parseUsername(
+            //   address.to
+            // )}@${this.parseDomain(address.to, false)}`;
             const match = normalized.find(
               r => r.host === address.host && r.port === recipient.port
             );
             if (match) {
-              if (!match.to.includes(normal)) match.to.push(normal);
+              // if (!match.to.includes(normal)) match.to.push(normal);
+              if (!match.to.includes(address.to)) match.to.push(address.to);
               if (!match.replacements[recipient.address])
-                match.replacements[recipient.address] = normal;
+                match.replacements[recipient.address] = address.to; // normal;
             } else {
               const replacements = {};
-              replacements[recipient.address] = normal;
+              replacements[recipient.address] = address.to; // normal;
               normalized.push({
                 host: address.host,
                 port: recipient.port,
-                to: [normal],
+                to: [address.to], // [ normal ],
                 replacements
               });
             }
