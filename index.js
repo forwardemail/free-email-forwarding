@@ -7,6 +7,7 @@ const util = require('util');
 // const mailUtilities = require('mailin/lib/mailUtilities.js');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
+const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
@@ -128,6 +129,13 @@ const transporterConfig = {
   socketTimeout: ms('1m')
 };
 
+// <https://srs-discuss.v2.listbox.narkive.com/Mh6X2B2w/help-how-to-unwind-an-srs-address#post17>
+// note we can't use `/^SRS=/i` because it would match `srs@example.com`
+const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
+const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
+const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
+const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
+
 class ForwardEmail {
   constructor(config = {}) {
     this.config = {
@@ -152,7 +160,7 @@ class ForwardEmail {
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
         logInfo: !env.IS_SILENT,
-        logger: !env.IS_SILENT, // doesn't seem to be bunyan compatible
+        logger: env.IS_SILENT ? false : logger,
         ...config.smtp
       },
       spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
@@ -356,7 +364,7 @@ class ForwardEmail {
       name,
       envelope: {
         from,
-        to: recipient.to.join(', ')
+        to: recipient.to
       },
       raw,
       port: recipient.port
@@ -383,7 +391,7 @@ class ForwardEmail {
       return {
         accepted: [],
         // TODO: in future handle this `options.port`
-        // and also handle it in `13) send email`
+        // and also handle it in `12) send email`
         rejected: [options.host],
         rejectedErrors: [err]
       };
@@ -602,9 +610,8 @@ class ForwardEmail {
       // 8) X conditionally rewrite with friendly from if DMARC were to fail
       // 9) X rewrite message ID and lookup multiple recipients
       // 10) X add our own DKIM signature
-      // 11) X set from address using SRS
-      // 12) X normalize recipients by host and without "+" symbols
-      // 13) X send email
+      // 11) X normalize recipients by host and without "+" symbols
+      // 12) X send email
       //
       try {
         //
@@ -632,17 +639,12 @@ class ForwardEmail {
         //
         // headers object (includes the \r\n\r\n header and body separator)
         const { headers } = messageSplitter;
-        const messageId = headers.getFirst('message-id');
-        const replyTo = headers.getFirst('reply-to');
-        const inReplyTo = headers.getFirst('in-reply-to');
-
-        //
-        // 3) reverse SRS bounces
-        //
+        const messageId = headers.getFirst('Message-ID');
+        const replyTo = headers.getFirst('Reply-To');
+        const inReplyTo = headers.getFirst('In-Reply-To');
 
         // <https://www.oreilly.com/library/view/programming-internet-email/9780596802585/ch02s04.html>
         // <https://tools.ietf.org/html/rfc822
-        // TODO: either To, BCC are required on the message
         /*
         A.3.1.  Minimum required
 
@@ -653,22 +655,39 @@ class ForwardEmail {
              Note that the "Bcc" field may be empty, while the  "To"  field
              is required to have at least one address.
         */
-
-        // check "To:" header
-        const originalTo = headers.getFirst('to');
-        if (!originalTo)
+        const hasHeaderTo = headers.hasHeader('To');
+        if (!hasHeaderTo && !headers.hasHeader('Bcc'))
           throw new CustomError(
-            'Your message is not RFC 5322 compliant, please include a valid "To" header.'
+            'Your message is not RFC 5322 compliant, please include a valid "To" and/or "Bcc" header.'
           );
-        headers.update('to', this.checkSRS(originalTo));
+
+        // validate that the To field has at least one address if it was set
+        if (hasHeaderTo) {
+          const toAddresses = addressParser(headers.getFirst('To'));
+          if (
+            toAddresses.every(
+              a =>
+                !_.isObject(a) ||
+                !isSANB(a.address) ||
+                !validator.isEmail(a.address)
+            )
+          )
+            throw new CustomError(
+              'Your message is not RFC 5322 compliant, please include at least one valid email address in the "To" header, otherwise unset it and and use a "Bcc" header.'
+            );
+        }
 
         //
-        // rewrite envelope rcpt to
+        // 3) reverse SRS bounces
         //
-        session.envelope.rcptTo = session.envelope.rcptTo.map(to => ({
-          ...to,
-          address: this.checkSRS(to.address)
-        }));
+        session.envelope.rcptTo = session.envelope.rcptTo.map(to => {
+          const address = this.checkSRS(to.address);
+          return {
+            ...to,
+            address,
+            isBounce: address !== to.address
+          };
+        });
 
         //
         // 4) prevent replies to no-reply@forwardemail.net
@@ -682,7 +701,7 @@ class ForwardEmail {
           throw new CustomError(
             oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
           );
-        const originalFrom = headers.getFirst('from');
+        const originalFrom = headers.getFirst('From');
 
         if (!originalFrom)
           throw new CustomError(
@@ -907,8 +926,7 @@ class ForwardEmail {
                 _.isString(result.tags.adkim.value)
               )
                 adkim = result.tags.adkim.value;
-              const signatures = headers.get('dkim-signature');
-              // const updatedTo = headers.getFirst('to') !== originalTo;
+              const signatures = headers.get('DKIM-Signature');
               for (const [i, signature] of signatures.entries()) {
                 // eslint-disable-next-line no-await-in-loop
                 const isValidDKIM = await this.validateDKIM(originalRaw, i);
@@ -969,7 +987,7 @@ class ForwardEmail {
               // then we don't want to modify it of course
               //
               if (!replyTo) {
-                changes.push('reply-to');
+                changes.push('Reply-To');
                 headers.update('Reply-To', originalFrom);
               }
 
@@ -997,6 +1015,12 @@ class ForwardEmail {
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async to => {
             try {
+              let port = '25';
+
+              // if it was a bounce then return early
+              if (to.isBounce)
+                return { address: to.address, addresses: [to.address], port };
+
               // bounce message if it was sent to no-reply@
               if (to.address === this.config.noReply)
                 throw new CustomError(
@@ -1010,7 +1034,6 @@ class ForwardEmail {
                 return { address: to.address, addresses: [], ignored: true };
 
               // lookup the port (e.g. if `forward-email-port=` or custom set on the domain)
-              let port = '25';
               try {
                 const domain = this.parseDomain(to.address, false);
 
@@ -1060,12 +1083,12 @@ class ForwardEmail {
                 // need removed (we keep track of changed headers below)
                 //
                 if (messageId) {
-                  const changes = ['message-id', 'x-original-message-id'];
+                  const changes = ['Message-ID', 'X-Original-Message-ID'];
                   headers.update('Message-ID', createMessageID(session));
                   headers.update('X-Original-Message-ID', messageId);
                   // don't modify the reply-to if it was already set
                   if (!inReplyTo) {
-                    changes.push('in-reply-to');
+                    changes.push('In-Reply-To');
                     headers.update('In-Reply-To', messageId);
                   }
 
@@ -1113,6 +1136,7 @@ class ForwardEmail {
                 addresses.map(async address => {
                   try {
                     const addresses = await this.validateMX(address);
+                    // TODO: we don't do anything with priority right now
                     // `addresses` are already pre-sorted by lowest priority
                     return { to: address, host: addresses[0].exchange };
                   } catch (err) {
@@ -1167,15 +1191,7 @@ class ForwardEmail {
         const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
 
         //
-        // 11) set from address using SRS
-        //
-        const from = this.srs.forward(
-          session.envelope.mailFrom.address,
-          this.config.srsDomain
-        );
-
-        //
-        // 12) normalize recipients by host and without "+" symbols
+        // 11) normalize recipients by host and without "+" symbols
         //
         const normalized = [];
 
@@ -1208,16 +1224,21 @@ class ForwardEmail {
         }
 
         //
-        // 13) send email
+        // 12) send email
         //
         try {
           const accepted = [];
+          // set SRS
+          const from = this.srs.forward(
+            session.envelope.mailFrom.address,
+            this.config.srsDomain
+          );
           const mapper = async recipient => {
             const result = await this.processRecipient({
               recipient,
               name,
-              from,
-              raw
+              raw,
+              from
             });
             if (result.accepted.length > 0) accepted.push(recipient.address);
             if (result.rejected.length === 0) return;
@@ -1375,10 +1396,10 @@ class ForwardEmail {
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      if (/queryMx ENODATA/.test(err)) {
+      if (REGEX_ENODATA.test(err)) {
         err.message = `DNS lookup for ${address} did not return a valid MX record`;
         err.responseCode = 550;
-      } else if (/queryTxt ENOTFOUND/.test(err)) {
+      } else if (REGEX_ENOTFOUND.test(err)) {
         err.message = `DNS lookup for ${address} did not return a valid TXT record`;
         err.responseCode = 550;
       } else if (!err.responseCode) {
@@ -1448,7 +1469,8 @@ class ForwardEmail {
   // this returns either the reversed SRS address
   // or the address that was passed to this function
   checkSRS(address) {
-    if (!/^SRS/i.test(address)) return address;
+    if (!REGEX_SRS0.test(address) && !REGEX_SRS1.test(address)) return address;
+
     try {
       const reversed = this.srs.reverse(address);
       if (_.isNull(reversed))
@@ -1714,8 +1736,18 @@ class ForwardEmail {
 
   async onRcptTo(address, session, fn) {
     try {
-      // attempt reverse SRS here
-      address.address = this.checkSRS(address.address);
+      // if it was a bounce and not valid, then throw an error
+      if (
+        REGEX_SRS0.test(address.address) ||
+        REGEX_SRS1.test(address.address)
+      ) {
+        if (_.isNull(this.srs.reverse(address.address)))
+          throw new CustomError(
+            `SRS address of ${address.address} was invalid`
+          );
+        // otherwise return early
+        return fn();
+      }
 
       // validate forwarding address by looking up TXT record `forward-email=`
       await this.getForwardingAddresses(address.address);
@@ -1750,7 +1782,7 @@ class ForwardEmail {
     if (changes.length === 0) return;
 
     // Always remove X-Google-DKIM-Signature
-    headers.remove('x-google-dkim-signature');
+    headers.remove('X-Google-DKIM-Signature');
 
     //
     // Right now it's not easy to delete a header by its index
@@ -1765,10 +1797,10 @@ class ForwardEmail {
     //
 
     // Get all signatures as an Array
-    const signatures = headers.get('dkim-signature');
+    const signatures = headers.get('DKIM-Signature');
 
     // Remove all DKIM-Signatures (we add back the ones that are not affected)
-    headers.remove('dkim-signature');
+    headers.remove('DKIM-Signature');
 
     // Note that we don't validate the signature, we just check its headers
     // And we don't specifically because `this.validateDKIM` could throw error
@@ -1790,7 +1822,7 @@ class ForwardEmail {
           .filter(h => h !== '');
         if (signedHeaders.length === 0) continue;
         if (signedHeaders.every(h => !changes.includes(h)))
-          headers.add('dkim-signature', signature, headers.lines.length + 1);
+          headers.add('DKIM-Signature', signature, headers.lines.length + 1);
       }
     }
   }

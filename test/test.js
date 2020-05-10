@@ -605,6 +605,152 @@ test('rejects a disposable email sender', async t => {
   });
 });
 
+test('requires at least one valid email in To header if it was set', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'foo@spamchecker.net',
+      to: 'baz@spamchecker.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+From: foo@spamchecker.net
+To:
+Subject: requires at least one valid email in To header if it was set
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err.responseCode, 550);
+        t.regex(err.message, /please include at least one/);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('requires either Bcc or To header', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'foo@spamchecker.net',
+      to: 'baz@spamchecker.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+From: foo@spamchecker.net
+Subject: requires either Bcc or To header
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err.responseCode, 550);
+        t.regex(
+          err.message,
+          /please include a valid "To" and\/or "Bcc" header/
+        );
+        connection.close();
+      });
+    });
+  });
+});
+
+test('allows empty Bcc header', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'foo@spamchecker.net',
+      to: 'baz@spamchecker.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+From: foo@spamchecker.net
+Bcc:
+Subject: allows empty Bcc header
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('tests SRS auto-reply', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'foo@wakeup.io',
+      to: [
+        t.context.forwardEmail.srs.forward(
+          'nicholasbaugh@gmail.com',
+          t.context.forwardEmail.config.srsDomain
+        ),
+        'srs@spamchecker.net'
+      ]
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+To: nicholasbaugh@gmail.com
+From: startupsupper@gmail.com
+Subject: tests SRS auto-reply
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
 test('tests verification record', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
