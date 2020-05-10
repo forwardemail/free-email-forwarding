@@ -663,6 +663,7 @@ class ForwardEmail {
 
         // validate that the To field has at least one address if it was set
         if (hasHeaderTo) {
+          headers.update('To', this.checkSRS(headers.getFirst('To')));
           const toAddresses = addressParser(headers.getFirst('To'));
           if (
             toAddresses.every(
