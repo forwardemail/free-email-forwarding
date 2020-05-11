@@ -1608,12 +1608,8 @@ class ForwardEmail {
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
         // check if we have a match (and if it is ignored)
-        if (
-          _.isString(addr[0]) &&
-          addr[0].indexOf('!') === 0 &&
-          username === addr[0].slice(1)
-        ) {
-          ignored = true;
+        if (_.isString(addr[0]) && addr[0].indexOf('!') === 0) {
+          if (username === addr[0].slice(1)) ignored = true;
           break;
         }
 
