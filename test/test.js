@@ -2,7 +2,6 @@ const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const util = require('util');
 
 const Client = require('nodemailer/lib/smtp-connection');
 const IORedis = require('ioredis');
@@ -15,8 +14,9 @@ const nodemailer = require('nodemailer');
 const shell = require('shelljs');
 const test = require('ava');
 const { v4 } = require('uuid');
+const pify = require('pify');
 
-const lookupAsync = util.promisify(dns.lookup);
+const lookupAsync = pify(dns.lookup);
 
 const ForwardEmail = require('..');
 

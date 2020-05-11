@@ -47,6 +47,7 @@
     "ms": "^2.1.2",
     "nodemailer": "^6.4.6",
     "parse-domain": "^2.3.4",
+    "pify": "^5.0.0",
     "pino": "^6.2.1",
     "punycode": "^2.1.1",
     "python-dkim-verify": "^1.0.2",

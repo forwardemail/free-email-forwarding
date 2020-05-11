@@ -23,6 +23,7 @@ const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
+const pify = require('pify');
 const pkg = require('./package');
 const punycode = require('punycode/');
 const sharedConfig = require('@ladjs/shared-config');
@@ -43,10 +44,7 @@ const {
   logger
 } = require('./helpers');
 
-const lookupAsync = util.promisify(dns.lookup);
-const resolveTxtAsync = util.promisify(dns.resolveTxt);
-const resolveMxAsync = util.promisify(dns.resolveMx);
-// const computeSpamScoreAsync = util.promisify(mailUtilities.computeSpamScore);
+// const computeSpamScoreAsync = pify(mailUtilities.computeSpamScore);
 
 /*
 //
@@ -316,8 +314,6 @@ class ForwardEmail {
       this.config.logger.error(err);
     });
 
-    dns.setServers(this.config.dns);
-
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
     this.processRecipient = this.processRecipient.bind(this);
@@ -347,14 +343,14 @@ class ForwardEmail {
   }
 
   async listen(port, ...args) {
-    await util.promisify(this.server.listen).bind(this.server)(
+    await pify(this.server.listen).bind(this.server)(
       port || this.config.port,
       ...args
     );
   }
 
   async close() {
-    await util.promisify(this.server.close).bind(this.server);
+    await pify(this.server.close).bind(this.server);
   }
 
   processRecipient(options) {
@@ -742,7 +738,7 @@ class ForwardEmail {
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
-          const obj = await lookupAsync(this.config.exchanges[0]);
+          const obj = await dns.promises.lookup(this.config.exchanges[0]);
           ipAddress = obj.address;
         } else {
           ipAddress = ip.address();
@@ -1356,7 +1352,7 @@ class ForwardEmail {
     if (!parsedDomain) return false;
     const entry = `_dmarc.${hostname}`;
     try {
-      const records = await resolveTxtAsync(entry);
+      const records = await dns.promises.resolveTxt(entry);
       // note that it's an array of arrays [ [ 'v=DMARC1' ] ]
       if (!_.isArray(records) || _.isEmpty(records)) return false;
       if (!_.isArray(records[0]) || _.isEmpty(records[0])) return false;
@@ -1391,7 +1387,7 @@ class ForwardEmail {
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await resolveMxAsync(domain);
+      const addresses = await dns.promises.resolveMx(domain);
       if (!addresses || addresses.length === 0)
         throw new CustomError(
           `DNS lookup for ${domain} did not return any valid MX records`
@@ -1500,7 +1496,7 @@ class ForwardEmail {
   // eslint-disable-next-line complexity
   async getForwardingAddresses(address, recursive = []) {
     const domain = this.parseDomain(address, false);
-    const records = await resolveTxtAsync(domain);
+    const records = await dns.promises.resolveTxt(domain);
 
     // dns TXT record must contain `forward-email=` prefix
     const validRecords = [];

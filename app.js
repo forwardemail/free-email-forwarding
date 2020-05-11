@@ -1,9 +1,13 @@
+const dns = require('dns');
+
 const Graceful = require('@ladjs/graceful');
 const ip = require('ip');
 const ForwardEmail = require('.');
 
 const app = new ForwardEmail();
 const { logger, port } = app.config;
+
+dns.setServers(app.config.dns);
 
 if (!module.parent) {
   const graceful = new Graceful({
