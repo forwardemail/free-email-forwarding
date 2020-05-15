@@ -1713,11 +1713,35 @@ class ForwardEmail {
     // test:h.com
     // ...
 
-    // TODO: lookup here to determine max forwarded addresses on the domain
+    // lookup here to determine max forwarded addresses on the domain
     // if max number of forwarding addresses exceeded
-    if (forwardingAddresses.length > this.config.maxForwardedAddresses)
+    let { maxForwardedAddresses } = this.config;
+    try {
+      const { body } = await superagent
+        .get(
+          `${this.config.apiEndpoint}/v1/max-forwarded-addresses?domain=${domain}`
+        )
+        .set('accept', 'json')
+        .set('User-Agent', `forward-email/${pkg.version}`)
+        .auth(this.config.apiSecrets[0])
+        .timeout(this.config.timeout)
+        .retry(this.config.retry)
+        .send();
+
+      // body is an Object with `max_forwarded_addresses` Number
+      if (
+        _.isObject(body) &&
+        _.isNumber(body.max_forwarded_addresses) &&
+        body.max_forwarded_addresses > 0
+      )
+        maxForwardedAddresses = body.max_forwarded_addresses;
+    } catch (err) {
+      this.config.logger.error(err);
+    }
+
+    if (forwardingAddresses.length > maxForwardedAddresses)
       throw new CustomError(
-        `The address ${address} is attempted to be forwarded to (${forwardingAddresses.length}) addresses which exceeds the maximum of (${this.config.maxForwardedAddresses})`
+        `The address ${address} is attempted to be forwarded to (${forwardingAddresses.length}) addresses which exceeds the maximum of (${maxForwardedAddresses})`
       );
 
     // otherwise transform the + symbol filter if we had it
