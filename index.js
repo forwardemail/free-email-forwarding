@@ -1147,9 +1147,18 @@ class ForwardEmail {
                   }
                 })
               );
+              if (recipient.addresses.length === 0 && recipient.port !== '25') {
+                recipient.addresses = [
+                  {
+                    to: recipient.address,
+                    host: this.parseDomain(recipient.address, false)
+                  }
+                ];
+              }
+
               recipient.addresses = _.compact(recipient.addresses);
               if (!_.isEmpty(recipient.addresses)) return recipient;
-              if (errors.length === 0) return recipient;
+              if (errors.length === 0) return;
               throw new Error(
                 errors.map(error => `${error.address}: ${error.err.message}`)
               );
@@ -1676,6 +1685,7 @@ class ForwardEmail {
           forwardingAddress,
           newRecursive
         );
+
         // if address was ignored then skip adding it
         if (addresses === false) continue;
 
