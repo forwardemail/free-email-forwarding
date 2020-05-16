@@ -524,7 +524,8 @@ class ForwardEmail {
       // this will indicate it is a TLS issue, so we should retry as plain
       // if it doesn't have all these properties per this link then its not TLS
       // <https://github.com/nodejs/node/blob/1f9761f4cc027315376cd669ceed2eeaca865d76/lib/tls.js#L287>
-      if (!err.reason || !err.host || !err.cert) throw err;
+      // TODO: we may want to uncomment the line below, otherwise all emails that fail will be retried
+      // if (!err.reason || !err.host || !err.cert) throw err;
       // NOTE: we could do smart alerting for customers recipients here
       // but for now we just retry in plain text mode without SSL/STARTTLS
       this.config.logger.error(err, { options, envelope });
@@ -1477,9 +1478,12 @@ class ForwardEmail {
           await Promise.all(
             bounces.map(async bounce => {
               try {
+                const addresses = await this.validateMX(
+                  session.envelope.mailFrom.address
+                );
                 await this.sendEmail({
-                  host: session.remoteAddress,
-                  port: session.remotePort,
+                  host: addresses[0].exchange,
+                  port: '25',
                   name,
                   envelope: {
                     from: '',
