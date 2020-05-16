@@ -18,6 +18,7 @@ const dmarcParse = require('dmarc-parse');
 const dnsbl = require('dnsbl');
 const domains = require('disposable-email-domains');
 const getFQDN = require('get-fqdn');
+const getStream = require('get-stream');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
@@ -31,10 +32,12 @@ const spfCheck2 = require('python-spfcheck2');
 const superagent = require('superagent');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
+const { Iconv } = require('iconv');
 const { SMTPServer } = require('smtp-server');
 const { SRS } = require('sender-rewriting-scheme');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
+const { simpleParser } = require('mailparser');
 
 const {
   CustomError,
@@ -45,6 +48,8 @@ const {
 } = require('./helpers');
 
 // const computeSpamScoreAsync = pify(mailUtilities.computeSpamScore);
+
+const USER_AGENT = `forward-email/${pkg.version}`;
 
 /*
 //
@@ -133,6 +138,11 @@ const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
 const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
 const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
+
+const isURLOptions = {
+  protocols: ['http', 'https'],
+  require_protocol: true
+};
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -237,6 +247,7 @@ class ForwardEmail {
       srsDomain: env.SRS_DOMAIN,
       timeout: 5000,
       retry: 3,
+      simpleParser: { Iconv },
       ...config
     };
 
@@ -605,9 +616,8 @@ class ForwardEmail {
       // 7) X check for DMARC compliance
       // 8) X conditionally rewrite with friendly from if DMARC were to fail
       // 9) X rewrite message ID and lookup multiple recipients
-      // 10) X add our own DKIM signature
-      // 11) X normalize recipients by host and without "+" symbols
-      // 12) X send email
+      // 10) X normalize recipients by host and without "+" symbols
+      // 11) X send email
       //
       try {
         //
@@ -1036,8 +1046,8 @@ class ForwardEmail {
 
                 const { body } = await superagent
                   .get(`${this.config.apiEndpoint}/v1/port?domain=${domain}`)
-                  .set('accept', 'json')
-                  .set('User-Agent', `forward-email/${pkg.version}`)
+                  .set('Accept', 'json')
+                  .set('User-Agent', USER_AGENT)
                   .auth(this.config.apiSecrets[0])
                   .timeout(this.config.timeout)
                   .retry(this.config.retry)
@@ -1132,6 +1142,9 @@ class ForwardEmail {
               recipient.addresses = await Promise.all(
                 addresses.map(async address => {
                   try {
+                    // if it was a URL webhook then return early
+                    if (validator.isURL(address, isURLOptions))
+                      return { to: address, is_webhook: true };
                     const addresses = await this.validateMX(address);
                     // TODO: we don't do anything with priority right now
                     // `addresses` are already pre-sorted by lowest priority
@@ -1188,16 +1201,7 @@ class ForwardEmail {
         }
 
         //
-        // 10) add our own DKIM signature
-        //
-
-        // join headers object and body into a full rfc822 formatted email
-        // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
-        // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
-        const raw = this.dkim.sign(Buffer.concat([headers.build(), ...chunks]));
-
-        //
-        // 11) normalize recipients by host and without "+" symbols
+        // 10) normalize recipients by host and without "+" symbols
         //
         const normalized = [];
 
@@ -1205,6 +1209,15 @@ class ForwardEmail {
           // if it's ignored then don't bother
           if (recipient.ignored) continue;
           for (const address of recipient.addresses) {
+            // if it's a webhook then return early
+            if (address.is_webhook) {
+              normalized.push({
+                webhook: address.to,
+                recipient: recipient.address
+              });
+              continue;
+            }
+
             // get normalized form without `+` symbol
             // const normal = `${this.parseUsername(
             //   address.to
@@ -1231,8 +1244,16 @@ class ForwardEmail {
         }
 
         //
-        // 12) send email
+        // 11) send email
         //
+
+        // join headers object and body into a full rfc822 formatted email
+        // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
+        // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
+        const raw = await getStream(
+          this.dkim.sign(Buffer.concat([headers.build(), ...chunks]))
+        );
+
         try {
           const accepted = [];
           // set SRS
@@ -1241,6 +1262,30 @@ class ForwardEmail {
             this.config.srsDomain
           );
           const mapper = async recipient => {
+            if (recipient.webhook) {
+              try {
+                const mail = await simpleParser(raw, this.config.simpleParser);
+
+                await superagent
+                  .post(recipient.webhook)
+                  // .type('message/rfc822')
+                  .set('User-Agent', USER_AGENT)
+                  .timeout(this.config.timeout)
+                  .retry(this.config.retry)
+                  .send({
+                    ...mail,
+                    raw
+                  });
+              } catch (err_) {
+                bounces.push({
+                  address: recipient.recipient,
+                  err: err_
+                });
+              }
+
+              return;
+            }
+
             const result = await this.processRecipient({
               recipient,
               name,
@@ -1542,8 +1587,8 @@ class ForwardEmail {
           .get(
             `${this.config.apiEndpoint}/v1/lookup?verification_record=${verifications[0]}`
           )
-          .set('accept', 'json')
-          .set('User-Agent', `forward-email/${pkg.version}`)
+          .set('Accept', 'json')
+          .set('User-Agent', USER_AGENT)
           .auth(this.config.apiSecrets[0])
           .timeout(this.config.timeout)
           .retry(this.config.retry)
@@ -1608,7 +1653,16 @@ class ForwardEmail {
       // convert addresses to lowercase
       addresses[i] = addresses[i].toLowerCase();
       if (addresses[i].includes(':') || addresses[i].indexOf('!') === 0) {
-        const addr = addresses[i].split(':');
+        // > const str = 'foo:https://foo.com'
+        // > str.slice(0, str.indexOf(':'))
+        // 'foo'
+        // > str.slice(str.indexOf(':') + 1)
+        // 'https://foo.com'
+        const index = addresses[i].indexOf(':');
+        const addr = [
+          addresses[i].slice(0, index),
+          addresses[i].slice(index + 1)
+        ];
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
@@ -1625,7 +1679,8 @@ class ForwardEmail {
         if (
           addr.length !== 2 ||
           !_.isString(addr[1]) ||
-          !validator.isEmail(addr[1])
+          (!validator.isEmail(addr[1]) &&
+            !validator.isURL(addr[1], isURLOptions))
         )
           throw new CustomError(
             `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
@@ -1633,15 +1688,23 @@ class ForwardEmail {
 
         if (_.isString(addr[0]) && username === addr[0])
           forwardingAddresses.push(addr[1]);
-      } else if (validator.isFQDN(addresses[i])) {
+      } else if (
+        validator.isFQDN(addresses[i]) ||
+        validator.isIP(addresses[i])
+      ) {
         // allow domain alias forwarding
         // (e.. the record is just "b.com" if it's not a valid email)
         globalForwardingAddresses.push(`${username}@${addresses[i]}`);
       } else if (validator.isEmail(addresses[i])) {
         const domain = this.parseDomain(addresses[i], false);
-        if (validator.isFQDN(domain) && validator.isEmail(addresses[i])) {
+        if (
+          (validator.isFQDN(domain) || validator.isIP(domain)) &&
+          validator.isEmail(addresses[i])
+        ) {
           globalForwardingAddresses.push(addresses[i]);
         }
+      } else if (validator.isURL(addresses[i], isURLOptions)) {
+        globalForwardingAddresses.push(addresses[i]);
       }
     }
 
@@ -1672,8 +1735,10 @@ class ForwardEmail {
       const forwardingAddress = forwardingAddresses[x];
       try {
         if (recursive.includes(forwardingAddress)) continue;
+        if (validator.isURL(forwardingAddress, isURLOptions)) continue;
 
         const newRecursive = forwardingAddresses.concat(recursive);
+
         // prevent a double-lookup if user is using + symbols
         if (forwardingAddress.includes('+'))
           newRecursive.push(
@@ -1731,7 +1796,7 @@ class ForwardEmail {
         .get(
           `${this.config.apiEndpoint}/v1/max-forwarded-addresses?domain=${domain}`
         )
-        .set('accept', 'json')
+        .set('Accept', 'json')
         .set('User-Agent', `forward-email/${pkg.version}`)
         .auth(this.config.apiSecrets[0])
         .timeout(this.config.timeout)

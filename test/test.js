@@ -726,8 +726,42 @@ test('nobody', async t => {
 Message-ID: <123.abc@test>
 Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
 To: nobody@forwardemail.net
-From: Forward Email Test <test@niftylettuce.com>
+From: Test <test@niftylettuce.com>
 Subject: testing custom port forwarding
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('webhooks', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'test@niftylettuce.com',
+      to: 'webhook@spamapi.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+To: webhook@spamapi.net
+From: Test <test@niftylettuce.com>
+Subject: testing webhooks
 Mime-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Transfer-Encoding: 7bit
@@ -760,7 +794,7 @@ test('port forwarding', async t => {
 Message-ID: <123.abc@test>
 Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
 To: test@spamapi.net
-From: Forward Email Test <test@niftylettuce.com>
+From: Test <test@niftylettuce.com>
 Subject: testing custom port forwarding
 Mime-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
