@@ -30,7 +30,6 @@
     "@ladjs/proxy": "^1.0.3",
     "@ladjs/redis": "^1.0.3",
     "@ladjs/shared-config": "^2.0.1",
-    "array-join-conjunction": "^1.0.0",
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
     "cabin": "^6.1.1",
