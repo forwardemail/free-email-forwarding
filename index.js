@@ -139,11 +139,6 @@ const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
 const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
 
-const isURLOptions = {
-  protocols: ['http', 'https'],
-  require_protocol: true
-};
-
 class ForwardEmail {
   constructor(config = {}) {
     this.config = {
@@ -248,6 +243,10 @@ class ForwardEmail {
       timeout: 5000,
       retry: 3,
       simpleParser: { Iconv },
+      isURLOptions: {
+        protocols: ['http', 'https'],
+        require_protocol: true
+      },
       ...config
     };
 
@@ -1143,7 +1142,7 @@ class ForwardEmail {
                 addresses.map(async address => {
                   try {
                     // if it was a URL webhook then return early
-                    if (validator.isURL(address, isURLOptions))
+                    if (validator.isURL(address, this.config.isURLOptions))
                       return { to: address, is_webhook: true };
                     const addresses = await this.validateMX(address);
                     // TODO: we don't do anything with priority right now
@@ -1680,7 +1679,7 @@ class ForwardEmail {
           addr.length !== 2 ||
           !_.isString(addr[1]) ||
           (!validator.isEmail(addr[1]) &&
-            !validator.isURL(addr[1], isURLOptions))
+            !validator.isURL(addr[1], this.config.isURLOptions))
         )
           throw new CustomError(
             `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
@@ -1703,7 +1702,7 @@ class ForwardEmail {
         ) {
           globalForwardingAddresses.push(addresses[i]);
         }
-      } else if (validator.isURL(addresses[i], isURLOptions)) {
+      } else if (validator.isURL(addresses[i], this.config.isURLOptions)) {
         globalForwardingAddresses.push(addresses[i]);
       }
     }
@@ -1735,7 +1734,8 @@ class ForwardEmail {
       const forwardingAddress = forwardingAddresses[x];
       try {
         if (recursive.includes(forwardingAddress)) continue;
-        if (validator.isURL(forwardingAddress, isURLOptions)) continue;
+        if (validator.isURL(forwardingAddress, this.config.isURLOptions))
+          continue;
 
         const newRecursive = forwardingAddresses.concat(recursive);
 
