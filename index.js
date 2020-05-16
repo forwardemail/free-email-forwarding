@@ -1,17 +1,16 @@
 const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
-// const tls = require('tls');
 const util = require('util');
 
 // const mailUtilities = require('mailin/lib/mailUtilities.js');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
+const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
-const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
@@ -106,30 +105,17 @@ const CIPHERS = [
   'AES128-SHA'
 ].join(':');
 
-const CODES_TO_RESPONSE_CODES = {
-  ETIMEDOUT: 420,
-  ECONNRESET: 442,
-  EADDRINUSE: 421,
-  ECONNREFUSED: 421,
-  EPIPE: 421,
-  ENOTFOUND: 421,
-  ENETUNREACH: 421,
-  EAI_AGAIN: 421
-};
-
-const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 const transporterConfig = {
   debug: !env.IS_SILENT,
   direct: true,
-  opportunisticTLS: true,
   // this can be overridden now
   // port: 25,
   tls: {
     rejectUnauthorized: env.NODE_ENV !== 'test'
   },
-  connectionTimeout: ms('1m'),
-  greetingTimeout: ms('1m'),
-  socketTimeout: ms('1m')
+  connectionTimeout: ms('30s'),
+  greetingTimeout: ms('30s'),
+  socketTimeout: ms('30s')
 };
 
 // <https://srs-discuss.v2.listbox.narkive.com/Mh6X2B2w/help-how-to-unwind-an-srs-address#post17>
@@ -138,6 +124,7 @@ const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
 const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
 const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
+const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -247,6 +234,11 @@ class ForwardEmail {
         protocols: ['http', 'https'],
         require_protocol: true
       },
+      mailerDaemon: {
+        name: 'Mail Delivery Subsystem',
+        address: 'mailer-daemon@[HOSTNAME]'
+      },
+      sendingZone: 'bounces',
       ...config
     };
 
@@ -259,7 +251,10 @@ class ForwardEmail {
       throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS');
 
     if (this.config.ssl) {
+      // set minimum tls version allowed
       this.config.ssl.minVersion = 'TLSv1.2';
+
+      // set tls ciphers allowed (in order of preference)
       this.config.ssl.ciphers = CIPHERS;
       //
       // should be automatic per `tls.createServer()` but just in case
@@ -350,6 +345,8 @@ class ForwardEmail {
     this.conditionallyRemoveSignatures = this.conditionallyRemoveSignatures.bind(
       this
     );
+    this.getBounceStream = this.getBounceStream.bind(this);
+    this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
   }
 
   async listen(port, ...args) {
@@ -404,18 +401,147 @@ class ForwardEmail {
     }
   }
 
+  getDiagnosticCode(err) {
+    if (err.response && REGEX_DIAGNOSTIC_CODE.test(err.response))
+      return err.response;
+    return `${err.responseCode ||
+      err.code ||
+      err.statusCode ||
+      err.status ||
+      500} ${err.message}`;
+  }
+
+  getBounceStream(options) {
+    // options.headers
+    // options.from (MAIL FROM)
+    // options.name (FQDN of our MX server)
+    // options.bounce = {
+    //   address: recipient address that failed,
+    //   host: recipient host name that failed,
+    //   err: error and error message,
+    // }
+    //
+    // Mail Delivery Subsystem <mailer-daemon@mx1.forwardemail.net>
+    //
+    const rootNode = new MimeNode(
+      'multipart/report; report-type=delivery-status'
+    );
+
+    const from = this.config.mailerDaemon;
+    const to = options.from;
+    const { sendingZone } = this.config;
+
+    // format Mailer Daemon address
+    const fromAddress = rootNode
+      ._convertAddresses(rootNode._parseAddresses(from))
+      .replace(/\[HOSTNAME\]/gi, options.name);
+
+    rootNode.setHeader('From', fromAddress);
+    rootNode.setHeader('To', to);
+    rootNode.setHeader('X-Sending-Zone', sendingZone);
+    rootNode.setHeader('X-Failed-Recipients', options.bounce.address);
+    rootNode.setHeader('Auto-Submitted', 'auto-replied');
+    rootNode.setHeader('Subject', 'Delivery Status Notification (Failure)');
+
+    const messageId = options.headers.getFirst('Message-ID');
+
+    if (messageId) {
+      rootNode.setHeader('In-Reply-To', messageId);
+      rootNode.setHeader('References', messageId);
+    }
+
+    // TODO: text/html all fancy
+
+    rootNode
+      .createChild('text/plain')
+      .setHeader('Content-Description', 'Notification')
+      .setContent(
+        [
+          `Delivery to the following recipient failed permanently: ${options.bounce.address}`,
+          `Technical details of permanent failure: ${options.bounce.err.message}`
+        ].join('\n')
+      );
+
+    rootNode
+      .createChild('message/delivery-status')
+      .setHeader('Content-Description', 'Delivery report')
+      .setContent(
+        _.compact([
+          `Reporting-MTA: dns; ${options.name}`,
+          `X-ForwardEmail-Version: ${pkg.version}`,
+          `X-ForwardEmail-Session-ID: ${options.id}`,
+          `X-ForwardEmail-Sender: rfc822; ${options.from}`,
+          `Arrival-Date: ${new Date(options.arrivalDate)
+            .toUTCString()
+            .replace(/GMT/, '+0000')}`,
+          `Final-Recipient: rfc822; ${options.bounce.address}`,
+          `Action: failed`,
+          `Status: 5.0.0`,
+          `Remote-MTA: dns; ${options.bounce.host}`,
+          `Diagnostic-Code: smtp; ${this.getDiagnosticCode(options.bounce.err)}`
+        ]).join('\n')
+      );
+
+    rootNode
+      .createChild('text/rfc822-headers')
+      .setHeader('Content-Description', 'Undelivered Message Headers')
+      .setContent(options.headers.build());
+
+    return rootNode.createReadStream();
+  }
+
   // we have already combined multiple recipients with same host+port mx combo
-  sendEmail(options) {
+  async sendEmail(options) {
     const { host, name, envelope, raw, port } = options;
-    const transporter = nodemailer.createTransport({
-      ...transporterConfig,
-      ...this.config.ssl,
-      port: parseInt(port, 10),
-      logger: this.config.logger,
-      host,
-      name
-    });
-    return transporter.sendMail({ envelope, raw });
+    // try it once with opportunisticTLS otherwise ignoreTLS
+    // (e.g. in case of a bad altname on a certificate)
+    let info;
+    let transporter;
+    try {
+      transporter = nodemailer.createTransport({
+        ...transporterConfig,
+        ...this.config.ssl,
+        opportunisticTLS: true,
+        port: parseInt(port, 10),
+        logger: this.config.logger,
+        host,
+        name
+      });
+      info = await transporter.sendMail({ envelope, raw });
+    } catch (err) {
+      /*
+      ✖  error     Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com
+          at Object.checkServerIdentity (tls.js:288:12)
+          at TLSSocket.onConnectSecure (_tls_wrap.js:1483:27)
+          at TLSSocket.emit (events.js:311:20)
+          at TLSSocket._finishInit (_tls_wrap.js:916:8)
+          at TLSWrap.ssl.onhandshakedone (_tls_wrap.js:686:12) {
+        reason: "Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com",
+        host: 'mx.example.com',
+        cert: { ... },
+        ...
+      */
+      // this will indicate it is a TLS issue, so we should retry as plain
+      // if it doesn't have all these properties per this link then its not TLS
+      // <https://github.com/nodejs/node/blob/1f9761f4cc027315376cd669ceed2eeaca865d76/lib/tls.js#L287>
+      if (!err.reason || !err.host || !err.cert) throw err;
+      // NOTE: we could do smart alerting for customers recipients here
+      // but for now we just retry in plain text mode without SSL/STARTTLS
+      this.config.logger.error(err, { options, envelope });
+      transporter = nodemailer.createTransport({
+        ...transporterConfig,
+        ...this.config.ssl,
+        ignoreTLS: true,
+        secure: false,
+        port: parseInt(port, 10),
+        logger: this.config.logger,
+        host,
+        name
+      });
+      info = await transporter.sendMail({ envelope, raw });
+    }
+
+    return info;
   }
 
   rewriteFriendlyFrom(from) {
@@ -514,6 +640,9 @@ class ForwardEmail {
   }
 
   async onConnect(session, fn) {
+    // set arrival date for future use by bounce handler
+    session.arrivalDate = Date.now();
+
     if (env.NODE_ENV === 'test') return fn();
 
     // TODO: implement stricter spam checking to alleviate this
@@ -647,6 +776,10 @@ class ForwardEmail {
         const messageId = headers.getFirst('Message-ID');
         const replyTo = headers.getFirst('Reply-To');
         const inReplyTo = headers.getFirst('In-Reply-To');
+
+        // <https://github.com/zone-eu/zone-mta/blob/2557a975ee35ed86e4d95d6cfe78d1b249dec1a0/plugins/core/email-bounce.js#L97>
+        if (headers.get('Received').length > 25)
+          throw new CustomError('Message was stuck in a redirect loop');
 
         // <https://www.oreilly.com/library/view/programming-internet-email/9780596802585/ch02s04.html>
         // <https://tools.ietf.org/html/rfc822
@@ -1117,6 +1250,7 @@ class ForwardEmail {
         // flatten the recipients and make them unique
         recipients = _.uniqBy(_.compact(_.flatten(recipients)), 'address');
 
+        // TODO: we can probably remove this now
         // go through recipients and if we have a user+xyz@domain
         // AND we also have user@domain then honor the user@domain only
         // (helps to alleviate bulk spam with services like Gmail)
@@ -1235,6 +1369,7 @@ class ForwardEmail {
               normalized.push({
                 host: address.host,
                 port: recipient.port,
+                recipient: recipient.address,
                 to: [address.to], // [ normal ],
                 replacements
               });
@@ -1246,6 +1381,16 @@ class ForwardEmail {
         // 11) send email
         //
 
+        // set `X-ForwardEmail-Version`
+        headers.update('X-ForwardEmail-Version', pkg.version);
+        // and `X-ForwardEmail-Session-ID`
+        headers.update('X-ForwardEmail-Session-ID', session.id);
+        // and `X-ForwardEmai-Sender`
+        headers.update(
+          'X-ForwardEmail-Sender',
+          `rfc822; ${session.envelope.mailFrom.address}`
+        );
+
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
@@ -1254,7 +1399,6 @@ class ForwardEmail {
         );
 
         try {
-          const accepted = [];
           // set SRS
           const from = this.srs.forward(
             session.envelope.mailFrom.address,
@@ -1275,10 +1419,11 @@ class ForwardEmail {
                     ...mail,
                     raw
                   });
-              } catch (err_) {
+              } catch (err) {
                 bounces.push({
                   address: recipient.recipient,
-                  err: err_
+                  err,
+                  host: recipient.webhook
                 });
               }
 
@@ -1291,13 +1436,13 @@ class ForwardEmail {
               raw,
               from
             });
-            if (result.accepted.length > 0) accepted.push(recipient.address);
             if (result.rejected.length === 0) return;
             for (let x = 0; x < result.rejected.length; x++) {
               const err = result.rejectedErrors[x];
               bounces.push({
                 // TODO: in future handle this port: recipient.port
                 // and also handle it in `async processAddress(replacements, opts)`
+                address: recipient.recipient,
                 host: recipient.host,
                 err
               });
@@ -1306,46 +1451,62 @@ class ForwardEmail {
 
           await Promise.all(normalized.map(mapper));
 
+          // if there weren't any bounces then return early
           if (bounces.length === 0) return fn();
 
-          const codes = bounces.map(bounce => {
-            if (_.isNumber(bounce.err.responseCode))
-              return bounce.err.responseCode;
-            if (
-              _.isString(bounce.err.code) &&
-              RETRY_CODES.includes(bounce.err.code)
-            )
-              return CODES_TO_RESPONSE_CODES[bounce.err.code];
-            return 550;
-          });
+          //
+          // if the message had any of these headers then don't send bounce
+          // <https://www.jitbit.com/maxblog/18-detecting-outlook-autoreplyout-of-office-emails-and-x-auto-response-suppress-header/>
+          // <https://github.com/nodemailer/smtp-server/issues/129>
+          //
+          if (
+            headers.hasHeader('X-Autoreply') ||
+            headers.hasHeader('X-Autorespond') ||
+            (headers.hasHeader('Auto-Submitted') &&
+              headers.getFirst('Auto-Submitted') === 'auto-replied')
+          )
+            return fn();
 
-          // sort the codes and get the lowest one
-          // (that way 4xx retries are attempted)
-          const [code] = codes.sort();
+          //
+          // instead of returning an error if it bounced
+          // which would in turn cause the message to get retried
+          // we should instead send a bounce email to the user
+          //
+          // <https://github.com/nodemailer/smtp-server/issues/129>
+          //
+          await Promise.all(
+            bounces.map(async bounce => {
+              try {
+                await this.sendEmail({
+                  host: session.remoteAddress,
+                  port: session.remotePort,
+                  name,
+                  envelope: {
+                    from: '',
+                    to: session.envelope.mailFrom.address
+                  },
+                  raw: this.dkim.sign(
+                    this.getBounceStream({
+                      headers,
+                      from: session.envelope.mailFrom.address,
+                      name,
+                      bounce,
+                      id: session.id,
+                      arrivalDate: session.arrivalDate
+                    })
+                  )
+                });
+              } catch (err) {
+                this.config.logger.error(err);
+              }
+            })
+          );
 
-          const messages = [];
+          fn();
 
-          if (accepted.length > 0)
-            messages.push(
-              `Message was sent successfully to ${arrayJoinConjunction(
-                accepted
-              )}`
-            );
-
-          for (const element of bounces) {
-            messages.push(
-              `Error for ${element.host || element.address} of "${
-                element.err.message
-              }"`
-            );
-          }
-
-          // join the messages together and make them unique
-          const err = new CustomError(_.uniq(messages).join(', '), code);
-
-          this.config.logger.error(err);
-
-          fn(err);
+          //
+          // TODO: add smart alerting here for all bounces
+          //
         } catch (err) {
           stream.destroy(err);
         }
@@ -1357,7 +1518,8 @@ class ForwardEmail {
     stream.once('error', err => {
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
-        err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+        if (!err.responseCode)
+          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
         err.message = err.message.split('msg:')[1];
       }
 

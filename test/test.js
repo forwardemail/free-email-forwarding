@@ -711,6 +711,40 @@ Test`.trim()
   });
 });
 
+test('bounce', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'test@niftylettuce.com',
+      to: 'bounces@spamchecker.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+To: bounces@spamchecker.net
+From: Test <test@niftylettuce.com>
+Subject: testing bounces
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
 test('nobody', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
