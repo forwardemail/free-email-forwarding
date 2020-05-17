@@ -476,7 +476,7 @@ class ForwardEmail {
       rootNode
         .createChild('text/html; charset=utf-8')
         .setHeader('Content-Description', 'Notification')
-        .setRaw(
+        .setContent(
           options.template.html
             .replace(REGEX_BOUNCE_ADDRESS, options.bounce.address)
             .replace(
@@ -505,7 +505,7 @@ class ForwardEmail {
         ].join('\n')
       );
 
-    rootNode.createChild('message/rfc822').setRaw(options.originalRaw);
+    rootNode.createChild('message/rfc822').setContent(options.originalRaw);
 
     return rootNode.createReadStream();
   }
