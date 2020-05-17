@@ -125,6 +125,8 @@ const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
 const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
+const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
+const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -443,30 +445,51 @@ class ForwardEmail {
     rootNode.setHeader('Auto-Submitted', 'auto-replied');
     rootNode.setHeader('Subject', 'Delivery Status Notification (Failure)');
 
-    const messageId = options.headers.getFirst('Message-ID');
-
-    if (messageId) {
-      rootNode.setHeader('In-Reply-To', messageId);
-      rootNode.setHeader('References', messageId);
+    if (options.messageId) {
+      rootNode.setHeader('In-Reply-To', options.messageId);
+      rootNode.setHeader('References', options.messageId);
     }
 
-    // TODO: text/html all fancy
-
     rootNode
-      .createChild('text/plain')
+      .createChild('text/plain; charset=utf-8')
       .setHeader('Content-Description', 'Notification')
       .setContent(
-        [
-          `Delivery to the following recipient failed permanently: ${options.bounce.address}`,
-          `Technical details of permanent failure: ${options.bounce.err.message}`
-        ].join('\n')
+        options.template && options.template.text
+          ? options.template.text
+              .replace(REGEX_BOUNCE_ADDRESS, options.bounce.address)
+              .replace(
+                REGEX_BOUNCE_ERROR_MESSAGE,
+                options.bounce.err.response || options.bounce.err.message
+              )
+          : [
+              `Your message wasn't delivered to ${options.bounce.address} due to an error.`,
+              '',
+              'The response was:',
+              '',
+              options.bounce.err.response || options.bounce.err.message,
+              '',
+              `If you need help, forward this to ${this.config.email} or visit ${this.config.website}.`
+            ].join('\n')
       );
+
+    if (options.template && options.template.html)
+      rootNode
+        .createChild('text/html; charset=utf-8')
+        .setHeader('Content-Description', 'Notification')
+        .setRaw(
+          options.template.html
+            .replace(REGEX_BOUNCE_ADDRESS, options.bounce.address)
+            .replace(
+              REGEX_BOUNCE_ERROR_MESSAGE,
+              options.bounce.err.response || options.bounce.err.message
+            )
+        );
 
     rootNode
       .createChild('message/delivery-status')
       .setHeader('Content-Description', 'Delivery report')
       .setContent(
-        _.compact([
+        [
           `Reporting-MTA: dns; ${options.name}`,
           `X-ForwardEmail-Version: ${pkg.version}`,
           `X-ForwardEmail-Session-ID: ${options.id}`,
@@ -479,13 +502,10 @@ class ForwardEmail {
           `Status: 5.0.0`,
           `Remote-MTA: dns; ${options.bounce.host}`,
           `Diagnostic-Code: smtp; ${this.getDiagnosticCode(options.bounce.err)}`
-        ]).join('\n')
+        ].join('\n')
       );
 
-    rootNode
-      .createChild('text/rfc822-headers')
-      .setHeader('Content-Description', 'Undelivered Message Headers')
-      .setContent(options.headers.build());
+    rootNode.createChild('message/rfc822').setRaw(options.originalRaw);
 
     return rootNode.createReadStream();
   }
@@ -1479,6 +1499,30 @@ class ForwardEmail {
           // (will basically pick the first that was pushed to the list)
           //
           const uniqueBounces = _.uniqBy(bounces, 'address');
+
+          //
+          // TODO: get the latest bounce template rendered for the user from our API
+          // (which we'll then replace with the recipient's address and message)
+          //
+          const template = false;
+          /*
+          try {
+            const { body } = await superagent
+              .get(`${this.config.apiEndpoint}/v1/bounce`)
+              .set('Accept', 'json')
+              .set('User-Agent', `forward-email/${pkg.version}`)
+              .auth(this.config.apiSecrets[0])
+              .timeout(this.config.timeout)
+              .retry(this.config.retry)
+              .send();
+
+            if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
+              template = body;
+          } catch (err) {
+            this.config.logger.error(err);
+          }
+          */
+
           await Promise.all(
             uniqueBounces.map(async bounce => {
               try {
@@ -1500,7 +1544,10 @@ class ForwardEmail {
                       name,
                       bounce,
                       id: session.id,
-                      arrivalDate: session.arrivalDate
+                      arrivalDate: session.arrivalDate,
+                      originalRaw,
+                      messageId,
+                      template
                     })
                   )
                 });
@@ -1706,7 +1753,9 @@ class ForwardEmail {
   async onMailFrom(address, session, fn) {
     try {
       await Promise.all([
-        this.validateRateLimit(address.address),
+        this.validateRateLimit(
+          address.address || session.clientHostname || session.remoteAddress
+        ),
         this.validateMX(address.address)
       ]);
       fn();
