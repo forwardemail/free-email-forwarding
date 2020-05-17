@@ -1475,8 +1475,12 @@ class ForwardEmail {
           //
           // <https://github.com/nodemailer/smtp-server/issues/129>
           //
+          // and we also need to make bounces unique by address here
+          // (will basically pick the first that was pushed to the list)
+          //
+          const uniqueBounces = _.uniqBy(bounces, 'address');
           await Promise.all(
-            bounces.map(async bounce => {
+            uniqueBounces.map(async bounce => {
               try {
                 const addresses = await this.validateMX(
                   session.envelope.mailFrom.address
@@ -1509,7 +1513,7 @@ class ForwardEmail {
           fn();
 
           //
-          // TODO: add smart alerting here for all bounces
+          // TODO: add smart alerting here for all `bounces`
           //
         } catch (err) {
           stream.destroy(err);
