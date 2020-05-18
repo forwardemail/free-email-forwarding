@@ -1880,10 +1880,10 @@ class ForwardEmail {
         // > str.slice(str.indexOf(':') + 1)
         // 'https://foo.com'
         const index = addresses[i].indexOf(':');
-        const addr = [
-          addresses[i].slice(0, index),
-          addresses[i].slice(index + 1)
-        ];
+        const addr =
+          index === -1
+            ? [addresses[i]]
+            : [addresses[i].slice(0, index), addresses[i].slice(index + 1)];
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
