@@ -825,6 +825,7 @@ class ForwardEmail {
           headers.update('To', this.checkSRS(headers.getFirst('To')));
           const toAddresses = addressParser(headers.getFirst('To'));
           if (
+            !headers.hasHeader('Bcc') &&
             toAddresses.every(
               a =>
                 !_.isObject(a) ||
@@ -1397,6 +1398,8 @@ class ForwardEmail {
             }
           }
         }
+
+        if (normalized.length === 0) return fn();
 
         //
         // 11) send email
