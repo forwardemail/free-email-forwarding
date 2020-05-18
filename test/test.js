@@ -745,6 +745,43 @@ Test`.trim()
   });
 });
 
+test('to parsing should not throw error', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    envelope: {
+      from: 'test@niftylettuce.com',
+      to: 'notthrow@forwardemail.net'
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+From: Test <test@niftylettuce.com>
+To: undisclosed-recipients:;
+Cc:
+Bcc: bcc@niftylettuce.com
+Date: Sun, 17 May 2020 18:21:15 -0500
+Subject: testing parser
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim()
+  });
+  return new Promise(resolve => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, err => {
+        t.is(err, null);
+        connection.close();
+      });
+    });
+  });
+});
+
 test('nobody', async t => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
