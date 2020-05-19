@@ -1444,7 +1444,7 @@ class ForwardEmail {
                   .retry(this.config.retry)
                   .send({
                     ...mail,
-                    raw: originalRaw
+                    raw: originalRaw.toString()
                   });
               } catch (err) {
                 bounces.push({
