@@ -229,7 +229,7 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
-      timeout: 5000,
+      timeout: 10000,
       retry: 3,
       simpleParser: { Iconv },
       isURLOptions: {
