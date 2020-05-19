@@ -1431,7 +1431,10 @@ class ForwardEmail {
           const mapper = async recipient => {
             if (recipient.webhook) {
               try {
-                const mail = await simpleParser(raw, this.config.simpleParser);
+                const mail = await simpleParser(
+                  originalRaw,
+                  this.config.simpleParser
+                );
 
                 await superagent
                   .post(recipient.webhook)
@@ -1441,7 +1444,7 @@ class ForwardEmail {
                   .retry(this.config.retry)
                   .send({
                     ...mail,
-                    raw
+                    raw: originalRaw
                   });
               } catch (err) {
                 bounces.push({
