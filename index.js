@@ -1903,7 +1903,9 @@ class ForwardEmail {
         if (
           addr.length !== 2 ||
           !_.isString(addr[1]) ||
-          (!validator.isEmail(addr[1]) &&
+          (!validator.isFQDN(addr[1]) &&
+            !validator.isIP(addr[1]) &&
+            !validator.isEmail(addr[1]) &&
             !validator.isURL(addr[1], this.config.isURLOptions))
         )
           throw new CustomError(
