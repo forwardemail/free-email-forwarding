@@ -1878,7 +1878,10 @@ class ForwardEmail {
     for (let i = 0; i < addresses.length; i++) {
       // convert addresses to lowercase
       addresses[i] = addresses[i].toLowerCase();
-      if (addresses[i].includes(':') || addresses[i].indexOf('!') === 0) {
+      if (
+        (addresses[i].includes(':') || addresses[i].indexOf('!') === 0) &&
+        !validator.isURL(addresses[i], this.config.isURLOptions)
+      ) {
         // > const str = 'foo:https://foo.com'
         // > str.slice(0, str.indexOf(':'))
         // 'foo'
