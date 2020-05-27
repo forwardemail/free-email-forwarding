@@ -814,6 +814,7 @@ class ForwardEmail {
              Note that the "Bcc" field may be empty, while the  "To"  field
              is required to have at least one address.
         */
+        /*
         const hasHeaderTo = headers.hasHeader('To');
         if (!hasHeaderTo && !headers.hasHeader('Bcc'))
           throw new CustomError(
@@ -837,6 +838,7 @@ class ForwardEmail {
               'Your message is not RFC 5322 compliant, please include at least one valid email address in the "To" header, otherwise unset it and and use a "Bcc" header.'
             );
         }
+        */
 
         //
         // 3) reverse SRS bounces
