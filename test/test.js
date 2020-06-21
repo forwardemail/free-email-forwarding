@@ -11,10 +11,10 @@ const domains = require('disposable-email-domains');
 const getPort = require('get-port');
 const isCI = require('is-ci');
 const nodemailer = require('nodemailer');
+const pify = require('pify');
 const shell = require('shelljs');
 const test = require('ava');
 const { v4 } = require('uuid');
-const pify = require('pify');
 
 const lookupAsync = pify(dns.lookup);
 
@@ -29,6 +29,7 @@ test.beforeEach(async t => {
   if (keys.length > 0) await Promise.all(keys.map(key => client.del(key)));
   const port = await getPort();
   const forwardEmail = new ForwardEmail({ port });
+  await forwardEmail.scanner.load();
   await forwardEmail.listen();
   t.context.forwardEmail = forwardEmail;
 });
@@ -1014,6 +1015,60 @@ if (!isCI)
       });
     });
   });
+
+//
+// NOTE: redis could test this by sending same message twice
+// and then checking redis.get key/hash value if it was set in between
+//
+test('greylisting with redis', async t => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+
+  const { port } = t.context.forwardEmail.server.address();
+
+  const connection = new Client({ port, tls });
+
+  const envelope = {
+    from: 'test@spamapi.net',
+    to: 'test@forwardemail.net'
+  };
+
+  const raw = `
+Message-ID: <123.abc@test>
+Date: ${new Date().toString()}
+To: nobody@forwardemail.net
+From: Test <test@niftylettuce.com>
+Subject: testing custom port forwarding
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`.trim();
+
+  const connect = pify(connection.connect).bind(connection);
+  const send = pify(connection.send).bind(connection);
+  const key = t.context.forwardEmail.getSentKey('niftylettuce@gmail.com', raw);
+
+  const info = await transporter.sendMail({
+    envelope,
+    raw
+  });
+
+  let val = await t.context.forwardEmail.client.get(key);
+
+  t.is(val, null);
+
+  await connect();
+
+  await send(info.envelope, info.message);
+
+  // note the envelope.to hash is for niftylettuce@gmail.com
+  // since that is where it actually forwards to (that's where test@niftylettuce.com goes to)
+  val = await t.context.forwardEmail.client.get(key);
+
+  t.is(val, '1');
+});
 
 /*
 test.todo('rejects invalid DKIM signature');
