@@ -3,14 +3,15 @@ const dns = require('dns');
 const fs = require('fs');
 const util = require('util');
 
-// const mailUtilities = require('mailin/lib/mailUtilities.js');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
+const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
+const arrayJoinConjunction = require('array-join-conjunction');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
@@ -21,13 +22,16 @@ const getStream = require('get-stream');
 const ip = require('ip');
 const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
+const mxConnect = require('mx-connect');
 const nodemailer = require('nodemailer');
 const parseDomain = require('parse-domain');
 const pify = require('pify');
 const pkg = require('./package');
 const punycode = require('punycode/');
+const revHash = require('rev-hash');
 const sharedConfig = require('@ladjs/shared-config');
 const spfCheck2 = require('python-spfcheck2');
+const splitLines = require('split-lines');
 const superagent = require('superagent');
 const validator = require('validator');
 const wildcards = require('disposable-email-domains/wildcard.json');
@@ -46,9 +50,20 @@ const {
   logger
 } = require('./helpers');
 
-// const computeSpamScoreAsync = pify(mailUtilities.computeSpamScore);
+const CODES_TO_RESPONSE_CODES = {
+  ETIMEDOUT: 420,
+  ECONNRESET: 442,
+  EADDRINUSE: 421,
+  ECONNREFUSED: 421,
+  EPIPE: 421,
+  ENOTFOUND: 421,
+  ENETUNREACH: 421,
+  EAI_AGAIN: 421
+};
 
-const USER_AGENT = `forward-email/${pkg.version}`;
+const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
+
+const asyncMxConnect = pify(mxConnect);
 
 /*
 //
@@ -229,7 +244,7 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
-      timeout: 10000,
+      timeout: ms('10s'),
       retry: 3,
       simpleParser: { Iconv },
       isURLOptions: {
@@ -241,13 +256,17 @@ class ForwardEmail {
         address: 'mailer-daemon@[HOSTNAME]'
       },
       sendingZone: 'bounces',
+      userAgent: `${pkg.name}/${pkg.version}`,
+      spamScanner: {},
+      ttlMs: ms('7d'),
+      maxRetry: 5,
       ...config
     };
 
     if (
       this.dnsbl &&
-      Array.isArray(this.dnsbl.domains) &&
-      Array.isArray(this.dnsbl.removals) &&
+      _.isArray(this.dnsbl.domains) &&
+      _.isArray(this.dnsbl.removals) &&
       this.dnsbl.domains.length !== this.dnsbl.removals.length
     )
       throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS');
@@ -320,6 +339,9 @@ class ForwardEmail {
     this.server.on('error', err => {
       this.config.logger.error(err);
     });
+
+    // expose spamscanner
+    this.scanner = new SpamScanner(this.config.spamScanner);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -510,56 +532,141 @@ class ForwardEmail {
     return rootNode.createReadStream();
   }
 
+  getSentKey(to, raw) {
+    // safeguards for development
+    if (_.isString(to)) to = [to];
+    if (!_.isArray(to)) throw new Error('to must be an Array');
+    if (!_.isString(raw)) throw new Error('raw must be String');
+
+    // `raw` seems to have trailing line break
+    // so normalizing it is a safeguard
+    let lines = splitLines(raw.trim());
+
+    // strip first DKIM-Signature (the first will always be ours)
+    let lastDKIMIndex = 0;
+    for (const [i, line] of lines.entries()) {
+      if (
+        (i === 0 && !line.startsWith('DKIM-Signature')) ||
+        (i > 0 && !line.startsWith(' '))
+      )
+        break;
+      lastDKIMIndex++;
+    }
+
+    lines = lines.slice(lastDKIMIndex);
+
+    // strip all X-ForwardEmail header lines (since versions can change in between greylisting)
+    lines = lines.filter(line => !line.startsWith('X-ForwardEmail-'));
+
+    return `sent:${revHash(JSON.stringify(to))}:${revHash(
+      JSON.stringify(lines)
+    )}`;
+  }
+
+  // TODO: implement ARF parser
+  //       POST /abuse
+  //       GET /abuse?email=mailfrom&ip=
+  //       sends 4xx retry later if it found in this list
+  //       which gives us time to manually curate the list of false positives
+
   // we have already combined multiple recipients with same host+port mx combo
   async sendEmail(options) {
     const { host, name, envelope, raw, port } = options;
+
+    //
+    // two good resources for testing greylisting:
+    // <https://test.meinmail.info/greylisting-test.html> (translate to en)
+    // <http://www.allaboutspam.com/email-server-test/>
+    //
+    const key = this.getSentKey(envelope.to, raw);
+
+    // this has support for greylisting, where we check for a cached key already sent for envelope to
+    // and if so, then we will return early and not send the message twice
+    // and so in this case, we can send a retry to the end user, but it won't actually retry
+    // TTL should be 7 days with rev-hashed body
+    const val = await this.client.get(key);
+
+    // if there was a value (non-null) then that means it was already sent
+    // so we can return early here and not re-send the message twice
+    if (val)
+      return {
+        accepted: [envelope.to],
+        rejected: [],
+        rejectedErrors: []
+      };
+
+    //
+    // only allow up to 5 retries (greylist attempts) for this message
+    //
+    const count =
+      _.isString(val) && _.isFinite(parseInt(val, 10))
+        ? parseInt(val, 10) + 1
+        : 1;
+
+    if (count > this.config.maxRetry)
+      throw new CustomError(
+        `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
+      );
+
     // try it once with opportunisticTLS otherwise ignoreTLS
     // (e.g. in case of a bad altname on a certificate)
     let info;
     let transporter;
     try {
+      const mx = await asyncMxConnect({
+        target: host,
+        port: parseInt(port, 10),
+        localHostname: name
+      });
       transporter = nodemailer.createTransport({
         ...transporterConfig,
         ...this.config.ssl,
         opportunisticTLS: true,
-        port: parseInt(port, 10),
         logger: this.config.logger,
-        host,
+        host: mx.host,
+        port: mx.port,
         name
       });
       info = await transporter.sendMail({ envelope, raw });
+      await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
-      /*
-      ✖  error     Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com
-          at Object.checkServerIdentity (tls.js:288:12)
-          at TLSSocket.onConnectSecure (_tls_wrap.js:1483:27)
-          at TLSSocket.emit (events.js:311:20)
-          at TLSSocket._finishInit (_tls_wrap.js:916:8)
-          at TLSWrap.ssl.onhandshakedone (_tls_wrap.js:686:12) {
-        reason: "Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com",
-        host: 'mx.example.com',
-        cert: { ... },
-        ...
-      */
-      // this will indicate it is a TLS issue, so we should retry as plain
+      // this error will indicate it is a TLS issue, so we should retry as plain
       // if it doesn't have all these properties per this link then its not TLS
+      //
+      // ✖  error     Error [ERR_TLS_CERT_ALTNAME_INVALID]: Hostname/IP does not match certificate's altnames: Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com
+      //     at Object.checkServerIdentity (tls.js:288:12)
+      //     at TLSSocket.onConnectSecure (_tls_wrap.js:1483:27)
+      //     at TLSSocket.emit (events.js:311:20)
+      //     at TLSSocket._finishInit (_tls_wrap.js:916:8)
+      //     at TLSWrap.ssl.onhandshakedone (_tls_wrap.js:686:12) {
+      //   reason: "Host: mx.example.com. is not in the cert's altnames: DNS:test1.example.com, DNS:test2.example.com",
+      //   host: 'mx.example.com',
+      //   cert: { ... },
+      //   ...
+      //
       // <https://github.com/nodejs/node/blob/1f9761f4cc027315376cd669ceed2eeaca865d76/lib/tls.js#L287>
-      // TODO: we may want to uncomment the line below, otherwise all emails that fail will be retried
+      //
+      // NOTE: we may want to uncomment the line below, otherwise all emails that fail will be retried
       // if (!err.reason || !err.host || !err.cert) throw err;
-      // NOTE: we could do smart alerting for customers recipients here
-      // but for now we just retry in plain text mode without SSL/STARTTLS
+      //
       this.config.logger.error(err, { options, envelope });
+      const mx = await asyncMxConnect({
+        target: host,
+        port: parseInt(port, 10),
+        localHostname: name
+      });
       transporter = nodemailer.createTransport({
         ...transporterConfig,
         ...this.config.ssl,
         ignoreTLS: true,
         secure: false,
-        port: parseInt(port, 10),
         logger: this.config.logger,
-        host,
+        host: mx.host,
+        port: mx.port,
         name
       });
       info = await transporter.sendMail({ envelope, raw });
+      await this.client.set(key, count, 'PX', this.config.ttlMs);
     }
 
     return info;
@@ -620,18 +727,18 @@ class ForwardEmail {
     if (
       !this.config.dnsbl ||
       !this.config.dnsbl.domains ||
-      (Array.isArray(this.config.dnsbl.domains) &&
+      (_.isArray(this.config.dnsbl.domains) &&
         this.config.dnsbl.domains.length === 0)
     ) {
       this.config.logger.warn('No DNS blacklists were provided');
       return false;
     }
 
-    if (Array.isArray(this.config.dnsbl.domains)) {
+    if (_.isArray(this.config.dnsbl.domains)) {
       const results = await dnsbl.batch(ip, this.config.dnsbl.domains, {
         servers: this.config.dns
       });
-      if (!Array.isArray(results) || results.length === 0) return false;
+      if (!_.isArray(results) || results.length === 0) return false;
       const blacklistedResults = results.filter(result => result.listed);
       if (blacklistedResults.length === 0) return false;
       return blacklistedResults
@@ -666,17 +773,6 @@ class ForwardEmail {
 
     if (env.NODE_ENV === 'test') return fn();
 
-    // TODO: implement stricter spam checking to alleviate this
-    /*
-    // ensure it's a fully qualififed domain name
-    if (!validator.isFQDN(session.clientHostname))
-      return fn(
-        new CustomError(
-          `${session.clientHostname} is not a fully qualified domain name ("FQDN")`
-        )
-      );
-    */
-
     try {
       // check against blacklist
       if (
@@ -693,11 +789,11 @@ class ForwardEmail {
         );
 
       // ensure that it's not on the DNS blacklist
-      // Spamhaus = zen.spamhaus.org
-      // SpamCop = bl.spamcop.net
-      // Barracuda = b.barracudacentral.org
-      // Lashback = ubl.unsubscore.com
-      // PSBL = psbl.surriel.com
+      // X Spamhaus = zen.spamhaus.org
+      // - SpamCop = bl.spamcop.net
+      // - Barracuda = b.barracudacentral.org
+      // - Lashback = ubl.unsubscore.com
+      // - PSBL = psbl.surriel.com
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
@@ -760,7 +856,7 @@ class ForwardEmail {
       // 2) X ensure all email headers were parsed
       // 3) X reverse SRS bounces
       // 4) X prevent replies to no-reply@forwardemail.net (no bottleneck)
-      // 5) O check for spam (score must be < 5) (child process spam daemon)
+      // 5) X check for spam
       // 6) X if SPF is valid (child process python)
       // 7) X check for DMARC compliance
       // 8) X conditionally rewrite with friendly from if DMARC were to fail
@@ -864,7 +960,17 @@ class ForwardEmail {
           throw new CustomError(
             oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
           );
+
+        console.log('headers', headers);
+
         const originalFrom = headers.getFirst('From');
+
+        console.log('originalFrom', originalFrom);
+
+        // message body as a single Buffer (everything after the \r\n\r\n separator)
+        originalRaw = Buffer.concat([headers.build(), ...chunks]);
+
+        console.log('originalRaw', originalRaw.toString());
 
         if (!originalFrom)
           throw new CustomError(
@@ -875,31 +981,53 @@ class ForwardEmail {
         const fromDomain = this.parseDomain(originalFrom);
         const parsedFromDomain = parseDomain(fromDomain);
 
-        // message body as a single Buffer (everything after the \r\n\r\n separator)
-        originalRaw = Buffer.concat([headers.build(), ...chunks]);
-
         //
-        // 5) check for spam (score must be < 5)
+        // 5) check for spam
         //
-        // TODO: we need to replace the spam block below with implementation
-        // // of `pdf-spamc-stream` from https://github.com/streamtOtO/spamc-stream
-        // // note that this package name is published with several key updates
-        //
-        // TODO: we may also want to add clamav for attachment scanning
-        /*
-        let spamScore = 0;
+        let results;
         try {
-          spamScore = await computeSpamScoreAsync(originalRaw);
+          results = await this.scanner.scan(originalRaw);
         } catch (err) {
-          this.config.logger.error(err);
+          logger.error(err);
         }
 
-        if (spamScore >= this.config.spamScoreThreshold)
-          throw new CustomError(
-            `Message detected as spam (spam score of ${spamScore} exceeds threshold of ${this.config.spamScoreThreshold})`,
-            554
-          );
-        */
+        if (results) {
+          if (results.is_spam)
+            logger.error('spam detected', {
+              originalRaw: originalRaw.toString(),
+              results
+            });
+
+          //
+          // NOTE: until we are confident with the accuracy
+          // we are not utilizing classification right now
+          // however we still want to use other detections
+          //
+          const messages = [];
+
+          if (
+            _.isObject(results.phishing) &&
+            _.isArray(results.phishing.messages)
+          )
+            for (const message of results.phishing.messages) {
+              messages.push(message);
+            }
+
+          if (_.isArray(results.executables)) {
+            for (const message of results.executables) {
+              messages.push(message);
+            }
+          }
+
+          if (_.isArray(results.arbitrary)) {
+            for (const message of results.arbitrary) {
+              messages.push(message);
+            }
+          }
+
+          if (messages.length > 0)
+            throw new CustomError(messages.join(' '), 554);
+        }
 
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
@@ -1201,9 +1329,10 @@ class ForwardEmail {
                 const domain = this.parseDomain(to.address, false);
 
                 const { body } = await superagent
-                  .get(`${this.config.apiEndpoint}/v1/port?domain=${domain}`)
+                  .get(`${this.config.apiEndpoint}/v1/port`)
+                  .query({ domain })
                   .set('Accept', 'json')
-                  .set('User-Agent', USER_AGENT)
+                  .set('User-Agent', this.config.userAgent)
                   .auth(this.config.apiSecrets[0])
                   .timeout(this.config.timeout)
                   .retry(this.config.retry)
@@ -1231,6 +1360,29 @@ class ForwardEmail {
               // if we already rewrote headers no need to continue
               if (rewritten) return { address: to.address, addresses, port };
 
+              // get or create a new Message-ID that may or may not be used
+              // by looking up a hash of the original raw message
+              let createdMessageId = createMessageID(session);
+              try {
+                //
+                // NOTE: we may want to make this more unique somehow
+                //       but right now there is no easy way, since we cannot
+                //       rely upon the session.envelope.mailFrom as it could change
+                //
+                const key = revHash(originalRaw.toString());
+                const val = await this.client.get(key);
+                if (val) createdMessageId = val;
+                else
+                  await this.client.set(
+                    key,
+                    createdMessageId,
+                    'PX',
+                    this.config.ttlMs
+                  );
+              } catch (err) {
+                this.config.logger.error(err);
+              }
+
               // the same address that gets forwarded TO using our service
               // (we can assume that other mail providers do the same)
               for (const address of addresses) {
@@ -1247,7 +1399,7 @@ class ForwardEmail {
                 //
                 if (messageId) {
                   const changes = ['Message-ID', 'X-Original-Message-ID'];
-                  headers.update('Message-ID', createMessageID(session));
+                  headers.update('Message-ID', createdMessageId);
                   headers.update('X-Original-Message-ID', messageId);
                   // don't modify the reply-to if it was already set
                   if (!inReplyTo) {
@@ -1302,10 +1454,10 @@ class ForwardEmail {
                     // if it was a URL webhook then return early
                     if (validator.isURL(address, this.config.isURLOptions))
                       return { to: address, is_webhook: true };
-                    const addresses = await this.validateMX(address);
-                    // TODO: we don't do anything with priority right now
-                    // `addresses` are already pre-sorted by lowest priority
-                    return { to: address, host: addresses[0].exchange };
+                    return {
+                      to: address,
+                      host: this.parseDomain(address, false)
+                    };
                   } catch (err) {
                     // e.g. if the MX servers don't exist for recipient
                     // then obviously there should be an error
@@ -1425,6 +1577,7 @@ class ForwardEmail {
         );
 
         try {
+          const accepted = [];
           // set SRS
           const from = this.srs.forward(
             session.envelope.mailFrom.address,
@@ -1441,17 +1594,17 @@ class ForwardEmail {
                 await superagent
                   .post(recipient.webhook)
                   // .type('message/rfc822')
-                  .set('User-Agent', USER_AGENT)
+                  .set('User-Agent', this.config.userAgent)
                   .timeout(this.config.timeout)
                   .retry(this.config.retry)
                   .send({
                     ...mail,
                     raw: originalRaw.toString()
                   });
-              } catch (err) {
+              } catch (err_) {
                 bounces.push({
                   address: recipient.recipient,
-                  err,
+                  err_,
                   host: recipient.webhook
                 });
               }
@@ -1465,6 +1618,7 @@ class ForwardEmail {
               raw,
               from
             });
+            if (result.accepted.length > 0) accepted.push(recipient.address);
             if (result.rejected.length === 0) return;
             for (let x = 0; x < result.rejected.length; x++) {
               const err = result.rejectedErrors[x];
@@ -1483,6 +1637,44 @@ class ForwardEmail {
           // if there weren't any bounces then return early
           if (bounces.length === 0) return fn();
 
+          const codes = bounces.map(bounce => {
+            if (_.isNumber(bounce.err.responseCode))
+              return bounce.err.responseCode;
+            if (
+              _.isString(bounce.err.code) &&
+              RETRY_CODES.includes(bounce.err.code)
+            )
+              return CODES_TO_RESPONSE_CODES[bounce.err.code];
+            return 550;
+          });
+
+          // sort the codes and get the lowest one
+          // (that way 4xx retries are attempted)
+          const [code] = codes.sort();
+
+          const messages = [];
+
+          if (accepted.length > 0)
+            messages.push(
+              `Message was sent successfully to ${arrayJoinConjunction(
+                accepted
+              )}`
+            );
+
+          for (const element of bounces) {
+            messages.push(
+              `Error for ${element.host || element.address} of "${
+                element.err.message
+              }"`
+            );
+          }
+
+          // join the messages together and make them unique
+          const err = new CustomError(_.uniq(messages).join(', '), code);
+
+          // send error to user
+          fn(err);
+
           //
           // if the message had any of these headers then don't send bounce
           // <https://www.jitbit.com/maxblog/18-detecting-outlook-autoreplyout-of-office-emails-and-x-auto-response-suppress-header/>
@@ -1494,7 +1686,7 @@ class ForwardEmail {
             (headers.hasHeader('Auto-Submitted') &&
               headers.getFirst('Auto-Submitted') === 'auto-replied')
           )
-            return fn();
+            return;
 
           //
           // instead of returning an error if it bounced
@@ -1533,39 +1725,42 @@ class ForwardEmail {
 
           await Promise.all(
             uniqueBounces.map(async bounce => {
+              const raw = await getStream(
+                this.dkim.sign(
+                  this.getBounceStream({
+                    headers,
+                    from: session.envelope.mailFrom.address,
+                    name,
+                    bounce,
+                    id: session.id,
+                    arrivalDate: session.arrivalDate,
+                    originalRaw,
+                    messageId,
+                    template
+                  })
+                )
+              );
               try {
-                const addresses = await this.validateMX(
-                  session.envelope.mailFrom.address
-                );
                 await this.sendEmail({
-                  host: addresses[0].exchange,
+                  host: session.envelope.mailFrom.address,
+                  //
+                  // NOTE: bounces to custom ports won't work
+                  //       we would require custom logic here
+                  //       to lookup forward-email-port config
+                  //
                   port: '25',
                   name,
                   envelope: {
                     from: '',
                     to: session.envelope.mailFrom.address
                   },
-                  raw: this.dkim.sign(
-                    this.getBounceStream({
-                      headers,
-                      from: session.envelope.mailFrom.address,
-                      name,
-                      bounce,
-                      id: session.id,
-                      arrivalDate: session.arrivalDate,
-                      originalRaw,
-                      messageId,
-                      template
-                    })
-                  )
+                  raw
                 });
-              } catch (err) {
-                this.config.logger.error(err);
+              } catch (err_) {
+                this.config.logger.error(err_);
               }
             })
           );
-
-          fn();
 
           //
           // TODO: add smart alerting here for all `bounces`
@@ -1723,7 +1918,7 @@ class ForwardEmail {
   }
 
   isBlacklisted(domain) {
-    return Array.isArray(this.config.blacklist)
+    return _.isArray(this.config.blacklist)
       ? this.config.blacklist.includes(domain)
       : false;
   }
@@ -1810,18 +2005,17 @@ class ForwardEmail {
       // if there was a verification record then perform lookup
       try {
         const { body } = await superagent
-          .get(
-            `${this.config.apiEndpoint}/v1/lookup?verification_record=${verifications[0]}`
-          )
+          .get(`${this.config.apiEndpoint}/v1/lookup`)
+          .query({ verification_record: verifications[0] })
           .set('Accept', 'json')
-          .set('User-Agent', USER_AGENT)
+          .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
           .timeout(this.config.timeout)
           .retry(this.config.retry)
           .send();
 
         // body is an Array of records that are formatted like TXT records
-        if (Array.isArray(body)) {
+        if (_.isArray(body)) {
           // combine with any existing TXT records (ensures graceful DNS propagation)
           for (const element of body) {
             validRecords.push(element);

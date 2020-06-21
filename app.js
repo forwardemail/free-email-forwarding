@@ -14,7 +14,11 @@ if (!module.parent) {
 
   (async () => {
     try {
-      await Promise.all([app.listen(port), graceful.listen()]);
+      await Promise.all([
+        app.listen(port),
+        app.spamscanner.load(),
+        graceful.listen()
+      ]);
       if (process.send) process.send('ready');
       logger.info(
         `ForwardEmail server listening on ${

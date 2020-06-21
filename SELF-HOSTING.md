@@ -126,7 +126,19 @@ You'll also need the following dependencies installed:
   +domain.com
   ```
 
-* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.1` (see our [FAQ](https://forwardemail.net/faq) and here is a [TechRepublic][tr-guide] or a [Digital Ocean guide][do-guide])
+* Nameservers - we highly recommend you set your server's nameservers to `1.1.1.3` and `1.0.0.3` (see our [FAQ](https://forwardemail.net/faq) and here is a [TechRepublic][tr-guide] or a [Digital Ocean guide][do-guide]).  See <https://developers.cloudflare.com/1.1.1.1/1.1.1.1-for-families/> for more information on these DNS nameservers.
+
+  ```sh
+  sudo systemctl disable systemd-resolved.service
+  sudo systemctl stop systemd-resolved.service
+  sudo vim /etc/resolv.conf
+  ```
+
+  ```conf
+  nameserver 1.1.1.3
+  nameserver 1.0.0.3
+  options edns0
+  ```
 
 
 ## Programmatic Usage
