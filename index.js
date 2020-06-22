@@ -63,6 +63,8 @@ const CODES_TO_RESPONSE_CODES = {
 
 const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 
+const TLS_RETRY_CODES = ['ETLS', 'ECONNRESET'];
+
 const asyncMxConnect = pify(mxConnect);
 
 /*
@@ -142,6 +144,9 @@ const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
 const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
+const REGEX_TLS_ERR = new RE2(
+  /SSL23_GET_SERVER_HELLO|\/deps\/openssl|ssl3_check|SSL routines/gim
+);
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -646,27 +651,41 @@ class ForwardEmail {
       //
       // <https://github.com/nodejs/node/blob/1f9761f4cc027315376cd669ceed2eeaca865d76/lib/tls.js#L287>
       //
+      // we should only retry on cert/connection error
+      // <https://gist.github.com/andris9/2e28727c4fd905ccbfe74fb348d27cc1>
+      //
       // NOTE: we may want to uncomment the line below, otherwise all emails that fail will be retried
       // if (!err.reason || !err.host || !err.cert) throw err;
       //
-      this.config.logger.error(err, { options, envelope });
-      const mx = await asyncMxConnect({
-        target: host,
-        port: parseInt(port, 10),
-        localHostname: name
-      });
-      transporter = nodemailer.createTransport({
-        ...transporterConfig,
-        ...this.config.ssl,
-        ignoreTLS: true,
-        secure: false,
-        logger: this.config.logger,
-        host: mx.host,
-        port: mx.port,
-        name
-      });
-      info = await transporter.sendMail({ envelope, raw });
-      await this.client.set(key, count, 'PX', this.config.ttlMs);
+      if (
+        TLS_RETRY_CODES.includes(err.code) ||
+        REGEX_TLS_ERR.test(err.message) ||
+        err.reason ||
+        err.host ||
+        err.cert
+      ) {
+        this.config.logger.error(err, { options, envelope });
+        const mx = await asyncMxConnect({
+          target: host,
+          port: parseInt(port, 10),
+          localHostname: name
+        });
+        // try sending the message again without TLS enabled
+        transporter = nodemailer.createTransport({
+          ...transporterConfig,
+          ...this.config.ssl,
+          ignoreTLS: true,
+          secure: false,
+          logger: this.config.logger,
+          host: mx.host,
+          port: mx.port,
+          name
+        });
+        info = await transporter.sendMail({ envelope, raw });
+        await this.client.set(key, count, 'PX', this.config.ttlMs);
+      } else {
+        throw err;
+      }
     }
 
     return info;
