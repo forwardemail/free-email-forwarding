@@ -62,7 +62,6 @@
     "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
     "smtp-server": "^3.6.0",
-    "spamscanner": "0.0.1",
     "split-lines": "^2.0.0",
     "superagent": "^5.2.2",
     "validator": "^13.1.1"
