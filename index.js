@@ -2088,23 +2088,27 @@ class ForwardEmail {
     // (e.g. hello@niftylettuce.com => hello)
     const username = this.parseUsername(address);
 
-    for (let i = 0; i < addresses.length; i++) {
+    for (const element of addresses) {
       // convert addresses to lowercase
-      addresses[i] = addresses[i].toLowerCase();
+      const lowerCaseAddress = element.toLowerCase();
       if (
-        (addresses[i].includes(':') || addresses[i].indexOf('!') === 0) &&
-        !validator.isURL(addresses[i], this.config.isURLOptions)
+        (lowerCaseAddress.includes(':') ||
+          lowerCaseAddress.indexOf('!') === 0) &&
+        !validator.isURL(element, this.config.isURLOptions)
       ) {
         // > const str = 'foo:https://foo.com'
         // > str.slice(0, str.indexOf(':'))
         // 'foo'
         // > str.slice(str.indexOf(':') + 1)
         // 'https://foo.com'
-        const index = addresses[i].indexOf(':');
+        const index = lowerCaseAddress.indexOf(':');
         const addr =
           index === -1
-            ? [addresses[i]]
-            : [addresses[i].slice(0, index), addresses[i].slice(index + 1)];
+            ? [lowerCaseAddress]
+            : [
+                lowerCaseAddress.slice(0, index),
+                lowerCaseAddress.slice(index + 1)
+              ];
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
@@ -2127,28 +2131,28 @@ class ForwardEmail {
             !validator.isURL(addr[1], this.config.isURLOptions))
         )
           throw new CustomError(
-            `${address} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${addresses[i]}"`
+            `${lowerCaseAddress} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${element}"`
           );
 
         if (_.isString(addr[0]) && username === addr[0])
           forwardingAddresses.push(addr[1]);
       } else if (
-        validator.isFQDN(addresses[i]) ||
-        validator.isIP(addresses[i])
+        validator.isFQDN(lowerCaseAddress) ||
+        validator.isIP(lowerCaseAddress)
       ) {
         // allow domain alias forwarding
         // (e.. the record is just "b.com" if it's not a valid email)
-        globalForwardingAddresses.push(`${username}@${addresses[i]}`);
-      } else if (validator.isEmail(addresses[i])) {
-        const domain = this.parseDomain(addresses[i], false);
+        globalForwardingAddresses.push(`${username}@${lowerCaseAddress}`);
+      } else if (validator.isEmail(lowerCaseAddress)) {
+        const domain = this.parseDomain(lowerCaseAddress, false);
         if (
           (validator.isFQDN(domain) || validator.isIP(domain)) &&
-          validator.isEmail(addresses[i])
+          validator.isEmail(lowerCaseAddress)
         ) {
-          globalForwardingAddresses.push(addresses[i]);
+          globalForwardingAddresses.push(lowerCaseAddress);
         }
-      } else if (validator.isURL(addresses[i], this.config.isURLOptions)) {
-        globalForwardingAddresses.push(addresses[i]);
+      } else if (validator.isURL(element, this.config.isURLOptions)) {
+        globalForwardingAddresses.push(element);
       }
     }
 
