@@ -16,7 +16,7 @@ if (!module.parent) {
     try {
       await Promise.all([
         app.listen(port),
-        app.spamscanner.load(),
+        // app.spamscanner.load(),
         graceful.listen()
       ]);
       if (process.send) process.send('ready');

@@ -8,7 +8,7 @@ const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
-const SpamScanner = require('spamscanner');
+// const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
@@ -262,7 +262,7 @@ class ForwardEmail {
       },
       sendingZone: 'bounces',
       userAgent: `${pkg.name}/${pkg.version}`,
-      spamScanner: {},
+      // spamScanner: {},
       ttlMs: ms('7d'),
       maxRetry: 5,
       ...config
@@ -346,7 +346,7 @@ class ForwardEmail {
     });
 
     // expose spamscanner
-    this.scanner = new SpamScanner(this.config.spamScanner);
+    // this.scanner = new SpamScanner(this.config.spamScanner);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -1003,6 +1003,7 @@ class ForwardEmail {
         //
         // 5) check for spam
         //
+        /*
         let results;
         try {
           results = await this.scanner.scan(originalRaw);
@@ -1047,6 +1048,7 @@ class ForwardEmail {
           if (messages.length > 0)
             throw new CustomError(messages.join(' '), 554);
         }
+        */
 
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
