@@ -54,7 +54,6 @@
       "user": "deploy",
       "host": [
         "us-sf-1-mx1-forwardemail-net-deploy",
-        "uk-london-1-mx1-forwardemail-net-deploy",
         "us-nyc-1-mx2-forwardemail-net-deploy"
       ],
       "ref": "origin/master",
