@@ -630,7 +630,11 @@ class ForwardEmail {
         logger: this.config.logger,
         host: mx.host,
         port: mx.port,
-        name
+        name,
+        tls: {
+          servername: mx.hostname,
+          rejectUnauthorized: false
+        }
       });
       info = await transporter.sendMail({ envelope, raw });
       await this.client.set(key, count, 'PX', this.config.ttlMs);
