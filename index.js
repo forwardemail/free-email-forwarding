@@ -984,16 +984,10 @@ class ForwardEmail {
             oneLine`You need to reply to the "Reply-To" email address on the email; do not send messages to <${this.config.noReply}>`
           );
 
-        console.log('headers', headers);
-
         const originalFrom = headers.getFirst('From');
-
-        console.log('originalFrom', originalFrom);
 
         // message body as a single Buffer (everything after the \r\n\r\n separator)
         originalRaw = Buffer.concat([headers.build(), ...chunks]);
-
-        console.log('originalRaw', originalRaw.toString());
 
         if (!originalFrom)
           throw new CustomError(
@@ -2107,20 +2101,17 @@ class ForwardEmail {
         // 'foo'
         // > str.slice(str.indexOf(':') + 1)
         // 'https://foo.com'
-        const index = lowerCaseAddress.indexOf(':');
+        const index = element.indexOf(':');
         const addr =
           index === -1
-            ? [lowerCaseAddress]
-            : [
-                lowerCaseAddress.slice(0, index),
-                lowerCaseAddress.slice(index + 1)
-              ];
+            ? [element]
+            : [element.slice(0, index), element.slice(index + 1)];
 
         // addr[0] = hello (username)
         // addr[1] = niftylettuce@gmail.com (forwarding email)
         // check if we have a match (and if it is ignored)
         if (_.isString(addr[0]) && addr[0].indexOf('!') === 0) {
-          if (username === addr[0].slice(1)) {
+          if (username === addr[0].toLowerCase().slice(1)) {
             ignored = true;
             break;
           }
@@ -2140,8 +2131,11 @@ class ForwardEmail {
             `${lowerCaseAddress} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${element}"`
           );
 
-        if (_.isString(addr[0]) && username === addr[0])
-          forwardingAddresses.push(addr[1]);
+        if (_.isString(addr[0]) && username === addr[0].toLowerCase()) {
+          if (validator.isURL(addr[1], this.config.isURLOptions))
+            forwardingAddresses.push(addr[1]);
+          else forwardingAddresses.push(addr[1].toLowerCase());
+        }
       } else if (
         validator.isFQDN(lowerCaseAddress) ||
         validator.isIP(lowerCaseAddress)
