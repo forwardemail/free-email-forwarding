@@ -1629,7 +1629,7 @@ class ForwardEmail {
               } catch (err_) {
                 bounces.push({
                   address: recipient.recipient,
-                  err_,
+                  err: err_,
                   host: recipient.webhook
                 });
               }
