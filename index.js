@@ -1643,7 +1643,7 @@ class ForwardEmail {
               raw,
               from
             });
-            if (result.accepted.length > 0) accepted.push(recipient.address);
+            if (result.accepted.length > 0) accepted.push(recipient.recipient);
             if (result.rejected.length === 0) return;
             for (let x = 0; x < result.rejected.length; x++) {
               const err = result.rejectedErrors[x];
