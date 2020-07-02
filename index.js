@@ -662,8 +662,11 @@ class ForwardEmail {
       // if (!err.reason || !err.host || !err.cert) throw err;
       //
       if (
-        TLS_RETRY_CODES.includes(err.code) ||
-        REGEX_TLS_ERR.test(err.message) ||
+        (err.code &&
+          parseInt(err.code, 10) >= 400 &&
+          parseInt(err.code, 10) < 500) ||
+        (err.code && TLS_RETRY_CODES.includes(err.code)) ||
+        (err.code && REGEX_TLS_ERR.test(err.message)) ||
         err.reason ||
         err.host ||
         err.cert
@@ -2054,7 +2057,8 @@ class ForwardEmail {
     // if the record was blank then throw an error
     if (!isSANB(record))
       throw new CustomError(
-        `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record or has zero aliases configured`
+        `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record or has zero aliases configured`,
+        420
       );
 
     // e.g. hello@niftylettuce.com => niftylettuce@gmail.com
@@ -2071,7 +2075,8 @@ class ForwardEmail {
 
     if (addresses.length === 0)
       throw new CustomError(
-        `${address} domain of ${domain} has zero forwarded addresses configured in the TXT record with "${this.config.recordPrefix}"`
+        `${address} domain of ${domain} has zero forwarded addresses configured in the TXT record with "${this.config.recordPrefix}"`,
+        420
       );
 
     // store if address is ignored or not
@@ -2172,7 +2177,8 @@ class ForwardEmail {
     // if we don't have a forwarding address then throw an error
     if (forwardingAddresses.length === 0)
       throw new CustomError(
-        `${address} domain of ${domain} is not configured properly and does not contain any valid "${this.config.recordPrefix}" TXT records`
+        `${address} domain of ${domain} is not configured properly and does not contain any valid "${this.config.recordPrefix}" TXT records`,
+        420
       );
 
     // allow one recursive lookup on forwarding addresses
@@ -2310,7 +2316,8 @@ class ForwardEmail {
           address.address
         } is missing required DNS MX records of ${this.config.exchanges.join(
           ', '
-        )}`
+        )}`,
+        420
       );
     } catch (err) {
       fn(err);
