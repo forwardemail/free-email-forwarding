@@ -319,23 +319,22 @@ class ForwardEmail {
     // set up DKIM instance for signing messages
     this.dkim = new DKIM(this.config.dkim);
 
-    // initialize redis
-    const client = new Redis(
-      this.config.redis,
-      this.config.logger,
-      this.config.redisMonitor
-    );
+    // initialize and expose redis
+    if (this.config.redis)
+      this.client = new Redis(
+        this.config.redis,
+        this.config.logger,
+        this.config.redisMonitor
+      );
 
     // setup rate limiting with redis
     if (this.config.rateLimit) {
       this.limiter = {
-        db: client,
+        db: this.client,
         ...this.config.rateLimit
       };
     }
 
-    // expose client
-    this.client = client;
     // setup our smtp server which listens for incoming email
     this.server = new SMTPServer(this.config.smtp);
     // kind of hacky but I filed a GH issue
@@ -589,7 +588,7 @@ class ForwardEmail {
     // and if so, then we will return early and not send the message twice
     // and so in this case, we can send a retry to the end user, but it won't actually retry
     // TTL should be 7 days with rev-hashed body
-    const val = await this.client.get(key);
+    const val = this.client ? await this.client.get(key) : null;
 
     // if there was a value (non-null) then that means it was already sent
     // so we can return early here and not re-send the message twice
@@ -637,7 +636,8 @@ class ForwardEmail {
         }
       });
       info = await transporter.sendMail({ envelope, raw });
-      await this.client.set(key, count, 'PX', this.config.ttlMs);
+      if (this.client)
+        await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
       // this error will indicate it is a TLS issue, so we should retry as plain
       // if it doesn't have all these properties per this link then its not TLS
@@ -689,7 +689,8 @@ class ForwardEmail {
           name
         });
         info = await transporter.sendMail({ envelope, raw });
-        await this.client.set(key, count, 'PX', this.config.ttlMs);
+        if (this.client)
+          await this.client.set(key, count, 'PX', this.config.ttlMs);
       } else {
         throw err;
       }
@@ -1392,9 +1393,9 @@ class ForwardEmail {
                 //       rely upon the session.envelope.mailFrom as it could change
                 //
                 const key = revHash(originalRaw.toString());
-                const val = await this.client.get(key);
+                const val = this.client ? await this.client.get(key) : null;
                 if (val) createdMessageId = val;
-                else
+                else if (this.client)
                   await this.client.set(
                     key,
                     createdMessageId,
