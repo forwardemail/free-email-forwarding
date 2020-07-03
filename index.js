@@ -139,8 +139,8 @@ const transporterConfig = {
 // note we can't use `/^SRS=/i` because it would match `srs@example.com`
 const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
 const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
-const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
-const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
+// const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
+// const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
 const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
@@ -1855,6 +1855,8 @@ class ForwardEmail {
       // join together the record by space
       return { hostname, record: records[0].join(' ') };
     } catch (err) {
+      this.config.logger.error(err);
+
       // recursively look up from subdomain to parent domain for record
       if (_.isString(err.code) && err.code === 'ENOTFOUND') {
         // no dmarc record exists so return `false`
@@ -1863,7 +1865,12 @@ class ForwardEmail {
         return this.getDMARC(`${parsedDomain.domain}.${parsedDomain.tld}`);
       }
 
-      this.config.logger.error(err);
+      // support retries
+      if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
+        err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
+        throw err;
+      }
+
       return false;
     }
   }
@@ -1886,19 +1893,15 @@ class ForwardEmail {
       const addresses = await dns.promises.resolveMx(domain);
       if (!addresses || addresses.length === 0)
         throw new CustomError(
-          `DNS lookup for ${domain} did not return any valid MX records`
+          `DNS lookup for ${domain} did not return any valid MX records`,
+          420
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      if (REGEX_ENODATA.test(err)) {
-        err.message = `DNS lookup for ${address} did not return a valid MX record`;
-        err.responseCode = 550;
-      } else if (REGEX_ENOTFOUND.test(err)) {
-        err.message = `DNS lookup for ${address} did not return a valid TXT record`;
-        err.responseCode = 550;
-      } else if (!err.responseCode) {
-        err.responseCode = 421;
-      }
+      this.config.logger.error(err);
+      // support retries
+      if (_.isString(err.code) && RETRY_CODES.includes(err.code))
+        err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
 
       throw err;
     }
@@ -1994,7 +1997,16 @@ class ForwardEmail {
   // eslint-disable-next-line complexity
   async getForwardingAddresses(address, recursive = []) {
     const domain = this.parseDomain(address, false);
-    const records = await dns.promises.resolveTxt(domain);
+    let records;
+    try {
+      records = await dns.promises.resolveTxt(domain);
+    } catch (err) {
+      this.config.logger.error(err);
+      // support retries
+      if (_.isString(err.code) && RETRY_CODES.includes(err.code))
+        err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
+      throw err;
+    }
 
     // dns TXT record must contain `forward-email=` prefix
     const validRecords = [];
