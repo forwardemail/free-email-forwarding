@@ -139,8 +139,6 @@ const transporterConfig = {
 // note we can't use `/^SRS=/i` because it would match `srs@example.com`
 const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
 const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
-// const REGEX_ENOTFOUND = new RE2(/queryTxt ENOTFOUND/);
-// const REGEX_ENODATA = new RE2(/queryMx ENODATA/);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
 const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
@@ -661,6 +659,9 @@ class ForwardEmail {
       // NOTE: we may want to uncomment the line below, otherwise all emails that fail will be retried
       // if (!err.reason || !err.host || !err.cert) throw err;
       //
+
+      // TODO: we should add 1x greylist retry so that if the end server has DNS issues
+      // then it will attempt to retry it once before completely failing
       if (
         (err.code &&
           parseInt(err.code, 10) >= 400 &&
@@ -1868,7 +1869,10 @@ class ForwardEmail {
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
-        throw err;
+      } else {
+        // all other lookup errors should retry 420
+        // https://github.com/nodejs/node/blob/f1ae7ea343020f608fdc1ca77d9cdfe2c093ac72/src/cares_wrap.cc#L95
+        err.responseCode = 420;
       }
 
       return false;
@@ -1900,8 +1904,13 @@ class ForwardEmail {
     } catch (err) {
       this.config.logger.error(err);
       // support retries
-      if (_.isString(err.code) && RETRY_CODES.includes(err.code))
+      if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
+      } else {
+        // all other lookup errors should retry 420
+        // https://github.com/nodejs/node/blob/f1ae7ea343020f608fdc1ca77d9cdfe2c093ac72/src/cares_wrap.cc#L95
+        err.responseCode = 420;
+      }
 
       throw err;
     }
@@ -2003,8 +2012,14 @@ class ForwardEmail {
     } catch (err) {
       this.config.logger.error(err);
       // support retries
-      if (_.isString(err.code) && RETRY_CODES.includes(err.code))
+      if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
+      } else {
+        // all other lookup errors should retry 420
+        // https://github.com/nodejs/node/blob/f1ae7ea343020f608fdc1ca77d9cdfe2c093ac72/src/cares_wrap.cc#L95
+        err.responseCode = 420;
+      }
+
       throw err;
     }
 
