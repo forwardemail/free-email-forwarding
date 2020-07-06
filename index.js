@@ -637,6 +637,7 @@ class ForwardEmail {
       if (this.client)
         await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
+      this.config.logger.error(err, { options, envelope });
       // this error will indicate it is a TLS issue, so we should retry as plain
       // if it doesn't have all these properties per this link then its not TLS
       //
@@ -672,7 +673,6 @@ class ForwardEmail {
         err.host ||
         err.cert
       ) {
-        this.config.logger.error(err, { options, envelope });
         const mx = await asyncMxConnect({
           target: host,
           port: parseInt(port, 10),
