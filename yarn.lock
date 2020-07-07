@@ -1188,10 +1188,10 @@ aws4@^1.8.0:
   resolved "https://registry.yarnpkg.com/aws4/-/aws4-1.10.0.tgz#a17b3a8ea811060e74d47d306122400ad4497ae2"
   integrity sha512-3YDiu347mtVtjpyV3u5kVqQLP242c06zwDOgpeRnybmXlYYsLbtTrUBUm8i8srONt+FWobl5aibnU1030PeeuA==
 
-axe@^6.0.2:
-  version "6.0.2"
-  resolved "https://registry.yarnpkg.com/axe/-/axe-6.0.2.tgz#8e9d70d803b622605ce7f129a45b32eeceec62e1"
-  integrity sha512-+gLBm24zEsXz7vWcFpXPDeVo49tgcazOYIhkyOMHNetj1otFZhlorH5Fq0UtGoBBmZyr8PNkrvD62mjlACX6tQ==
+axe@^6.0.3:
+  version "6.0.3"
+  resolved "https://registry.yarnpkg.com/axe/-/axe-6.0.3.tgz#056bb7e178cfaa429317a2bd9ad3c6e41a374896"
+  integrity sha512-Pz+B9DU9lpxKbfjAlNbQBqAo9MaOmBZj3KE6qixG4diRwNj6iiSdA+Cfj3ivDfQdq0uM/qgpQDBAEJ1x+EtMuQ==
   dependencies:
     "@ladjs/format-util" "^1.0.4"
     boolean "^3.0.1"
@@ -1411,13 +1411,13 @@ bytes@^3.1.0:
   resolved "https://registry.yarnpkg.com/bytes/-/bytes-3.1.0.tgz#f6cf7933a360e0588fa9fde85651cdc7f805d1f6"
   integrity sha512-zauLjrfCG+xvoyaqLoV8bLVXXNGC4JqlxFCutSDWA6fJrTo2ZuvLYTqZ7aHBLZSMOopbzwv8f+wZcVzfVTI2Dg==
 
-cabin@^8.0.2:
-  version "8.0.2"
-  resolved "https://registry.yarnpkg.com/cabin/-/cabin-8.0.2.tgz#bb3a9182eebf7a5f776564ff6319d8eb8fe6d273"
-  integrity sha512-UfFFQVW3NcWveTcwcmRaoENZjytPJohFA2/SVJpeFVbczO97q6heKyJMFrOKF9JFHjCfI86/51nrcdXGtxcW9Q==
+cabin@^8.0.3:
+  version "8.0.3"
+  resolved "https://registry.yarnpkg.com/cabin/-/cabin-8.0.3.tgz#4df54507fc2729d8989e4171ba90a120dd77f385"
+  integrity sha512-PmLzi3PgU+jb99ilLaMRfol5REU80BY+JTf3bj+StoA13WavIVAFTmw6LifpGgEpjmByaKv85RJyPQ4R3jzXmw==
   dependencies:
     ansi-colors "^4.1.1"
-    axe "^6.0.2"
+    axe "^6.0.3"
     clf-date "^0.2.0"
     iserror "^0.0.2"
     ms "^2.1.2"
@@ -7220,7 +7220,7 @@ remark-heading-gap@^3.1.2:
   resolved "https://registry.yarnpkg.com/remark-heading-gap/-/remark-heading-gap-3.1.2.tgz#480b71a655e793848db42b714358b5533d7d5ec3"
   integrity sha512-LNm1B4UveH1BkSLx4OPab0vW/p3KOc+8wV4kd94CHXmhuJ8i+kdroG2AonkUVzbOElc8U8ylxF3WPfmqYbRjJg==
 
-"remark-license@github:niftylettuce/remark-license":
+remark-license@niftylettuce/remark-license:
   version "4.0.1"
   resolved "https://codeload.github.com/niftylettuce/remark-license/tar.gz/17ecb8f64f8f6082414d14f9267a12764e6ddbfb"
   dependencies:
