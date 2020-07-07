@@ -1619,11 +1619,11 @@ class ForwardEmail {
                   // .type('message/rfc822')
                   .set('User-Agent', this.config.userAgent)
                   .timeout(this.config.timeout)
-                  .retry(this.config.retry)
                   .send({
                     ...mail,
                     raw: originalRaw.toString()
-                  });
+                  })
+                  .retry(this.config.retry);
               } catch (err_) {
                 bounces.push({
                   address: recipient.recipient,
@@ -2059,8 +2059,7 @@ class ForwardEmail {
           .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
           .timeout(this.config.timeout)
-          .retry(this.config.retry)
-          .send();
+          .retry(this.config.retry);
 
         // body is an Array of records that are formatted like TXT records
         if (_.isArray(body)) {
@@ -2281,8 +2280,7 @@ class ForwardEmail {
         .set('User-Agent', `forward-email/${pkg.version}`)
         .auth(this.config.apiSecrets[0])
         .timeout(this.config.timeout)
-        .retry(this.config.retry)
-        .send();
+        .retry(this.config.retry);
 
       // body is an Object with `max_forwarded_addresses` Number
       if (
