@@ -1358,8 +1358,8 @@ class ForwardEmail {
                   .set('Accept', 'json')
                   .set('User-Agent', this.config.userAgent)
                   .auth(this.config.apiSecrets[0])
-                  .timeout(this.config.timeout)
-                  .retry(this.config.retry);
+                  .timeout(this.config.timeout);
+                // .retry(this.config.retry);
 
                 // body is an Object with `port` Number (a valid port number, defaults to 25)
                 if (
@@ -1622,8 +1622,8 @@ class ForwardEmail {
                   .send({
                     ...mail,
                     raw: originalRaw.toString()
-                  })
-                  .retry(this.config.retry);
+                  });
+                // .retry(this.config.retry);
               } catch (err_) {
                 bounces.push({
                   address: recipient.recipient,
@@ -1736,7 +1736,7 @@ class ForwardEmail {
               .set('User-Agent', `forward-email/${pkg.version}`)
               .auth(this.config.apiSecrets[0])
               .timeout(this.config.timeout)
-              .retry(this.config.retry);
+              // .retry(this.config.retry);
 
             if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
               template = body;
@@ -2058,8 +2058,8 @@ class ForwardEmail {
           .set('Accept', 'json')
           .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
-          .timeout(this.config.timeout)
-          .retry(this.config.retry);
+          .timeout(this.config.timeout);
+        // .retry(this.config.retry);
 
         // body is an Array of records that are formatted like TXT records
         if (_.isArray(body)) {
@@ -2279,8 +2279,8 @@ class ForwardEmail {
         .set('Accept', 'json')
         .set('User-Agent', `forward-email/${pkg.version}`)
         .auth(this.config.apiSecrets[0])
-        .timeout(this.config.timeout)
-        .retry(this.config.retry);
+        .timeout(this.config.timeout);
+      // .retry(this.config.retry);
 
       // body is an Object with `max_forwarded_addresses` Number
       if (
