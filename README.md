@@ -2,7 +2,6 @@
   <a href="https://forwardemail.net"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding/master/media/header.png" alt="ForwardEmail" /></a>
 </h1>
 <div align="center">
-  <a href="https://slack.crocodilejs.com"><img src="https://slack.crocodilejs.com/badge.svg" alt="chat" /></a>
   <a href="https://travis-ci.com/forwardemail/free-email-forwarding"><img src="https://travis-ci.com/forwardemail/free-email-forwarding.svg?branch=master" alt="build status" /></a>
   <a href="https://codecov.io/github/forwardemail/free-email-forwarding"><img src="https://img.shields.io/codecov/c/github/forwardemail/free-email-forwarding/master.svg" alt="code coverage" /></a>
   <a href="https://github.com/sindresorhus/xo"><img src="https://img.shields.io/badge/code_style-XO-5ed9c7.svg" alt="code style" /></a>
