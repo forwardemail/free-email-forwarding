@@ -35,7 +35,7 @@ class MessageSplitter extends Transform {
     const nblen = Math.min(data.length, lblen);
 
     // shift existing bytes
-    for (let i = 0, len = lblen - nblen; i < len; i++) {
+    for (let i = 0, length = lblen - nblen; i < length; i++) {
       this.lastBytes[i] = this.lastBytes[i + nblen];
     }
 
@@ -60,7 +60,11 @@ class MessageSplitter extends Transform {
     const lblen = this.lastBytes.length;
     let headerPos = 0;
     this.curLinePos = 0;
-    for (let i = 0, len = this.lastBytes.length + data.length; i < len; i++) {
+    for (
+      let i = 0, length = this.lastBytes.length + data.length;
+      i < length;
+      i++
+    ) {
       let chr;
       if (i < lblen) {
         chr = this.lastBytes[i];
