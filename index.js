@@ -63,7 +63,7 @@ const CODES_TO_RESPONSE_CODES = {
 
 const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 
-const TLS_RETRY_CODES = ['ETLS', 'ECONNRESET'];
+const TLS_RETRY_CODES = new Set(['ETLS', 'ECONNRESET']);
 
 const asyncMxConnect = pify(mxConnect);
 
@@ -137,13 +137,13 @@ const transporterConfig = {
 
 // <https://srs-discuss.v2.listbox.narkive.com/Mh6X2B2w/help-how-to-unwind-an-srs-address#post17>
 // note we can't use `/^SRS=/i` because it would match `srs@example.com`
-const REGEX_SRS0 = new RE2(/^SRS0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
-const REGEX_SRS1 = new RE2(/^SRS1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
+const REGEX_SRS0 = new RE2(/^srs0[-+=]\S+=\S{2}=(\S+)=(.+)@\S+$/i);
+const REGEX_SRS1 = new RE2(/^srs1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
 const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
 const REGEX_TLS_ERR = new RE2(
-  /SSL23_GET_SERVER_HELLO|\/deps\/openssl|ssl3_check|SSL routines/gim
+  /ssl23_get_server_hello|\/deps\/openssl|ssl3_check|ssl routines/gim
 );
 
 class ForwardEmail {
@@ -338,7 +338,7 @@ class ForwardEmail {
     // kind of hacky but I filed a GH issue
     // <https://github.com/nodemailer/smtp-server/issues/135>
     this.server.address = this.server.server.address.bind(this.server.server);
-    this.server.on('error', err => {
+    this.server.on('error', (err) => {
       this.config.logger.error(err);
     });
 
@@ -430,11 +430,9 @@ class ForwardEmail {
   getDiagnosticCode(err) {
     if (err.response && REGEX_DIAGNOSTIC_CODE.test(err.response))
       return err.response;
-    return `${err.responseCode ||
-      err.code ||
-      err.statusCode ||
-      err.status ||
-      500} ${err.message}`;
+    return `${
+      err.responseCode || err.code || err.statusCode || err.status || 500
+    } ${err.message}`;
   }
 
   getBounceStream(options) {
@@ -460,7 +458,7 @@ class ForwardEmail {
     // format Mailer Daemon address
     const fromAddress = rootNode
       ._convertAddresses(rootNode._parseAddresses(from))
-      .replace(/\[HOSTNAME\]/gi, options.name);
+      .replace(/\[hostname]/gi, options.name);
 
     rootNode.setHeader('From', fromAddress);
     rootNode.setHeader('To', to);
@@ -558,7 +556,7 @@ class ForwardEmail {
     lines = lines.slice(lastDKIMIndex);
 
     // strip all X-ForwardEmail header lines (since versions can change in between greylisting)
-    lines = lines.filter(line => !line.startsWith('X-ForwardEmail-'));
+    lines = lines.filter((line) => !line.startsWith('X-ForwardEmail-'));
 
     return `sent:${revHash(JSON.stringify(to))}:${revHash(
       JSON.stringify(lines)
@@ -586,11 +584,11 @@ class ForwardEmail {
     // and if so, then we will return early and not send the message twice
     // and so in this case, we can send a retry to the end user, but it won't actually retry
     // TTL should be 7 days with rev-hashed body
-    const val = this.client ? await this.client.get(key) : null;
+    const value = this.client ? await this.client.get(key) : null;
 
     // if there was a value (non-null) then that means it was already sent
     // so we can return early here and not re-send the message twice
-    if (val)
+    if (value)
       return {
         accepted: [envelope.to],
         rejected: [],
@@ -601,8 +599,8 @@ class ForwardEmail {
     // only allow up to 5 retries (greylist attempts) for this message
     //
     const count =
-      _.isString(val) && _.isFinite(parseInt(val, 10))
-        ? parseInt(val, 10) + 1
+      _.isString(value) && _.isFinite(Number.parseInt(value, 10))
+        ? Number.parseInt(value, 10) + 1
         : 1;
 
     if (count > this.config.maxRetry)
@@ -617,7 +615,7 @@ class ForwardEmail {
     try {
       const mx = await asyncMxConnect({
         target: host,
-        port: parseInt(port, 10),
+        port: Number.parseInt(port, 10),
         localHostname: name
       });
       transporter = nodemailer.createTransport({
@@ -665,9 +663,9 @@ class ForwardEmail {
       // then it will attempt to retry it once before completely failing
       if (
         (err.code &&
-          parseInt(err.code, 10) >= 400 &&
-          parseInt(err.code, 10) < 500) ||
-        (err.code && TLS_RETRY_CODES.includes(err.code)) ||
+          Number.parseInt(err.code, 10) >= 400 &&
+          Number.parseInt(err.code, 10) < 500) ||
+        (err.code && TLS_RETRY_CODES.has(err.code)) ||
         (err.code && REGEX_TLS_ERR.test(err.message)) ||
         err.reason ||
         err.host ||
@@ -675,7 +673,7 @@ class ForwardEmail {
       ) {
         const mx = await asyncMxConnect({
           target: host,
-          port: parseInt(port, 10),
+          port: Number.parseInt(port, 10),
           localHostname: name
         });
         // try sending the message again without TLS enabled
@@ -767,10 +765,10 @@ class ForwardEmail {
         servers: this.config.dns
       });
       if (!_.isArray(results) || results.length === 0) return false;
-      const blacklistedResults = results.filter(result => result.listed);
+      const blacklistedResults = results.filter((result) => result.listed);
       if (blacklistedResults.length === 0) return false;
       return blacklistedResults
-        .map(result =>
+        .map((result) =>
           util.format(
             this.config.blacklistedStr,
             ip,
@@ -867,7 +865,7 @@ class ForwardEmail {
     //
     // if an error occurs we have to continue reading the stream
     //
-    messageSplitter.once('error', err => {
+    messageSplitter.once('error', (err) => {
       stream.unpipe(messageSplitter);
       stream.on('readable', () => {
         stream.read();
@@ -967,7 +965,7 @@ class ForwardEmail {
         //
         // 3) reverse SRS bounces
         //
-        session.envelope.rcptTo = session.envelope.rcptTo.map(to => {
+        session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
           const address = this.checkSRS(to.address);
           return {
             ...to,
@@ -982,7 +980,7 @@ class ForwardEmail {
         if (
           _.every(
             session.envelope.rcptTo,
-            to => to.address === this.config.noReply
+            (to) => to.address === this.config.noReply
           )
         )
           throw new CustomError(
@@ -1056,8 +1054,8 @@ class ForwardEmail {
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
-          const obj = await dns.promises.lookup(this.config.exchanges[0]);
-          ipAddress = obj.address;
+          const object = await dns.promises.lookup(this.config.exchanges[0]);
+          ipAddress = object.address;
         } else {
           ipAddress = ip.address();
         }
@@ -1248,9 +1246,11 @@ class ForwardEmail {
                 if (!isValidDKIM) continue;
                 const terms = signature
                   .split(/;/)
-                  .map(t => t.trim())
-                  .filter(t => t !== '');
-                const rules = terms.map(t => t.split(/[=]/).map(r => r.trim()));
+                  .map((t) => t.trim())
+                  .filter((t) => t !== '');
+                const rules = terms.map((t) =>
+                  t.split(/=/).map((r) => r.trim())
+                );
                 for (const rule of rules) {
                   // term = d
                   // value = example.com
@@ -1328,7 +1328,7 @@ class ForwardEmail {
         //
         let rewritten = false;
         let recipients = await Promise.all(
-          session.envelope.rcptTo.map(async to => {
+          session.envelope.rcptTo.map(async (to) => {
             try {
               let port = '25';
 
@@ -1393,8 +1393,8 @@ class ForwardEmail {
                 //       rely upon the session.envelope.mailFrom as it could change
                 //
                 const key = revHash(originalRaw.toString());
-                const val = this.client ? await this.client.get(key) : null;
-                if (val) createdMessageId = val;
+                const value = this.client ? await this.client.get(key) : null;
+                if (value) createdMessageId = value;
                 else if (this.client)
                   await this.client.set(
                     key,
@@ -1453,8 +1453,8 @@ class ForwardEmail {
         // go through recipients and if we have a user+xyz@domain
         // AND we also have user@domain then honor the user@domain only
         // (helps to alleviate bulk spam with services like Gmail)
-        recipients = recipients.map(recipient => {
-          recipient.addresses = recipient.addresses.filter(address => {
+        recipients = recipients.map((recipient) => {
+          recipient.addresses = recipient.addresses.filter((address) => {
             if (!address.includes('+')) return true;
             return !recipient.addresses.includes(
               `${this.parseUsername(address)}@${this.parseDomain(
@@ -1467,12 +1467,12 @@ class ForwardEmail {
         });
 
         recipients = await Promise.all(
-          recipients.map(async recipient => {
+          recipients.map(async (recipient) => {
             try {
               const errors = [];
               const { addresses } = recipient;
               recipient.addresses = await Promise.all(
-                addresses.map(async address => {
+                addresses.map(async (address) => {
                   try {
                     // if it was a URL webhook then return early
                     if (validator.isURL(address, this.config.isURLOptions))
@@ -1505,7 +1505,7 @@ class ForwardEmail {
               if (!_.isEmpty(recipient.addresses)) return recipient;
               if (errors.length === 0) return;
               throw new Error(
-                errors.map(error => `${error.address}: ${error.err.message}`)
+                errors.map((error) => `${error.address}: ${error.err.message}`)
               );
             } catch (err) {
               this.config.logger.error(err);
@@ -1525,7 +1525,7 @@ class ForwardEmail {
           throw new CustomError(
             bounces
               .map(
-                bounce =>
+                (bounce) =>
                   `Error for ${bounce.address} of "${bounce.err.message}"`
               )
               .join(', ')
@@ -1555,7 +1555,7 @@ class ForwardEmail {
             //   address.to
             // )}@${this.parseDomain(address.to, false)}`;
             const match = normalized.find(
-              r => r.host === address.host && r.port === recipient.port
+              (r) => r.host === address.host && r.port === recipient.port
             );
             if (match) {
               // if (!match.to.includes(normal)) match.to.push(normal);
@@ -1606,7 +1606,7 @@ class ForwardEmail {
             session.envelope.mailFrom.address,
             this.config.srsDomain
           );
-          const mapper = async recipient => {
+          const mapper = async (recipient) => {
             if (recipient.webhook) {
               try {
                 const mail = await simpleParser(
@@ -1655,12 +1655,12 @@ class ForwardEmail {
             }
           };
 
-          await Promise.all(normalized.map(mapper));
+          await Promise.all(normalized.map((recipient) => mapper(recipient)));
 
           // if there weren't any bounces then return early
           if (bounces.length === 0) return fn();
 
-          const codes = bounces.map(bounce => {
+          const codes = bounces.map((bounce) => {
             if (_.isNumber(bounce.err.responseCode))
               return bounce.err.responseCode;
             if (
@@ -1746,7 +1746,7 @@ class ForwardEmail {
           */
 
           await Promise.all(
-            uniqueBounces.map(async bounce => {
+            uniqueBounces.map(async (bounce) => {
               const raw = await getStream(
                 this.dkim.sign(
                   this.getBounceStream({
@@ -1795,7 +1795,7 @@ class ForwardEmail {
       }
     });
 
-    stream.once('error', err => {
+    stream.once('error', (err) => {
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
         if (!err.responseCode)
@@ -2074,10 +2074,7 @@ class ForwardEmail {
     }
 
     // join multi-line TXT records together and replace double w/single commas
-    const record = validRecords
-      .join(',')
-      .replace(/,+/g, ',')
-      .trim();
+    const record = validRecords.join(',').replace(/,+/g, ',').trim();
 
     // if the record was blank then throw an error
     if (!isSANB(record))
@@ -2096,7 +2093,7 @@ class ForwardEmail {
     // record = "forward-email=niftylettuce@gmail.com"
 
     // remove trailing whitespaces from each address listed
-    const addresses = record.split(',').map(a => a.trim());
+    const addresses = record.split(',').map((a) => a.trim());
 
     if (addresses.length === 0)
       throw new CustomError(
@@ -2194,7 +2191,7 @@ class ForwardEmail {
       forwardingAddresses.length === 0 &&
       globalForwardingAddresses.length > 0
     ) {
-      globalForwardingAddresses.forEach(address => {
+      globalForwardingAddresses.forEach((address) => {
         forwardingAddresses.push(address);
       });
     }
@@ -2209,8 +2206,8 @@ class ForwardEmail {
     // allow one recursive lookup on forwarding addresses
     const recursivelyForwardedAddresses = [];
 
-    const len = forwardingAddresses.length;
-    for (let x = 0; x < len; x++) {
+    const { length } = forwardingAddresses;
+    for (let x = 0; x < length; x++) {
       const forwardingAddress = forwardingAddresses[x];
       try {
         if (recursive.includes(forwardingAddress)) continue;
@@ -2303,7 +2300,7 @@ class ForwardEmail {
     // (we can return early here if there was no + symbol)
     if (!address.includes('+')) return forwardingAddresses;
 
-    return forwardingAddresses.map(forwardingAddress => {
+    return forwardingAddresses.map((forwardingAddress) => {
       return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
         address
       )}@${this.parseDomain(forwardingAddress, false)}`;
@@ -2330,9 +2327,11 @@ class ForwardEmail {
 
       // validate MX records exist and contain ours
       const addresses = await this.validateMX(address.address);
-      const exchanges = addresses.map(mxAddress => mxAddress.exchange);
-      const hasAllExchanges = this.config.exchanges.every(exchange =>
-        exchanges.includes(exchange)
+      const exchanges = new Set(
+        addresses.map((mxAddress) => mxAddress.exchange)
+      );
+      const hasAllExchanges = this.config.exchanges.every((exchange) =>
+        exchanges.has(exchange)
       );
       if (hasAllExchanges) return fn();
       throw new CustomError(
@@ -2384,9 +2383,9 @@ class ForwardEmail {
     for (const signature of signatures) {
       const terms = signature
         .split(/;/)
-        .map(t => t.trim())
-        .filter(t => t !== '');
-      const rules = terms.map(t => t.split(/[=]/).map(r => r.trim()));
+        .map((t) => t.trim())
+        .filter((t) => t !== '');
+      const rules = terms.map((t) => t.split(/=/).map((r) => r.trim()));
       for (const rule of rules) {
         // term = d
         // value = example.com
@@ -2395,10 +2394,10 @@ class ForwardEmail {
         if (term !== 'h') continue;
         const signedHeaders = value
           .split(':')
-          .map(h => h.trim().toLowerCase())
-          .filter(h => h !== '');
+          .map((h) => h.trim().toLowerCase())
+          .filter((h) => h !== '');
         if (signedHeaders.length === 0) continue;
-        if (signedHeaders.every(h => !changes.includes(h)))
+        if (signedHeaders.every((h) => !changes.includes(h)))
           headers.add('DKIM-Signature', signature, headers.lines.length + 1);
       }
     }

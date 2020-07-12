@@ -26,14 +26,14 @@
   ],
   "dependencies": {
     "@ladjs/env": "^2.0.0",
-    "@ladjs/graceful": "^1.0.1",
+    "@ladjs/graceful": "^1.0.3",
     "@ladjs/proxy": "^2.0.1",
     "@ladjs/redis": "^1.0.5",
     "@ladjs/shared-config": "^3.0.9",
     "array-join-conjunction": "^1.0.0",
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
-    "cabin": "^8.0.3",
+    "cabin": "^8.0.4",
     "common-tags": "^1.8.0",
     "disposable-email-domains": "^1.0.56",
     "dmarc-parse": "^1.2.1",
@@ -44,7 +44,7 @@
     "iconv": "^3.0.0",
     "ip": "^1.1.5",
     "is-string-and-not-blank": "^0.0.2",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "mailparser": "^2.7.7",
     "mailsplit": "^5.0.0",
     "ms": "^2.1.2",
@@ -57,7 +57,7 @@
     "python-dkim-verify": "^1.0.2",
     "python-spfcheck2": "^1.0.3",
     "ratelimiter": "^3.4.1",
-    "re2": "^1.15.1",
+    "re2": "^1.15.2",
     "rev-hash": "^3.0.0",
     "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
@@ -69,10 +69,10 @@
   "devDependencies": {
     "@commitlint/cli": "^9.0.1",
     "@commitlint/config-conventional": "^9.0.1",
-    "ava": "^3.10.0",
+    "ava": "^3.10.1",
     "codecov": "^3.7.0",
     "cross-env": "^7.0.2",
-    "eslint": "6.x",
+    "eslint": "^7.4.0",
     "eslint-config-xo-lass": "^1.0.3",
     "fixpack": "^3.0.6",
     "husky": "^4.2.5",
@@ -84,10 +84,10 @@
     "remark-preset-github": "^2.0.2",
     "shelljs": "^0.8.4",
     "uuid": "^8.2.0",
-    "xo": "0.25"
+    "xo": "^0.32.1"
   },
   "engines": {
-    "node": ">=8.3"
+    "node": ">=12"
   },
   "files": [
     "helpers/**/*",

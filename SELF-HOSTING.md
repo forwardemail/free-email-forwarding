@@ -140,6 +140,8 @@ You'll also need the following dependencies installed:
   options edns0
   ```
 
+* Enable IPv6 and set a AAAA record on the mail servers (see <https://www.digitalocean.com/docs/networking/ipv6/how-to/enable/>)
+
 
 ## Programmatic Usage
 

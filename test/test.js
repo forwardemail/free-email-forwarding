@@ -24,9 +24,9 @@ const tls = { rejectUnauthorized: false };
 
 const client = new IORedis();
 
-test.beforeEach(async t => {
+test.beforeEach(async (t) => {
   const keys = await client.keys('limit:*');
-  if (keys.length > 0) await Promise.all(keys.map(key => client.del(key)));
+  if (keys.length > 0) await Promise.all(keys.map((key) => client.del(key)));
   const port = await getPort();
   const forwardEmail = new ForwardEmail({ port });
   // await forwardEmail.scanner.load();
@@ -34,31 +34,31 @@ test.beforeEach(async t => {
   t.context.forwardEmail = forwardEmail;
 });
 
-test.afterEach(async t => {
+test.afterEach(async (t) => {
   await t.context.forwardEmail.close();
 });
 
-test('returns itself', t => {
+test('returns itself', (t) => {
   t.true(new ForwardEmail() instanceof ForwardEmail);
 });
 
-test('binds context', t => {
+test('binds context', (t) => {
   t.true(t.context.forwardEmail instanceof ForwardEmail);
 });
 
-test.cb('rejects auth connections', t => {
+test.cb('rejects auth connections', (t) => {
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   connection.once('end', t.end);
   connection.connect(() => {
-    connection.login({ user: 'user', pass: 'pass' }, err => {
+    connection.login({ user: 'user', pass: 'pass' }, (err) => {
       t.is(err.responseCode, 500);
       connection.close();
     });
   });
 });
 
-test('verifies connection', async t => {
+test('verifies connection', async (t) => {
   const { port } = t.context.forwardEmail.server.address();
   const transporter = nodemailer.createTransport({ port, tls });
   await transporter.verify();
@@ -97,7 +97,7 @@ test('rejects forwarding a non-FQDN email', async t => {
 //   t.regex(err.message, /does not have a valid forwardemail TXT record/);
 // });
 
-test('rejects forwarding a non-registered email address', async t => {
+test('rejects forwarding a non-registered email address', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -111,10 +111,10 @@ test('rejects forwarding a non-registered email address', async t => {
     html: '<strong>test html</strong>',
     attachments: []
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         t.regex(
           err.message,
@@ -127,7 +127,7 @@ test('rejects forwarding a non-registered email address', async t => {
 });
 
 if (!isCI)
-  test('rejects an email with failing SPF', async t => {
+  test('rejects an email with failing SPF', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -143,10 +143,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err.responseCode, 550);
           t.regex(
             err.message,
@@ -159,7 +159,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and without SPF (no DMARC)', async t => {
+  test('forwards an email with DKIM and without SPF (no DMARC)', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -175,10 +175,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -187,7 +187,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email without DKIM nor SPF (no DMARC)', async t => {
+  test('forwards an email without DKIM nor SPF (no DMARC)', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -202,10 +202,10 @@ if (!isCI)
       html: '<strong>test html</strong>',
       attachments: []
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -214,7 +214,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('rejects forwarding an email with max forwarding addresses exceeded', async t => {
+  test('rejects forwarding an email with max forwarding addresses exceeded', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -229,10 +229,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err.responseCode, 550);
           t.regex(err.message, /addresses which exceeds the maximum/);
           connection.close();
@@ -242,7 +242,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('rejects forwarding an email with recursive max forwarding addresses exceeded', async t => {
+  test('rejects forwarding an email with recursive max forwarding addresses exceeded', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -257,10 +257,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err.responseCode, 550);
           t.regex(err.message, /addresses which exceeds the maximum/);
           connection.close();
@@ -270,7 +270,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF without recursive loop', async t => {
+  test('forwards an email with DKIM and SPF without recursive loop', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -291,10 +291,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -303,7 +303,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('rejects sending to one invalid recipient', async t => {
+  test('rejects sending to one invalid recipient', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -318,7 +318,7 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, (err, response) => {
@@ -332,7 +332,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF to domain aliased recipients', async t => {
+  test('forwards an email with DKIM and SPF to domain aliased recipients', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -351,10 +351,10 @@ if (!isCI)
     /*
     t.deepEqual(info.envelope, ['niftylettuce@gmail.com']);
     */
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -363,7 +363,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF to global recipients', async t => {
+  test('forwards an email with DKIM and SPF to global recipients', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -381,10 +381,10 @@ if (!isCI)
     /*
     t.deepEqual(info.envelope, ['niftylettuce@gmail.com']);
     */
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -393,7 +393,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF to multiple recipients', async t => {
+  test('forwards an email with DKIM and SPF to multiple recipients', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -415,10 +415,10 @@ if (!isCI)
       'niftylettuce@gmail.com'
     ]);
     */
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -427,7 +427,7 @@ if (!isCI)
   });
 
 if (!isCI)
-  test('forwards an email with DKIM and SPF and a comma in the FROM', async t => {
+  test('forwards an email with DKIM and SPF and a comma in the FROM', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -443,10 +443,10 @@ if (!isCI)
       attachments: [],
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -455,7 +455,7 @@ if (!isCI)
   });
 
 if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
-  test('rejects a spam file', async t => {
+  test('rejects a spam file', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -471,10 +471,10 @@ if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
       html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err.responseCode, 551);
           t.regex(err.message, /Message detected as spam/);
           connection.close();
@@ -483,7 +483,7 @@ if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
     });
   });
 
-test('creates 100 simultaneous connections (w/o rate limiting)', async t => {
+test('creates 100 simultaneous connections (w/o rate limiting)', async (t) => {
   const forwardEmail = new ForwardEmail({ limiter: false });
   const port = await getPort();
   forwardEmail.server.listen(port);
@@ -504,7 +504,7 @@ test('creates 100 simultaneous connections (w/o rate limiting)', async t => {
         connection.once('error', reject);
         connection.once('end', resolve);
         connection.connect(() => {
-          connection.send(info.envelope, info.message, err => {
+          connection.send(info.envelope, info.message, (err) => {
             t.is(err.responseCode, 550);
             t.regex(err.message, /You need to reply/);
             connection.close();
@@ -516,7 +516,7 @@ test('creates 100 simultaneous connections (w/o rate limiting)', async t => {
   t.pass();
 });
 
-test('rejects a file over the limit', async t => {
+test('rejects a file over the limit', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -534,10 +534,10 @@ test('rejects a file over the limit', async t => {
     html: '<strong>test text</strong>',
     attachments: [{ path: filePath }]
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 552);
         t.regex(
           err.message,
@@ -556,7 +556,7 @@ test('rejects a file over the limit', async t => {
 });
 
 if (!isCI)
-  test('rejects and accepts at same time', async t => {
+  test('rejects and accepts at same time', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -570,10 +570,10 @@ if (!isCI)
       html: '<strong>test html</strong>',
       dkim: t.context.forwardEmail.config.dkim
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err.responseCode, 550);
           connection.close();
         });
@@ -581,7 +581,7 @@ if (!isCI)
     });
   });
 
-test('rejects a disposable email sender', async t => {
+test('rejects a disposable email sender', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -594,10 +594,10 @@ test('rejects a disposable email sender', async t => {
     text: 'test text',
     html: '<strong>test html</strong>'
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         t.regex(err.message, /is not permitted/);
         connection.close();
@@ -606,7 +606,7 @@ test('rejects a disposable email sender', async t => {
   });
 });
 
-test('requires at least one valid email in To header if it was set', async t => {
+test('requires at least one valid email in To header if it was set', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -629,10 +629,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         t.regex(err.message, /please include at least one/);
         connection.close();
@@ -641,7 +641,7 @@ Test`.trim()
   });
 });
 
-test('requires either Bcc or To header', async t => {
+test('requires either Bcc or To header', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -663,10 +663,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         t.regex(
           err.message,
@@ -678,7 +678,7 @@ Test`.trim()
   });
 });
 
-test('allows empty Bcc header', async t => {
+test('allows empty Bcc header', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -701,10 +701,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -712,7 +712,7 @@ Test`.trim()
   });
 });
 
-test('bounce', async t => {
+test('bounce', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -735,10 +735,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -746,7 +746,7 @@ Test`.trim()
   });
 });
 
-test('to parsing should not throw error', async t => {
+test('to parsing should not throw error', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -772,10 +772,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -783,7 +783,7 @@ Test`.trim()
   });
 });
 
-test('nobody', async t => {
+test('nobody', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -806,10 +806,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -817,7 +817,7 @@ Test`.trim()
   });
 });
 
-test('webhooks', async t => {
+test('webhooks', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -840,10 +840,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -851,7 +851,7 @@ Test`.trim()
   });
 });
 
-test('port forwarding', async t => {
+test('port forwarding', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -874,10 +874,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -885,7 +885,7 @@ Test`.trim()
   });
 });
 
-test('tests SRS auto-reply', async t => {
+test('tests SRS auto-reply', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -914,10 +914,10 @@ Content-Transfer-Encoding: 7bit
 
 Test`.trim()
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err, null);
         connection.close();
       });
@@ -925,7 +925,7 @@ Test`.trim()
   });
 });
 
-test('tests verification record', async t => {
+test('tests verification record', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -938,10 +938,10 @@ test('tests verification record', async t => {
     text: 'test text',
     html: '<strong>test html</strong>'
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         connection.close();
       });
@@ -949,7 +949,7 @@ test('tests verification record', async t => {
   });
 });
 
-test('rejects an email to no-reply@forwardemail.net', async t => {
+test('rejects an email to no-reply@forwardemail.net', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -962,10 +962,10 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
     text: 'test text',
     html: '<strong>test html</strong>'
   });
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     connection.once('end', resolve);
     connection.connect(() => {
-      connection.send(info.envelope, info.message, err => {
+      connection.send(info.envelope, info.message, (err) => {
         t.is(err.responseCode, 550);
         t.regex(
           err.message,
@@ -977,14 +977,14 @@ test('rejects an email to no-reply@forwardemail.net', async t => {
   });
 });
 
-test('ForwardEmail is not in DNS blacklists', async t => {
+test('ForwardEmail is not in DNS blacklists', async (t) => {
   const ips = await Promise.all([
     lookupAsync('forwardemail.net'),
     lookupAsync('mx1.forwardemail.net'),
     lookupAsync('mx2.forwardemail.net')
   ]);
   const [domain, mx1, mx2] = await Promise.all(
-    ips.map(ip => t.context.forwardEmail.checkBlacklists(ip.address))
+    ips.map((ip) => t.context.forwardEmail.checkBlacklists(ip.address))
   );
   t.is(domain, false);
   t.is(mx1, false);
@@ -992,7 +992,7 @@ test('ForwardEmail is not in DNS blacklists', async t => {
 });
 
 if (!isCI)
-  test('disabled emails are delivered to blackhole', async t => {
+  test('disabled emails are delivered to blackhole', async (t) => {
     const transporter = nodemailer.createTransport({
       streamTransport: true
     });
@@ -1005,10 +1005,10 @@ if (!isCI)
       text: 'test text',
       html: '<strong>test html</strong>'
     });
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       connection.once('end', resolve);
       connection.connect(() => {
-        connection.send(info.envelope, info.message, err => {
+        connection.send(info.envelope, info.message, (err) => {
           t.is(err, null);
           connection.close();
         });
@@ -1020,7 +1020,7 @@ if (!isCI)
 // NOTE: redis could test this by sending same message twice
 // and then checking redis.get key/hash value if it was set in between
 //
-test('greylisting with redis', async t => {
+test('greylisting with redis', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
   });
@@ -1055,9 +1055,9 @@ Test`.trim();
     raw
   });
 
-  let val = await t.context.forwardEmail.client.get(key);
+  let value = await t.context.forwardEmail.client.get(key);
 
-  t.is(val, null);
+  t.is(value, null);
 
   await connect();
 
@@ -1065,9 +1065,9 @@ Test`.trim();
 
   // note the envelope.to hash is for niftylettuce@gmail.com
   // since that is where it actually forwards to (that's where test@niftylettuce.com goes to)
-  val = await t.context.forwardEmail.client.get(key);
+  value = await t.context.forwardEmail.client.get(key);
 
-  t.is(val, '1');
+  t.is(value, '1');
 });
 
 /*
