@@ -263,6 +263,7 @@ class ForwardEmail {
       // spamScanner: {},
       ttlMs: ms('7d'),
       maxRetry: 5,
+      messageIdDomain: env.MESSAGE_ID_DOMAIN,
       ...config
     };
 
@@ -1385,42 +1386,29 @@ class ForwardEmail {
 
               // get or create a new Message-ID that may or may not be used
               // by looking up a hash of the original raw message
-              let createdMessageId = createMessageID(session);
-              try {
-                //
-                // NOTE: we may want to make this more unique somehow
-                //       but right now there is no easy way, since we cannot
-                //       rely upon the session.envelope.mailFrom as it could change
-                //
-                const key = revHash(originalRaw.toString());
-                const value = this.client ? await this.client.get(key) : null;
-                if (value) createdMessageId = value;
-                else if (this.client)
-                  await this.client.set(
-                    key,
-                    createdMessageId,
-                    'PX',
-                    this.config.ttlMs
-                  );
-              } catch (err) {
-                this.config.logger.error(err);
-              }
+              const createdMessageId = createMessageID(
+                this.config.messageIdDomain,
+                headers,
+                chunks
+              );
+
+              this.config.logger.debug('created message id', createdMessageId);
 
               // the same address that gets forwarded TO using our service
               // (we can assume that other mail providers do the same)
-              for (const address of addresses) {
-                if (rewritten) break;
-                const fromAddress = addressParser(originalFrom)[0].address;
-                if (address !== fromAddress) continue;
-                rewritten = true;
+              if (messageId) {
+                for (const address of addresses) {
+                  if (rewritten) break;
+                  const fromAddress = addressParser(originalFrom)[0].address;
+                  if (address !== fromAddress) continue;
+                  rewritten = true;
 
-                //
-                // if there was no message id then we don't need to add one
-                // otherwise if there was one, then we need to consider dkim
-                // and any passing signatures had had a changed header
-                // need removed (we keep track of changed headers below)
-                //
-                if (messageId) {
+                  //
+                  // if there was no message id then we don't need to add one
+                  // otherwise if there was one, then we need to consider dkim
+                  // and any passing signatures had had a changed header
+                  // need removed (we keep track of changed headers below)
+                  //
                   const changes = ['Message-ID', 'X-Original-Message-ID'];
                   headers.update('Message-ID', createdMessageId);
                   headers.update('X-Original-Message-ID', messageId);
@@ -1433,6 +1421,13 @@ class ForwardEmail {
                   // conditionally remove signatures necessary
                   this.conditionallyRemoveSignatures(headers, changes);
                 }
+              } else {
+                // always add a Message-ID to outbound messages so that they don't show up twice
+                const changes = ['Message-ID'];
+                headers.update('Message-ID', createdMessageId);
+                // conditionally remove signatures necessary
+                this.conditionallyRemoveSignatures(headers, changes);
+                rewritten = true;
               }
 
               return { address: to.address, addresses, port };
