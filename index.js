@@ -1784,9 +1784,7 @@ class ForwardEmail {
                 await this.sendEmail(options);
               } catch (err_) {
                 this.config.logger.error(
-                  `${err_.message} (Envelope: ${JSON.stringify(
-                    options.envelope
-                  )})`
+                  `${err_.message} (Session: ${JSON.stringify(session)})`
                 );
                 this.config.logger.error(err_);
               }
