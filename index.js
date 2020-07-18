@@ -1757,23 +1757,29 @@ class ForwardEmail {
                   })
                 )
               );
+              const options = {
+                host: session.envelope.mailFrom.address,
+                //
+                // NOTE: bounces to custom ports won't work
+                //       we would require custom logic here
+                //       to lookup forward-email-port config
+                //
+                port: '25',
+                name,
+                envelope: {
+                  from: '',
+                  to: session.envelope.mailFrom.address
+                },
+                raw
+              };
               try {
-                await this.sendEmail({
-                  host: session.envelope.mailFrom.address,
-                  //
-                  // NOTE: bounces to custom ports won't work
-                  //       we would require custom logic here
-                  //       to lookup forward-email-port config
-                  //
-                  port: '25',
-                  name,
-                  envelope: {
-                    from: '',
-                    to: session.envelope.mailFrom.address
-                  },
-                  raw
-                });
+                await this.sendEmail(options);
               } catch (err_) {
+                this.config.logger.error(
+                  `${err_.message} (Envelope: ${JSON.stringify(
+                    options.envelope
+                  )})`
+                );
                 this.config.logger.error(err_);
               }
             })
@@ -1987,7 +1993,11 @@ class ForwardEmail {
         this.validateRateLimit(
           address.address || session.clientHostname || session.remoteAddress
         ),
-        this.validateMX(address.address)
+        address.address
+          ? this.validateMX(address.address)
+          : Promise.reject(
+              new Error('Envelope MAIL FROM is missing on your message')
+            )
       ]);
       fn();
     } catch (err) {
