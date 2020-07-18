@@ -833,6 +833,14 @@ class ForwardEmail {
   }
 
   async onData(stream, session, fn) {
+    // check for missing MAIL FROM
+    if (!isSANB(session.envelope.mailFrom.address))
+      this.config.logger.error(
+        new Error(
+          `Envelope MAIL FROM missing on session: ${JSON.stringify(session)}`
+        )
+      );
+
     //
     // debugging
     //
