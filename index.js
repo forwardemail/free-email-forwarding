@@ -169,8 +169,8 @@ class ForwardEmail {
         onMailFrom: this.onMailFrom.bind(this),
         onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
-        logInfo: !env.IS_SILENT,
-        logger: env.IS_SILENT ? false : logger,
+        logInfo: true,
+        logger,
         ...config.smtp
       },
       spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
