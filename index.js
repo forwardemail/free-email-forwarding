@@ -844,14 +844,6 @@ class ForwardEmail {
   }
 
   async onData(stream, session, fn) {
-    // check for missing MAIL FROM
-    if (!isSANB(session.envelope.mailFrom.address))
-      this.config.logger.error(
-        new Error(
-          `Envelope MAIL FROM missing on session: ${JSON.stringify(session)}`
-        )
-      );
-
     //
     // debugging
     //
@@ -867,6 +859,13 @@ class ForwardEmail {
     // store an array of chunks of the message
     //
     const chunks = [];
+
+    //
+    // store original session.envelope.mailFrom
+    // since smtp-server calls `_resetSession()` internally
+    // which causes `session.envelope.mailFrom` to be set to `false
+    //
+    const { mailFrom } = session.envelope;
 
     //
     // read the message headers and message itself
@@ -1087,7 +1086,7 @@ class ForwardEmail {
         //
         const spf = await this.validateSPF(
           session.remoteAddress,
-          session.envelope.mailFrom.address,
+          mailFrom.address,
           session.clientHostname
         );
         if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
@@ -1188,9 +1187,7 @@ class ForwardEmail {
 
             // only test if SPF passed to begin with
             if (spf === 'pass') {
-              const envelopeFromDomain = this.parseDomain(
-                session.envelope.mailFrom.address
-              );
+              const envelopeFromDomain = this.parseDomain(mailFrom.address);
               const parsedEnvelopeFromDomain = parseDomain(envelopeFromDomain);
 
               // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
@@ -1601,10 +1598,7 @@ class ForwardEmail {
         // and `X-ForwardEmail-Session-ID`
         headers.update('X-ForwardEmail-Session-ID', session.id);
         // and `X-ForwardEmai-Sender`
-        headers.update(
-          'X-ForwardEmail-Sender',
-          `rfc822; ${session.envelope.mailFrom.address}`
-        );
+        headers.update('X-ForwardEmail-Sender', `rfc822; ${mailFrom.address}`);
 
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
@@ -1617,7 +1611,7 @@ class ForwardEmail {
           const accepted = [];
           // set SRS
           const from = this.srs.forward(
-            session.envelope.mailFrom.address,
+            mailFrom.address,
             this.config.srsDomain
           );
           const mapper = async (recipient) => {
@@ -1765,7 +1759,7 @@ class ForwardEmail {
                 this.dkim.sign(
                   this.getBounceStream({
                     headers,
-                    from: session.envelope.mailFrom.address,
+                    from: mailFrom.address,
                     name,
                     bounce,
                     id: session.id,
@@ -1777,7 +1771,7 @@ class ForwardEmail {
                 )
               );
               const options = {
-                host: session.envelope.mailFrom.address,
+                host: mailFrom.address,
                 //
                 // NOTE: bounces to custom ports won't work
                 //       we would require custom logic here
@@ -1787,7 +1781,7 @@ class ForwardEmail {
                 name,
                 envelope: {
                   from: '',
-                  to: session.envelope.mailFrom.address
+                  to: mailFrom.address
                 },
                 raw
               };
