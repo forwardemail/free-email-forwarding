@@ -3,12 +3,12 @@ const dns = require('dns');
 const fs = require('fs');
 const util = require('util');
 
+// const SpamScanner = require('spamscanner');
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
-// const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
@@ -571,6 +571,7 @@ class ForwardEmail {
   //       which gives us time to manually curate the list of false positives
 
   // we have already combined multiple recipients with same host+port mx combo
+  // eslint-disable-next-line complexity
   async sendEmail(options) {
     const { host, name, envelope, raw, port } = options;
 
@@ -613,12 +614,17 @@ class ForwardEmail {
     // (e.g. in case of a bad altname on a certificate)
     let info;
     let transporter;
+    let mx = {
+      host,
+      port: Number.parseInt(port, 10)
+    };
     try {
-      const mx = await asyncMxConnect({
-        target: host,
-        port: Number.parseInt(port, 10),
-        localHostname: name
-      });
+      if (mx.port !== 25)
+        mx = await asyncMxConnect({
+          target: mx.host,
+          port: mx.port,
+          localHostname: name
+        });
       transporter = nodemailer.createTransport({
         ...transporterConfig,
         ...this.config.ssl,
@@ -628,7 +634,7 @@ class ForwardEmail {
         port: mx.port,
         name,
         tls: {
-          servername: mx.hostname,
+          ...(mx.hostname ? { servername: mx.hostname } : {}),
           rejectUnauthorized: false
         }
       });
@@ -672,11 +678,16 @@ class ForwardEmail {
         err.host ||
         err.cert
       ) {
-        const mx = await asyncMxConnect({
-          target: host,
-          port: Number.parseInt(port, 10),
-          localHostname: name
-        });
+        mx = {
+          host,
+          port: Number.parseInt(port, 10)
+        };
+        if (mx.port !== 25)
+          mx = await asyncMxConnect({
+            target: host,
+            port: mx.port,
+            localHostname: name
+          });
         // try sending the message again without TLS enabled
         transporter = nodemailer.createTransport({
           ...transporterConfig,
