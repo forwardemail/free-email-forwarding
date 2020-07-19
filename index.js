@@ -619,7 +619,7 @@ class ForwardEmail {
       port: Number.parseInt(port, 10)
     };
     try {
-      if (mx.port !== 25)
+      if (mx.port === 25)
         mx = await asyncMxConnect({
           target: mx.host,
           port: mx.port,
@@ -682,7 +682,7 @@ class ForwardEmail {
           host,
           port: Number.parseInt(port, 10)
         };
-        if (mx.port !== 25)
+        if (mx.port === 25)
           mx = await asyncMxConnect({
             target: host,
             port: mx.port,
