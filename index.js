@@ -1930,7 +1930,7 @@ class ForwardEmail {
       // join together the record by space
       return { hostname, record: records[0].join(' ') };
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
 
       // recursively look up from subdomain to parent domain for record
       if (_.isString(err.code) && err.code === 'ENOTFOUND') {
@@ -1976,7 +1976,7 @@ class ForwardEmail {
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -2088,7 +2088,7 @@ class ForwardEmail {
     try {
       records = await dns.promises.resolveTxt(domain);
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
