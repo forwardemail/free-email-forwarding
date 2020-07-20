@@ -50,8 +50,8 @@ if (env.SLACK_API_TOKEN) {
   axe.setCallback(async (level, message, meta) => {
     try {
       // if meta did not have `slack: true`
-      // and it was not an error then return early
-      if (!meta.slack && !['error', 'fatal'].includes(level)) return;
+      // and it was not a fatal error then return early
+      if (!meta.slack && level !== 'fatal') return;
 
       // otherwise post a message to the slack channel
       const fields = [
@@ -76,6 +76,20 @@ if (env.SLACK_API_TOKEN) {
           short: true
         }
       ];
+
+      if (meta.bounce_info)
+        fields.push({
+          title: 'Bounce Info',
+          value: JSON.stringify(meta.bounce_info),
+          short: true
+        });
+
+      if (meta.envelope)
+        fields.push({
+          title: 'Envelope',
+          value: JSON.stringify(meta.envelope),
+          short: true
+        });
 
       const result = await web.chat.postMessage({
         channel: 'logs',

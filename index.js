@@ -341,7 +341,7 @@ class ForwardEmail {
     // <https://github.com/nodemailer/smtp-server/issues/135>
     this.server.address = this.server.server.address.bind(this.server.server);
     this.server.on('error', (err) => {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
     });
 
     // expose spamscanner
@@ -408,7 +408,7 @@ class ForwardEmail {
       this.config.logger.log(info);
       return info;
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       // here we do some magic so that we push an error message
       // that has the end-recipient's email masked with the
       // original to address that we were trying to send to
@@ -643,7 +643,7 @@ class ForwardEmail {
       if (this.client)
         await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
-      this.config.logger.warn(err, { options, envelope });
+      this.config.logger.error(err, { options, envelope });
 
       //
       // if there was `err.response` and it had a bounce reason
@@ -657,9 +657,8 @@ class ForwardEmail {
           ['defer', 'slowdown'].includes(bounceInfo.action) ||
           bounceInfo.category === 'blacklist'
         ) {
-          this.config.logger.error(err, {
+          this.config.logger.fatal(err, {
             bounce_info: bounceInfo,
-            options,
             envelope
           });
           err.responseCode = 421;
@@ -737,9 +736,8 @@ class ForwardEmail {
             ['defer', 'slowdown'].includes(bounceInfo.action) ||
             bounceInfo.category === 'blacklist'
           ) {
-            this.config.logger.error(err, {
+            this.config.logger.fatal(err, {
               bounce_info: bounceInfo,
-              options,
               envelope
             });
             err.responseCode = 421;
@@ -811,7 +809,7 @@ class ForwardEmail {
       (_.isArray(this.config.dnsbl.domains) &&
         this.config.dnsbl.domains.length === 0)
     ) {
-      this.config.logger.warn('No DNS blacklists were provided');
+      this.config.logger.error('No DNS blacklists were provided');
       return false;
     }
 
@@ -878,10 +876,10 @@ class ForwardEmail {
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       fn(err);
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       fn();
     }
   }
@@ -1071,12 +1069,12 @@ class ForwardEmail {
         try {
           results = await this.scanner.scan(originalRaw);
         } catch (err) {
-          logger.warn(err);
+          logger.error(err);
         }
 
         if (results) {
           if (results.is_spam)
-            logger.warn('spam detected', {
+            logger.error('spam detected', {
               originalRaw: originalRaw.toString(),
               results
             });
@@ -1374,7 +1372,7 @@ class ForwardEmail {
 
             /* eslint-enable max-depth */
           } catch (err) {
-            this.config.logger.warn(err);
+            this.config.logger.error(err);
           }
         }
 
@@ -1439,7 +1437,7 @@ class ForwardEmail {
                   );
                 }
               } catch (err) {
-                this.config.logger.warn(err);
+                this.config.logger.error(err);
               }
 
               // if we already rewrote headers no need to continue
@@ -1493,7 +1491,7 @@ class ForwardEmail {
 
               return { address: to.address, addresses, port };
             } catch (err) {
-              this.config.logger.warn(err);
+              this.config.logger.error(err);
               bounces.push({
                 address: to.address,
                 err
@@ -1540,7 +1538,7 @@ class ForwardEmail {
                   } catch (err) {
                     // e.g. if the MX servers don't exist for recipient
                     // then obviously there should be an error
-                    this.config.logger.warn(err);
+                    this.config.logger.error(err);
                     errors.push({
                       address,
                       err
@@ -1564,7 +1562,7 @@ class ForwardEmail {
                 errors.map((error) => `${error.address}: ${error.err.message}`)
               );
             } catch (err) {
-              this.config.logger.warn(err);
+              this.config.logger.error(err);
               bounces.push({
                 address: recipient.address,
                 err
@@ -1794,7 +1792,7 @@ class ForwardEmail {
             if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
               template = body;
           } catch (err) {
-            this.config.logger.warn(err);
+            this.config.logger.error(err);
           }
           */
 
@@ -1833,10 +1831,10 @@ class ForwardEmail {
               try {
                 await this.sendEmail(options);
               } catch (err_) {
-                this.config.logger.warn(
+                this.config.logger.error(
                   `${err_.message} (Session: ${JSON.stringify(session)})`
                 );
-                this.config.logger.warn(err_);
+                this.config.logger.error(err_);
               }
             })
           );
@@ -1854,7 +1852,7 @@ class ForwardEmail {
 
     stream.once('error', (err) => {
       // log original error
-      this.config.logger.warn(err, { session });
+      this.config.logger.error(err, { session });
 
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
@@ -1865,7 +1863,7 @@ class ForwardEmail {
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
       // if (originalRaw) meta.email = originalRaw.toString();
-      this.config.logger.warn(err, { session });
+      this.config.logger.error(err, { session });
       fn(err);
     });
 
@@ -1910,11 +1908,6 @@ class ForwardEmail {
           .then(() => {})
           .catch((err) => {
             this.config.logger.error(err);
-            this.config.logger.error(
-              new Error(
-                `Email could not be sent for ${remoteAddress}, ${from}, ${clientHostname} for SPF validation result of "${result}" and explanation "${explanation}"`
-              )
-            );
           });
 
       return { result, explanation };
@@ -1937,7 +1930,7 @@ class ForwardEmail {
       // join together the record by space
       return { hostname, record: records[0].join(' ') };
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
 
       // recursively look up from subdomain to parent domain for record
       if (_.isString(err.code) && err.code === 'ENOTFOUND') {
@@ -1965,7 +1958,7 @@ class ForwardEmail {
       const pass = await dkimVerify(raw, index);
       return pass;
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       err.message = `Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.  Original error message: ${err.message}`;
       err.responseCode = 421;
       throw err;
@@ -1983,7 +1976,7 @@ class ForwardEmail {
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -2064,7 +2057,7 @@ class ForwardEmail {
         throw new Error(`Invalid SRS reversed address for ${address}`);
       return reversed;
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       return address;
     }
   }
@@ -2095,7 +2088,7 @@ class ForwardEmail {
     try {
       records = await dns.promises.resolveTxt(domain);
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -2156,7 +2149,7 @@ class ForwardEmail {
           }
         }
       } catch (err) {
-        this.config.logger.warn(err);
+        this.config.logger.error(err);
       }
     }
 
@@ -2326,7 +2319,7 @@ class ForwardEmail {
           forwardingAddresses.push(element);
         }
       } catch (err) {
-        this.config.logger.warn(err);
+        this.config.logger.error(err);
       }
     }
 
@@ -2374,7 +2367,7 @@ class ForwardEmail {
       )
         maxForwardedAddresses = body.max_forwarded_addresses;
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.error(err);
     }
 
     if (forwardingAddresses.length > maxForwardedAddresses)
