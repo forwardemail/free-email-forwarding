@@ -92,9 +92,9 @@ if (env.SLACK_API_TOKEN) {
       });
 
       // finally log the result from slack
-      axe.info('web.chat.postMessage', { result, callback: false });
+      axe.debug('web.chat.postMessage', { result, callback: false });
     } catch (err) {
-      axe.error(err, { callback: false });
+      axe.debug(err, { callback: false });
     }
   });
 }
