@@ -12,6 +12,7 @@ const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
+const bounces = require('zone-mta/lib/bounces');
 const bytes = require('bytes');
 const dkimVerify = require('python-dkim-verify');
 const dmarcParse = require('dmarc-parse');
@@ -340,7 +341,7 @@ class ForwardEmail {
     // <https://github.com/nodemailer/smtp-server/issues/135>
     this.server.address = this.server.server.address.bind(this.server.server);
     this.server.on('error', (err) => {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
     });
 
     // expose spamscanner
@@ -407,7 +408,7 @@ class ForwardEmail {
       this.config.logger.log(info);
       return info;
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       // here we do some magic so that we push an error message
       // that has the end-recipient's email masked with the
       // original to address that we were trying to send to
@@ -642,7 +643,30 @@ class ForwardEmail {
       if (this.client)
         await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
-      this.config.logger.error(err, { options, envelope });
+      this.config.logger.warn(err, { options, envelope });
+
+      //
+      // if there was `err.response` and it had a bounce reason
+      // and if the bounce action was defer, slowdown, or it has a category
+      // of blacklist, then we should retry sending it later and send a 421 code
+      // and alert our team in Slack so they can investigate if IP mitigation needed
+      //
+      if (isSANB(err.response)) {
+        const bounceInfo = bounces.check(err.response);
+        if (
+          ['defer', 'slowdown'].includes(bounceInfo.action) ||
+          bounceInfo.category === 'blacklist'
+        ) {
+          this.config.logger.error(err, {
+            bounce_info: bounceInfo,
+            options,
+            envelope
+          });
+          err.responseCode = 421;
+          throw err;
+        }
+      }
+
       // this error will indicate it is a TLS issue, so we should retry as plain
       // if it doesn't have all these properties per this link then its not TLS
       //
@@ -666,8 +690,6 @@ class ForwardEmail {
       // if (!err.reason || !err.host || !err.cert) throw err;
       //
 
-      // TODO: we should add 1x greylist retry so that if the end server has DNS issues
-      // then it will attempt to retry it once before completely failing
       if (
         (err.code &&
           Number.parseInt(err.code, 10) >= 400 &&
@@ -703,6 +725,27 @@ class ForwardEmail {
         if (this.client)
           await this.client.set(key, count, 'PX', this.config.ttlMs);
       } else {
+        //
+        // if there was `err.response` and it had a bounce reason
+        // and if the bounce action was defer, slowdown, or it has a category
+        // of blacklist, then we should retry sending it later and send a 421 code
+        // and alert our team in Slack so they can investigate if IP mitigation needed
+        //
+        if (isSANB(err.response)) {
+          const bounceInfo = bounces.check(err.response);
+          if (
+            ['defer', 'slowdown'].includes(bounceInfo.action) ||
+            bounceInfo.category === 'blacklist'
+          ) {
+            this.config.logger.error(err, {
+              bounce_info: bounceInfo,
+              options,
+              envelope
+            });
+            err.responseCode = 421;
+          }
+        }
+
         throw err;
       }
     }
@@ -835,10 +878,10 @@ class ForwardEmail {
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       fn(err);
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       fn();
     }
   }
@@ -1028,12 +1071,12 @@ class ForwardEmail {
         try {
           results = await this.scanner.scan(originalRaw);
         } catch (err) {
-          logger.error(err);
+          logger.warn(err);
         }
 
         if (results) {
           if (results.is_spam)
-            logger.error('spam detected', {
+            logger.warn('spam detected', {
               originalRaw: originalRaw.toString(),
               results
             });
@@ -1089,9 +1132,9 @@ class ForwardEmail {
           mailFrom.address,
           session.clientHostname
         );
-        if (!['pass', 'neutral', 'none', 'softfail'].includes(spf))
+        if (spf.result === 'fail')
           throw new CustomError(
-            `The email you sent has failed SPF validation with a result of "${spf}"`
+            `The email you sent has failed SPF validation failed with result "${spf.result}" and explanation "${spf.explanation}"`
           );
 
         //
@@ -1186,14 +1229,15 @@ class ForwardEmail {
             let hasPassingSPF = false;
 
             // only test if SPF passed to begin with
-            if (spf === 'pass') {
+            if (spf.result === 'pass') {
               const envelopeFromDomain = this.parseDomain(mailFrom.address);
               const parsedEnvelopeFromDomain = parseDomain(envelopeFromDomain);
 
               // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
               if (
                 aspf === 'r' &&
-                parsedEnvelopeFromDomain.domain === parsedFromDomain.domain
+                parsedEnvelopeFromDomain.domain === parsedFromDomain.domain &&
+                parsedEnvelopeFromDomain.tld === parsedFromDomain.tld
               ) {
                 hasPassingSPF = true;
               } else if (aspf === 's' && envelopeFromDomain === fromDomain) {
@@ -1280,7 +1324,8 @@ class ForwardEmail {
                   // strict mode means the domain must be exact match
                   if (
                     (adkim === 'r' &&
-                      dkimParsedDomain.domain === parsedFromDomain.domain) ||
+                      dkimParsedDomain.domain === parsedFromDomain.domain &&
+                      dkimParsedDomain.tld === parsedFromDomain.tld) ||
                     (adkim === 's' && value === fromDomain)
                   ) {
                     hasPassingDKIM = true;
@@ -1329,7 +1374,7 @@ class ForwardEmail {
 
             /* eslint-enable max-depth */
           } catch (err) {
-            this.config.logger.error(err);
+            this.config.logger.warn(err);
           }
         }
 
@@ -1394,7 +1439,7 @@ class ForwardEmail {
                   );
                 }
               } catch (err) {
-                this.config.logger.error(err);
+                this.config.logger.warn(err);
               }
 
               // if we already rewrote headers no need to continue
@@ -1448,7 +1493,7 @@ class ForwardEmail {
 
               return { address: to.address, addresses, port };
             } catch (err) {
-              this.config.logger.error(err);
+              this.config.logger.warn(err);
               bounces.push({
                 address: to.address,
                 err
@@ -1495,7 +1540,7 @@ class ForwardEmail {
                   } catch (err) {
                     // e.g. if the MX servers don't exist for recipient
                     // then obviously there should be an error
-                    this.config.logger.error(err);
+                    this.config.logger.warn(err);
                     errors.push({
                       address,
                       err
@@ -1519,7 +1564,7 @@ class ForwardEmail {
                 errors.map((error) => `${error.address}: ${error.err.message}`)
               );
             } catch (err) {
-              this.config.logger.error(err);
+              this.config.logger.warn(err);
               bounces.push({
                 address: recipient.address,
                 err
@@ -1749,7 +1794,7 @@ class ForwardEmail {
             if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
               template = body;
           } catch (err) {
-            this.config.logger.error(err);
+            this.config.logger.warn(err);
           }
           */
 
@@ -1788,10 +1833,10 @@ class ForwardEmail {
               try {
                 await this.sendEmail(options);
               } catch (err_) {
-                this.config.logger.error(
+                this.config.logger.warn(
                   `${err_.message} (Session: ${JSON.stringify(session)})`
                 );
-                this.config.logger.error(err_);
+                this.config.logger.warn(err_);
               }
             })
           );
@@ -1808,6 +1853,9 @@ class ForwardEmail {
     });
 
     stream.once('error', (err) => {
+      // log original error
+      this.config.logger.error(err, { session });
+
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
         if (!err.responseCode)
@@ -1817,7 +1865,7 @@ class ForwardEmail {
 
       err.message += ` - if you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
       // if (originalRaw) meta.email = originalRaw.toString();
-      this.config.logger.error(err, { session });
+      this.config.logger.warn(err, { session });
       fn(err);
     });
 
@@ -1842,11 +1890,32 @@ class ForwardEmail {
         from,
         clientHostname
       );
-      if (['permerror', 'temperror'].includes(result))
-        throw new CustomError(
-          `SPF validation failed with result "${result}" and explanation "${explanation}"`
-        );
-      return result;
+      // email the person once as a courtesy of their invalid SPF setup
+      if (['fail', 'softfail', 'permerror', 'temperror'].includes(result))
+        superagent
+          .post(`${this.config.apiEndpoint}/v1/spf-error`)
+          .set('User-Agent', this.config.userAgent)
+          .timeout(this.config.timeout)
+          // .retry(this.config.retry);
+          .send({
+            remote_address: remoteAddress,
+            from,
+            client_hostname: clientHostname,
+            result,
+            explanation
+          })
+          // eslint-disable-next-line promise/prefer-await-to-then
+          .then(() => {})
+          .catch((err) => {
+            this.config.logger.error(err);
+            this.config.logger.error(
+              new Error(
+                `Email could not be sent for ${remoteAddress}, ${from}, ${clientHostname} for SPF validation result of "${result}" and explanation "${explanation}"`
+              )
+            );
+          });
+
+      return { result, explanation };
     } catch (err) {
       err.responseCode = 421;
       throw err;
@@ -1866,7 +1935,7 @@ class ForwardEmail {
       // join together the record by space
       return { hostname, record: records[0].join(' ') };
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
 
       // recursively look up from subdomain to parent domain for record
       if (_.isString(err.code) && err.code === 'ENOTFOUND') {
@@ -1894,7 +1963,7 @@ class ForwardEmail {
       const pass = await dkimVerify(raw, index);
       return pass;
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       err.message = `Your email contained an invalid DKIM signature. For more information visit https://en.wikipedia.org/wiki/DomainKeys_Identified_Mail. You can also reach out to us for help analyzing this issue.  Original error message: ${err.message}`;
       err.responseCode = 421;
       throw err;
@@ -1912,7 +1981,7 @@ class ForwardEmail {
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -1993,7 +2062,7 @@ class ForwardEmail {
         throw new Error(`Invalid SRS reversed address for ${address}`);
       return reversed;
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       return address;
     }
   }
@@ -2024,7 +2093,7 @@ class ForwardEmail {
     try {
       records = await dns.promises.resolveTxt(domain);
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -2085,7 +2154,7 @@ class ForwardEmail {
           }
         }
       } catch (err) {
-        this.config.logger.error(err);
+        this.config.logger.warn(err);
       }
     }
 
@@ -2255,7 +2324,7 @@ class ForwardEmail {
           forwardingAddresses.push(element);
         }
       } catch (err) {
-        this.config.logger.error(err);
+        this.config.logger.warn(err);
       }
     }
 
@@ -2303,7 +2372,7 @@ class ForwardEmail {
       )
         maxForwardedAddresses = body.max_forwarded_addresses;
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.warn(err);
     }
 
     if (forwardingAddresses.length > maxForwardedAddresses)
