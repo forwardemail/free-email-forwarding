@@ -248,7 +248,7 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
-      timeout: ms('10s'),
+      timeout: ms('20s'),
       retry: 3,
       simpleParser: { Iconv },
       isURLOptions: {
@@ -1854,7 +1854,7 @@ class ForwardEmail {
 
     stream.once('error', (err) => {
       // log original error
-      this.config.logger.error(err, { session });
+      this.config.logger.warn(err, { session });
 
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
@@ -1895,6 +1895,8 @@ class ForwardEmail {
         superagent
           .post(`${this.config.apiEndpoint}/v1/spf-error`)
           .set('User-Agent', this.config.userAgent)
+          .set('Accept', 'json')
+          .auth(this.config.apiSecrets[0])
           .timeout(this.config.timeout)
           // .retry(this.config.retry);
           .send({
