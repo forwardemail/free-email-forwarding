@@ -1026,6 +1026,7 @@ class ForwardEmail {
         // 3) reverse SRS bounces
         //
         const hasHeaderTo = headers.hasHeader('To');
+        const hasHeaderReplyTo = headers.hasHeader('Reply-To');
         if (hasHeaderTo) {
           const originalTo = headers.getFirst('To');
           const reversedSRSTo = this.checkSRS(originalTo);
@@ -1033,6 +1034,16 @@ class ForwardEmail {
             headers.update('To', reversedSRSTo);
             // conditionally remove signatures necessary
             this.conditionallyRemoveSignatures(headers, ['To']);
+          }
+        }
+
+        if (hasHeaderReplyTo) {
+          const originalReplyTo = headers.getFirst('Reply-To');
+          const reversedSRSReplyTo = this.checkSRS(originalReplyTo);
+          if (originalReplyTo !== reversedSRSReplyTo) {
+            headers.update('Reply-To', reversedSRSReplyTo);
+            // conditionally remove signatures necessary
+            this.conditionallyRemoveSignatures(headers, ['Reply-To']);
           }
         }
 
