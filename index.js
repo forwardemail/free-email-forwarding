@@ -1802,7 +1802,7 @@ class ForwardEmail {
                 this.dkim.sign(
                   this.getBounceStream({
                     headers,
-                    from: mailFrom.address,
+                    from: this.checkSRS(mailFrom.address),
                     name,
                     bounce,
                     id: session.id,
@@ -1814,7 +1814,7 @@ class ForwardEmail {
                 )
               );
               const options = {
-                host: mailFrom.address,
+                host: this.checkSRS(mailFrom.address),
                 //
                 // NOTE: bounces to custom ports won't work
                 //       we would require custom logic here
@@ -1824,7 +1824,7 @@ class ForwardEmail {
                 name,
                 envelope: {
                   from: '',
-                  to: mailFrom.address
+                  to: this.checkSRS(mailFrom.address)
                 },
                 raw
               };
