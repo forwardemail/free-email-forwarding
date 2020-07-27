@@ -1025,6 +1025,17 @@ class ForwardEmail {
         //
         // 3) reverse SRS bounces
         //
+        const hasHeaderTo = headers.hasHeader('To');
+        if (hasHeaderTo) {
+          const originalTo = headers.getFirst('To');
+          const reversedSRSTo = this.checkSRS(originalTo);
+          if (originalTo !== reversedSRSTo) {
+            headers.update('To', reversedSRSTo);
+            // conditionally remove signatures necessary
+            this.conditionallyRemoveSignatures(headers, ['To']);
+          }
+        }
+
         session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
           const address = this.checkSRS(to.address);
           return {
