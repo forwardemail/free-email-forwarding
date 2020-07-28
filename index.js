@@ -1025,27 +1025,28 @@ class ForwardEmail {
         //
         // 3) reverse SRS bounces
         //
-        const hasHeaderTo = headers.hasHeader('To');
-        const hasHeaderReplyTo = headers.hasHeader('Reply-To');
-        if (hasHeaderTo) {
-          const originalTo = headers.getFirst('To');
-          const reversedSRSTo = this.checkSRS(originalTo);
-          if (originalTo !== reversedSRSTo) {
-            headers.update('To', reversedSRSTo);
-            // conditionally remove signatures necessary
-            this.conditionallyRemoveSignatures(headers, ['To']);
+        //
+        // <https://stackoverflow.com/a/5474474>
+        //
+        // Errors-To is deprecated and Return-Path is overriden
+        // however we're adding this as a test for Gmail vacation responders
+        //
+        const changes = [];
+        for (const header of ['To', 'Reply-To', 'Errors-To', 'Return-Path']) {
+          const originalValue = headers.getFirst(header);
+          const reversedValue = this.checkSRS(originalValue);
+          if (!originalValue && ['Errors-To', 'Return-Path'].includes(header)) {
+            headers.update(header, this.checkSRS(mailFrom.address));
+            changes.push(header);
+          } else if (originalValue !== reversedValue) {
+            headers.update(header, reversedValue);
+            changes.push(header);
           }
         }
 
-        if (hasHeaderReplyTo) {
-          const originalReplyTo = headers.getFirst('Reply-To');
-          const reversedSRSReplyTo = this.checkSRS(originalReplyTo);
-          if (originalReplyTo !== reversedSRSReplyTo) {
-            headers.update('Reply-To', reversedSRSReplyTo);
-            // conditionally remove signatures necessary
-            this.conditionallyRemoveSignatures(headers, ['Reply-To']);
-          }
-        }
+        // conditionally remove signatures necessary
+        if (changes.length > 0);
+        this.conditionallyRemoveSignatures(headers, changes);
 
         session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
           const address = this.checkSRS(to.address);
@@ -1149,7 +1150,7 @@ class ForwardEmail {
         //
         const spf = await this.validateSPF(
           session.remoteAddress,
-          mailFrom.address,
+          this.checkSRS(mailFrom.address),
           session.clientHostname
         );
         if (spf.result === 'fail')
@@ -1250,7 +1251,9 @@ class ForwardEmail {
 
             // only test if SPF passed to begin with
             if (spf.result === 'pass') {
-              const envelopeFromDomain = this.parseDomain(mailFrom.address);
+              const envelopeFromDomain = this.parseDomain(
+                this.checkSRS(mailFrom.address)
+              );
               const parsedEnvelopeFromDomain = parseDomain(envelopeFromDomain);
 
               // MAIL FROM envelope organization domain must match FROM organization domain in relaxed mode
@@ -1663,7 +1666,10 @@ class ForwardEmail {
         // and `X-ForwardEmail-Session-ID`
         headers.update('X-ForwardEmail-Session-ID', session.id);
         // and `X-ForwardEmai-Sender`
-        headers.update('X-ForwardEmail-Sender', `rfc822; ${mailFrom.address}`);
+        headers.update(
+          'X-ForwardEmail-Sender',
+          `rfc822; ${this.checkSRS(mailFrom.address)}`
+        );
 
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
@@ -1824,7 +1830,7 @@ class ForwardEmail {
                 this.dkim.sign(
                   this.getBounceStream({
                     headers,
-                    from: mailFrom.address,
+                    from: this.checkSRS(mailFrom.address),
                     name,
                     bounce,
                     id: session.id,
@@ -1836,7 +1842,7 @@ class ForwardEmail {
                 )
               );
               const options = {
-                host: mailFrom.address,
+                host: this.checkSRS(mailFrom.address),
                 //
                 // NOTE: bounces to custom ports won't work
                 //       we would require custom logic here
@@ -1846,7 +1852,7 @@ class ForwardEmail {
                 name,
                 envelope: {
                   from: '',
-                  to: mailFrom.address
+                  to: this.checkSRS(mailFrom.address)
                 },
                 raw
               };
