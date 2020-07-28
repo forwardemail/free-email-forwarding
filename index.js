@@ -1045,8 +1045,8 @@ class ForwardEmail {
         }
 
         // conditionally remove signatures necessary
-        if (changes.length > 0);
-        this.conditionallyRemoveSignatures(headers, changes);
+        if (changes.length > 0)
+          this.conditionallyRemoveSignatures(headers, changes);
 
         session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
           const address = this.checkSRS(to.address);
