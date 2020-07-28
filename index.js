@@ -1025,20 +1025,11 @@ class ForwardEmail {
         //
         // 3) reverse SRS bounces
         //
-        //
-        // <https://stackoverflow.com/a/5474474>
-        //
-        // Errors-To is deprecated and Return-Path is overriden
-        // however we're adding this as a test for Gmail vacation responders
-        //
         const changes = [];
-        for (const header of ['To', 'Reply-To', 'Errors-To', 'Return-Path']) {
+        for (const header of ['To', 'Reply-To']) {
           const originalValue = headers.getFirst(header);
           const reversedValue = this.checkSRS(originalValue);
-          if (!originalValue && ['Errors-To', 'Return-Path'].includes(header)) {
-            headers.update(header, this.checkSRS(mailFrom.address));
-            changes.push(header);
-          } else if (originalValue !== reversedValue) {
+          if (originalValue !== reversedValue) {
             headers.update(header, reversedValue);
             changes.push(header);
           }
@@ -2483,11 +2474,21 @@ class ForwardEmail {
     // Get all signatures as an Array
     const signatures = headers.get('DKIM-Signature');
 
+    // If there were no signatures then return early
+    if (signatures.length === 0) return;
+
     // Remove all DKIM-Signatures (we add back the ones that are not affected)
     headers.remove('DKIM-Signature');
 
+    //
+    // NOTE: There seems to be a bug in Gmail in that is defers to the last DKIM signature
+    //       in the message instead of the first so we can't rely on the approach below
+    //       which would have normally conserved the original DKIM-Signature if it wasn't affected
+    //
+
     // Note that we don't validate the signature, we just check its headers
     // And we don't specifically because `this.validateDKIM` could throw error
+    /*
     for (const signature of signatures) {
       const terms = signature
         .split(/;/)
@@ -2509,6 +2510,7 @@ class ForwardEmail {
           headers.add('DKIM-Signature', signature, headers.lines.length + 1);
       }
     }
+    */
   }
 }
 
