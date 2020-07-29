@@ -2460,7 +2460,7 @@ class ForwardEmail {
     if (changes.length === 0) return headers;
 
     // Always remove X-Google-DKIM-Signature
-    headers.remove('X-Google-DKIM-Signature');
+    // headers.remove('X-Google-DKIM-Signature');
 
     //
     // Right now it's not easy to delete a header by its index
