@@ -975,7 +975,7 @@ class ForwardEmail {
         // store variables for use later
         //
         // headers object (includes the \r\n\r\n header and body separator)
-        const { headers } = messageSplitter;
+        let { headers } = messageSplitter;
         const messageId = headers.getFirst('Message-ID');
         const replyTo = headers.getFirst('Reply-To');
         const inReplyTo = headers.getFirst('In-Reply-To');
@@ -1037,7 +1037,7 @@ class ForwardEmail {
 
         // conditionally remove signatures necessary
         if (changes.length > 0)
-          this.conditionallyRemoveSignatures(headers, changes);
+          headers = this.conditionallyRemoveSignatures(headers, changes);
 
         session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
           const address = this.checkSRS(to.address);
@@ -1383,7 +1383,7 @@ class ForwardEmail {
               }
 
               // conditionally remove signatures necessary
-              this.conditionallyRemoveSignatures(headers, changes);
+              headers = this.conditionallyRemoveSignatures(headers, changes);
             }
 
             /* eslint-enable max-depth */
@@ -1494,14 +1494,17 @@ class ForwardEmail {
                   }
 
                   // conditionally remove signatures necessary
-                  this.conditionallyRemoveSignatures(headers, changes);
+                  headers = this.conditionallyRemoveSignatures(
+                    headers,
+                    changes
+                  );
                 }
               } else {
                 // always add a Message-ID to outbound messages so that they don't show up twice
                 const changes = ['Message-ID'];
                 headers.update('Message-ID', createdMessageId);
                 // conditionally remove signatures necessary
-                this.conditionallyRemoveSignatures(headers, changes);
+                headers = this.conditionallyRemoveSignatures(headers, changes);
                 rewritten = true;
               }
 
@@ -2454,7 +2457,7 @@ class ForwardEmail {
     // if it is not removed otherwise, and there was a rewrite done
     //
     // Return early if no changes
-    if (changes.length === 0) return;
+    if (changes.length === 0) return headers;
 
     // Always remove X-Google-DKIM-Signature
     headers.remove('X-Google-DKIM-Signature');
@@ -2475,20 +2478,13 @@ class ForwardEmail {
     const signatures = headers.get('DKIM-Signature');
 
     // If there were no signatures then return early
-    if (signatures.length === 0) return;
+    if (signatures.length === 0) return headers;
 
     // Remove all DKIM-Signatures (we add back the ones that are not affected)
     headers.remove('DKIM-Signature');
 
-    //
-    // NOTE: There seems to be a bug in Gmail in that is defers to the last DKIM signature
-    //       in the message instead of the first so we can't rely on the approach below
-    //       which would have normally conserved the original DKIM-Signature if it wasn't affected
-    //
-
     // Note that we don't validate the signature, we just check its headers
     // And we don't specifically because `this.validateDKIM` could throw error
-    /*
     for (const signature of signatures) {
       const terms = signature
         .split(/;/)
@@ -2510,7 +2506,8 @@ class ForwardEmail {
           headers.add('DKIM-Signature', signature, headers.lines.length + 1);
       }
     }
-    */
+
+    return headers;
   }
 }
 
