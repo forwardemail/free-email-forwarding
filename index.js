@@ -978,7 +978,6 @@ class ForwardEmail {
         let { headers } = messageSplitter;
         const messageId = headers.getFirst('Message-ID');
         const replyTo = headers.getFirst('Reply-To');
-        const inReplyTo = headers.getFirst('In-Reply-To');
 
         // <https://github.com/zone-eu/zone-mta/blob/2557a975ee35ed86e4d95d6cfe78d1b249dec1a0/plugins/core/email-bounce.js#L97>
         if (headers.get('Received').length > 25)
@@ -1026,7 +1025,7 @@ class ForwardEmail {
         // 3) reverse SRS bounces
         //
         const changes = [];
-        for (const header of ['To', 'Reply-To']) {
+        for (const header of ['To']) {
           const originalValue = headers.getFirst(header);
           const reversedValue = this.checkSRS(originalValue);
           if (originalValue !== reversedValue) {
@@ -1402,7 +1401,6 @@ class ForwardEmail {
         //
         // 9) rewrite message ID and lookup multiple recipients
         //
-        let rewritten = false;
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async (to) => {
             try {
@@ -1456,9 +1454,6 @@ class ForwardEmail {
                 this.config.logger.error(err);
               }
 
-              // if we already rewrote headers no need to continue
-              if (rewritten) return { address: to.address, addresses, port };
-
               // get or create a new Message-ID that may or may not be used
               // by looking up a hash of the original raw message
               const createdMessageId = createMessageID(
@@ -1469,43 +1464,12 @@ class ForwardEmail {
 
               this.config.logger.debug('created message id', createdMessageId);
 
-              // the same address that gets forwarded TO using our service
-              // (we can assume that other mail providers do the same)
-              if (messageId) {
-                for (const address of addresses) {
-                  if (rewritten) break;
-                  const fromAddress = addressParser(originalFrom)[0].address;
-                  if (address !== fromAddress) continue;
-                  rewritten = true;
-
-                  //
-                  // if there was no message id then we don't need to add one
-                  // otherwise if there was one, then we need to consider dkim
-                  // and any passing signatures had had a changed header
-                  // need removed (we keep track of changed headers below)
-                  //
-                  const changes = ['Message-ID', 'X-Original-Message-ID'];
-                  headers.update('Message-ID', createdMessageId);
-                  headers.update('X-Original-Message-ID', messageId);
-                  // don't modify the reply-to if it was already set
-                  if (!inReplyTo) {
-                    changes.push('In-Reply-To');
-                    headers.update('In-Reply-To', messageId);
-                  }
-
-                  // conditionally remove signatures necessary
-                  headers = this.conditionallyRemoveSignatures(
-                    headers,
-                    changes
-                  );
-                }
-              } else {
-                // always add a Message-ID to outbound messages so that they don't show up twice
+              // always add a Message-ID to outbound messages so that they don't show up twice
+              if (!messageId) {
                 const changes = ['Message-ID'];
                 headers.update('Message-ID', createdMessageId);
                 // conditionally remove signatures necessary
                 headers = this.conditionallyRemoveSignatures(headers, changes);
-                rewritten = true;
               }
 
               return { address: to.address, addresses, port };
@@ -1679,6 +1643,9 @@ class ForwardEmail {
             mailFrom.address,
             this.config.srsDomain
           );
+
+          const selfTestEmails = [];
+
           const mapper = async (recipient) => {
             if (recipient.webhook) {
               try {
@@ -1714,7 +1681,25 @@ class ForwardEmail {
               raw,
               from
             });
-            if (result.accepted.length > 0) accepted.push(recipient.recipient);
+
+            if (result.accepted.length > 0) {
+              // add to the
+              for (const a of result.accepted) {
+                // get normalized form without `+` symbol
+                const normal = `${this.parseUsername(a)}@${this.parseDomain(
+                  a,
+                  false
+                )}`;
+                if (
+                  !selfTestEmails.includes(normal) &&
+                  normal === this.checkSRS(mailFrom.address)
+                )
+                  selfTestEmails.push(normal);
+              }
+
+              accepted.push(recipient.recipient);
+            }
+
             if (result.rejected.length === 0) return;
             for (let x = 0; x < result.rejected.length; x++) {
               const err = result.rejectedErrors[x];
@@ -1729,6 +1714,34 @@ class ForwardEmail {
           };
 
           await Promise.all(normalized.map((recipient) => mapper(recipient)));
+
+          //
+          // if there were any where the MAIL FROM was equivalent to the recipient
+          // then we'll send them a one-time email to let them know it was successful
+          // and also that they made need to check their "Sent" folder since many email
+          // hosts like Gmail will not show a message you send from yourself to yourself
+          // unless we rewrite the Message-Id header, which was previously did, but even
+          // then it causes problems, as it prepends "This email looks suspicious" warning
+          //
+          // <https://support.google.com/a/answer/1703601?hl=en>
+          // <https://stackoverflow.com/a/52534520>
+          //
+          if (selfTestEmails.length > 0)
+            superagent
+              .post(`${this.config.apiEndpoint}/v1/self-test`)
+              .set('User-Agent', this.config.userAgent)
+              .set('Accept', 'json')
+              .auth(this.config.apiSecrets[0])
+              .timeout(this.config.timeout)
+              // .retry(this.config.retry);
+              .send({
+                emails: selfTestEmails
+              })
+              // eslint-disable-next-line promise/prefer-await-to-then
+              .then(() => {})
+              .catch((err) => {
+                this.config.logger.error(err);
+              });
 
           // if there weren't any bounces then return early
           if (bounces.length === 0) return fn();
@@ -1860,10 +1873,6 @@ class ForwardEmail {
               }
             })
           );
-
-          //
-          // TODO: add smart alerting here for all `bounces`
-          //
         } catch (err) {
           stream.destroy(err);
         }

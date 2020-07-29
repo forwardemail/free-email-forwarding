@@ -400,8 +400,8 @@ if (!isCI)
     const { port } = t.context.forwardEmail.server.address();
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
-      from: 'test <test@spamscanner.net>',
-      to: 'Niftylettuce <hello@niftylettuce.com>',
+      from: 'niftylettuce@gmail.com',
+      to: 'test@lad.sh',
       cc: 'cc@niftylettuce.com',
       subject: 'test',
       text: 'test text',
