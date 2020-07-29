@@ -2459,8 +2459,12 @@ class ForwardEmail {
     // Return early if no changes
     if (changes.length === 0) return headers;
 
+    // TODO: conditionally remove this signature like we do below with others
     // Always remove X-Google-DKIM-Signature
-    // headers.remove('X-Google-DKIM-Signature');
+    headers.remove('X-Google-DKIM-Signature');
+
+    // Convert all changes to lowercase for comparison below
+    changes = changes.map((change) => change.toLowerCase().trim());
 
     //
     // Right now it's not easy to delete a header by its index
