@@ -168,7 +168,7 @@ class ForwardEmail {
         onConnect: this.onConnect.bind(this),
         onData: this.onData.bind(this),
         onMailFrom: this.onMailFrom.bind(this),
-        onRcptTo: this.onRcptTo.bind(this),
+        // onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
         logInfo: true,
         logger,
@@ -369,7 +369,7 @@ class ForwardEmail {
     this.checkSRS = this.checkSRS.bind(this);
     this.onMailFrom = this.onMailFrom.bind(this);
     this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
-    this.onRcptTo = this.onRcptTo.bind(this);
+    // this.onRcptTo = this.onRcptTo.bind(this);
     this.conditionallyRemoveSignatures = this.conditionallyRemoveSignatures.bind(
       this
     );
@@ -1038,14 +1038,38 @@ class ForwardEmail {
         if (changes.length > 0)
           headers = this.conditionallyRemoveSignatures(headers, changes);
 
-        session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
-          const address = this.checkSRS(to.address);
-          return {
-            ...to,
-            address,
-            isBounce: address !== to.address
-          };
-        });
+        // clean up the rcptTo list of recipients
+        session.envelope.rcptTo = await Promise.all(
+          session.envelope.rcptTo.map((to) => {
+            // if it was a bounce and not valid, then return early
+            if (
+              (REGEX_SRS0.test(to.address) || REGEX_SRS1.test(to.address)) &&
+              _.isNull(this.srs.reverse(to.address))
+            ) {
+              this.config.logger.warn(
+                `SRS address of ${to.address} was invalid`
+              );
+              return;
+            }
+
+            //
+            // NOTE: we don't do MX record validation here
+            //       which we may want to add back in the future (as we previously did in onRcptTo)
+            //       however not having the lookup is more performant and we could already
+            //       assume that they have our MX record from this email hitting our server to begin with
+            //
+
+            const address = this.checkSRS(to.address);
+            return {
+              ...to,
+              address,
+              isBounce: address !== to.address
+            };
+          })
+        );
+
+        // remove null entries and clean up the Array
+        session.envelope.rcptTo = _.compact(session.envelope.rcptTo);
 
         //
         // 4) prevent replies to no-reply@forwardemail.net
@@ -1558,14 +1582,16 @@ class ForwardEmail {
 
         // if no recipients return early with bounces joined together
         if (_.isEmpty(recipients)) {
-          if (_.isEmpty(bounces)) throw new CustomError('Invalid recipients');
+          if (_.isEmpty(bounces))
+            throw new CustomError('Invalid recipients', 420);
           throw new CustomError(
             bounces
               .map(
                 (bounce) =>
                   `Error for ${bounce.address} of "${bounce.err.message}"`
               )
-              .join(', ')
+              .join(', '),
+            420
           );
         }
 
@@ -2100,7 +2126,7 @@ class ForwardEmail {
           address.address || session.clientHostname || session.remoteAddress
         ),
         address.address
-          ? this.validateMX(address.address)
+          ? Promise.resolve()
           : Promise.reject(
               new Error('Envelope MAIL FROM is missing on your message')
             )
@@ -2418,6 +2444,7 @@ class ForwardEmail {
     });
   }
 
+  /*
   async onRcptTo(address, session, fn) {
     try {
       // if it was a bounce and not valid, then throw an error
@@ -2457,6 +2484,7 @@ class ForwardEmail {
       fn(err);
     }
   }
+  */
 
   conditionallyRemoveSignatures(headers, changes) {
     //
