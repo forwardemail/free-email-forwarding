@@ -49,9 +49,8 @@ if (env.SLACK_API_TOKEN) {
 
   axe.setCallback(async (level, message, meta) => {
     try {
-      // if meta did not have `slack: true`
-      // and it was not a fatal error then return early
-      if (!meta.slack && level !== 'fatal') return;
+      // if meta did not have `slack: true` or not fatal/error
+      if (!meta.slack && !['error', 'fatal'].includes(level)) return;
 
       // otherwise post a message to the slack channel
       const fields = [
