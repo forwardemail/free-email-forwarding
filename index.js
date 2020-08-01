@@ -2166,7 +2166,7 @@ class ForwardEmail {
 
     // add support for multi-line TXT records
     for (let i = 0; i < records.length; i++) {
-      records[i] = records[i].join(''); // join chunks together
+      records[i] = records[i].join('').trim(); // join and trim chunks together
       if (records[i].startsWith(`${this.config.recordPrefix}=`))
         validRecords.push(
           records[i].replace(`${this.config.recordPrefix}=`, '')
