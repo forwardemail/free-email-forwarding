@@ -1127,6 +1127,12 @@ class ForwardEmail {
             session
           });
         } catch (err) {
+          console.error(err);
+          console.error('originalRaw');
+          console.error(originalRaw.toString());
+          console.error('session', session);
+          console.error('mailFrom', mailFrom);
+          console.error('name', name);
           this.config.logger.fatal(err, {
             name,
             session,
