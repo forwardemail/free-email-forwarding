@@ -144,6 +144,7 @@ const REGEX_TLS_ERR = new RE2(
   /ssl23_get_server_hello|\/deps\/openssl|ssl3_check|ssl routines/gim
 );
 
+/*
 // override console in production to be noop
 // NOTE: this should probably be its own package
 function noop() {}
@@ -152,6 +153,7 @@ if (env.NODE_ENV === 'production') {
     if (_.isFunction(console[key])) console[key] = noop;
   }
 }
+*/
 
 class ForwardEmail {
   constructor(config = {}) {
