@@ -7,7 +7,6 @@ const Client = require('nodemailer/lib/smtp-connection');
 const IORedis = require('ioredis');
 const _ = require('lodash');
 const bytes = require('bytes');
-const domains = require('disposable-email-domains');
 const getPort = require('get-port');
 const isCI = require('is-ci');
 const nodemailer = require('nodemailer');
@@ -521,7 +520,7 @@ test('rejects a file over the limit', async (t) => {
     streamTransport: true
   });
   const filePath = path.join(os.tmpdir(), v4());
-  const size = bytes('26mb');
+  const size = t.context.forwardEmail.config.smtp.size + 1;
   const { port } = t.context.forwardEmail.server.address();
   const connection = new Client({ port, tls });
   const fh = fs.openSync(filePath, 'w');
@@ -581,31 +580,6 @@ if (!isCI)
     });
   });
 
-test('rejects a disposable email sender', async (t) => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    from: `disposable@${domains[0]}`,
-    to: 'Niftylettuce <hello@niftylettuce.com>',
-    subject: 'test',
-    text: 'test text',
-    html: '<strong>test html</strong>'
-  });
-  return new Promise((resolve) => {
-    connection.once('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 550);
-        t.regex(err.message, /is not permitted/);
-        connection.close();
-      });
-    });
-  });
-});
-
 test('requires at least one valid email in To header if it was set', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
@@ -641,43 +615,6 @@ Test`.trim()
   });
 });
 
-test('requires either Bcc or To header', async (t) => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    envelope: {
-      from: 'foo@spamchecker.net',
-      to: 'baz@spamchecker.net'
-    },
-    raw: `
-Message-ID: <123.abc@test>
-Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
-From: foo@spamchecker.net
-Subject: requires either Bcc or To header
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Transfer-Encoding: 7bit
-
-Test`.trim()
-  });
-  return new Promise((resolve) => {
-    connection.once('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 550);
-        t.regex(
-          err.message,
-          /please include a valid "To" and\/or "Bcc" header/
-        );
-        connection.close();
-      });
-    });
-  });
-});
-
 test('allows empty Bcc header', async (t) => {
   const transporter = nodemailer.createTransport({
     streamTransport: true
@@ -695,40 +632,6 @@ Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
 From: foo@spamchecker.net
 Bcc:
 Subject: allows empty Bcc header
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Transfer-Encoding: 7bit
-
-Test`.trim()
-  });
-  return new Promise((resolve) => {
-    connection.once('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, (err) => {
-        t.is(err, null);
-        connection.close();
-      });
-    });
-  });
-});
-
-test('bounce', async (t) => {
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-  const info = await transporter.sendMail({
-    envelope: {
-      from: 'test@niftylettuce.com',
-      to: 'bounces@spamchecker.net'
-    },
-    raw: `
-Message-ID: <123.abc@test>
-Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
-To: bounces@spamchecker.net
-From: Test <test@niftylettuce.com>
-Subject: testing bounces
 Mime-Version: 1.0
 Content-Type: text/plain; charset=us-ascii
 Content-Transfer-Encoding: 7bit
