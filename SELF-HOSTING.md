@@ -108,7 +108,7 @@ You'll also need the following dependencies installed:
   pip3 install --upgrade pip setuptools wheel
   pip3 install dkimpy authres
   pip3 install git+https://github.com/forwardemail/authentication-headers.git
-  pip3 install pyspf
+  pip3 install git+https://github.com/forwardemail/pyspf.git
   pip3 install dnspython==1.16.0
   ```
 
