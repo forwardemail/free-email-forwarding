@@ -961,10 +961,10 @@ atomic-sleep@^1.0.0:
   resolved "https://registry.yarnpkg.com/atomic-sleep/-/atomic-sleep-1.0.0.tgz#eb85b77a601fc932cfe432c5acd364a9e2c9075b"
   integrity sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==
 
-authheaders@^2.0.0:
-  version "2.0.0"
-  resolved "https://registry.yarnpkg.com/authheaders/-/authheaders-2.0.0.tgz#18adbad530a25f0a73fd12b6ef60f41bd3f80c1b"
-  integrity sha512-HZVQA2WaodGZmOf27PPDnNPMTd9QVlrwJO4iid3N2bsrUMg0aiK2H6zjGfD6PmFahFK1PjFx4kJw+OCYnznF3g==
+authheaders@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/authheaders/-/authheaders-2.0.1.tgz#f210e872af92b19f24de3197f673c32ef644bc58"
+  integrity sha512-RE4D2GYiQidA7I3c7WxEF9kkew8fwHtGUaj0bi/2bv7IdeIGNCVwu8dtx15PmAyM3ChzV2LFs0QBAu9aqXMs6w==
   dependencies:
     debug "^4.1.1"
     ms "^2.1.2"
@@ -1477,9 +1477,9 @@ character-reference-invalid@^1.0.0:
   integrity sha512-mKKUkUbhPpQlCOfIuZkvSEgktjPFIsZKRRbC6KWVEMvlzblj3i3asQv5ODsrwt0N3pHAEvjP8KTQPHkp0+6jOg==
 
 chokidar@^3.0.0, chokidar@^3.4.1:
-  version "3.4.1"
-  resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-3.4.1.tgz#e905bdecf10eaa0a0b1db0c664481cc4cbc22ba1"
-  integrity sha512-TQTJyr2stihpC4Sya9hs2Xh+O2wf+igjL36Y75xx2WdHuiICcn/XJza46Jwt0eT5hVpQOzo3FpY3cj3RVYLX0g==
+  version "3.4.2"
+  resolved "https://registry.yarnpkg.com/chokidar/-/chokidar-3.4.2.tgz#38dc8e658dec3809741eb3ef7bb0a47fe424232d"
+  integrity sha512-IZHaDeBeI+sZJRX7lGcXsdzgvZqKv6sECqsbErJA4mHWfpRrD8B97kSFN4cQz6nGBGiuFia1MKR4d6c1o8Cv7A==
   dependencies:
     anymatch "~3.1.1"
     braces "~3.0.2"
@@ -1558,7 +1558,7 @@ cli-cursor@^3.1.0:
   dependencies:
     restore-cursor "^3.1.0"
 
-cli-spinners@^2.2.0:
+cli-spinners@^2.4.0:
   version "2.4.0"
   resolved "https://registry.yarnpkg.com/cli-spinners/-/cli-spinners-2.4.0.tgz#c6256db216b878cfba4720e719cec7cf72685d7f"
   integrity sha512-sJAofoarcm76ZGpuooaO0eDy8saEy+YoZBLjC4h8srt4jeBnkYeOgqxgsJQTpyt2LjI5PTfLJHSL+41Yu4fEJA==
@@ -1942,9 +1942,9 @@ csv-generate@^3.2.4:
   integrity sha512-qNM9eqlxd53TWJeGtY1IQPj90b563Zx49eZs8e0uMyEvPgvNVmX1uZDtdzAcflB3PniuH9creAzcFOdyJ9YGvA==
 
 csv-parse@^4.8.8:
-  version "4.11.1"
-  resolved "https://registry.yarnpkg.com/csv-parse/-/csv-parse-4.11.1.tgz#3935a7862d7e431020a25538905dec0153fa75bd"
-  integrity sha512-cH2BG5Gd0u4G8qVI/jGXJSP2+El7Vy91/ZD3ehKALAWids1aIKOPhZ1ZVJzUrs2zTn6aGumVPBlbHsI91kI83A==
+  version "4.12.0"
+  resolved "https://registry.yarnpkg.com/csv-parse/-/csv-parse-4.12.0.tgz#fd42d6291bbaadd51d3009f6cadbb3e53b4ce026"
+  integrity sha512-wPQl3H79vWLPI8cgKFcQXl0NBgYYEqVnT1i6/So7OjMpsI540oD7p93r3w6fDSyPvwkTepG05F69/7AViX2lXg==
 
 csv-stringify@^5.3.6:
   version "5.5.0"
@@ -5699,15 +5699,15 @@ optionator@^0.9.1:
     word-wrap "^1.2.3"
 
 ora@^4.0.5:
-  version "4.0.5"
-  resolved "https://registry.yarnpkg.com/ora/-/ora-4.0.5.tgz#7410b5cc2d99fa637fd5099bbb9f02bfbb5a361e"
-  integrity sha512-jCDgm9DqvRcNIAEv2wZPrh7E5PcQiDUnbnWbAfu4NGAE2ZNqPFbDixmWldy1YG2QfLeQhuiu6/h5VRrk6cG50w==
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/ora/-/ora-4.1.0.tgz#1fa5b17d2952ec9651be79ba32a328684870fc5d"
+  integrity sha512-PhDvXi7I+dLVyFekgqXt0iBDdo5ARzOxJNoj72TysoXkW4/oi1lRaeakr4skciyWgPpk6JPPGwO1V4zPr6YRZA==
   dependencies:
-    chalk "^3.0.0"
+    chalk "^4.1.0"
     cli-cursor "^3.1.0"
-    cli-spinners "^2.2.0"
+    cli-spinners "^2.4.0"
     is-interactive "^1.0.0"
-    log-symbols "^3.0.0"
+    log-symbols "^4.0.0"
     mute-stream "0.0.8"
     strip-ansi "^6.0.0"
     wcwidth "^1.0.1"

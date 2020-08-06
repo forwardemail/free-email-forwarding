@@ -32,7 +32,7 @@
     "@ladjs/shared-config": "^3.0.9",
     "@slack/web-api": "^5.11.0",
     "array-join-conjunction": "^1.0.0",
-    "authheaders": "^2.0.0",
+    "authheaders": "^2.0.1",
     "axe": "^6.0.4",
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
