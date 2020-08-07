@@ -1118,7 +1118,7 @@ class ForwardEmail {
         let authResults;
         try {
           authResults = await authenticateMessage(
-            originalRaw,
+            originalRaw.toString(),
             name,
             session.remoteAddress,
             mailFrom.address,
@@ -1176,14 +1176,14 @@ class ForwardEmail {
         */
 
         // check if SPF was valid
-        if (authResults.spf.result === 'fail')
-          throw new CustomError(
-            `The email sent has failed SPF validation.${
-              authResults.spf.reason
-                ? ` The reason given was "${authResults.spf.reason}".`
-                : ''
-            }`
-          );
+        // if (authResults.spf.result === 'fail' && )
+        //   throw new CustomError(
+        //     `The email sent has failed SPF validation.${
+        //       authResults.spf.reason
+        //         ? ` The reason given was "${authResults.spf.reason}".`
+        //         : ''
+        //     }`
+        //   );
 
         //
         // check if DKIM was valid
