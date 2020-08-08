@@ -144,17 +144,6 @@ const REGEX_TLS_ERR = new RE2(
   /ssl23_get_server_hello|\/deps\/openssl|ssl3_check|ssl routines/gim
 );
 
-/*
-// override console in production to be noop
-// NOTE: this should probably be its own package
-function noop() {}
-if (env.NODE_ENV === 'production') {
-  for (const key of Object.keys(console)) {
-    if (_.isFunction(console[key])) console[key] = noop;
-  }
-}
-*/
-
 class ForwardEmail {
   constructor(config = {}) {
     this.config = {
@@ -1099,7 +1088,6 @@ class ForwardEmail {
         //
 
         // get the fully qualified domain name ("FQDN") of this server
-        console.time('ipAddress');
         let ipAddress;
         if (env.NODE_ENV === 'test') {
           const object = await dns.promises.lookup(this.config.exchanges[0]);
@@ -1108,13 +1096,8 @@ class ForwardEmail {
           ipAddress = ip.address();
         }
 
-        console.timeEnd('ipAddress');
-
-        console.time('getFQDN');
         const name = await getFQDN(ipAddress);
-        console.timeEnd('getFQDN');
 
-        console.time('authResults');
         let authResults;
         try {
           authResults = await authenticateMessage(
@@ -1129,22 +1112,19 @@ class ForwardEmail {
             session
           });
         } catch (err) {
-          console.error(err);
-          console.error('originalRaw');
-          console.error(originalRaw.toString());
-          console.error('session', session);
-          console.error('mailFrom', mailFrom);
-          console.error('name', name);
-          this.config.logger.fatal(err, {
-            name,
-            session,
-            mailFrom
-          });
-          err.responseCode = 421;
-          throw err;
+          // TODO: probably just want to log this and let the message go through until
+          //       we have all the python package bugs sorted out at least
+          this.config.logger.fatal(
+            JSON.stringify({
+              err,
+              name,
+              session,
+              mailFrom
+            })
+          );
+          // err.responseCode = 421;
+          // throw err;
         }
-
-        console.timeEnd('authResults');
 
         //
         // TODO: we may want to re-enable this in the future but we have this currently disabled
@@ -1152,7 +1132,7 @@ class ForwardEmail {
         //
         // email the person once as a courtesy of their invalid SPF setup
         /*
-        if (['fail', 'softfail', 'permerror', 'temperror'].includes(authResults.spf.result))
+        if (authResults && ['fail', 'softfail', 'permerror', 'temperror'].includes(authResults.spf.result))
           superagent
             .post(`${this.config.apiEndpoint}/v1/spf-error`)
             .set('User-Agent', this.config.userAgent)
@@ -1176,7 +1156,7 @@ class ForwardEmail {
         */
 
         // check if SPF was valid
-        // if (authResults.spf.result === 'fail' && )
+        // if (authResults && authResults.spf.result === 'fail')
         //   throw new CustomError(
         //     `The email sent has failed SPF validation.${
         //       authResults.spf.reason
@@ -1199,7 +1179,10 @@ class ForwardEmail {
         if (
           // NOTE: we may want to further investigate this
           // only reject if ARC failed
+          authResults &&
+          authResults.arc &&
           authResults.arc.result !== 'pass' &&
+          authResults.dmarc &&
           authResults.dmarc.result === 'fail' &&
           authResults.dmarc.policy === 'reject'
         )
@@ -1209,7 +1192,10 @@ class ForwardEmail {
 
         // check if ARC failed then reject if DMARC policy was to reject
         if (
+          authResults &&
+          authResults.arc &&
           authResults.arc.result === 'fail' &&
+          authResults.dmarc &&
           authResults.dmarc.policy === 'reject'
         )
           throw new CustomError(
@@ -1255,7 +1241,6 @@ class ForwardEmail {
         //
         // 7) lookup forwarding recipients recursively
         //
-        console.time('recipients');
         let recipients = await Promise.all(
           session.envelope.rcptTo.map(async (to) => {
             try {
@@ -1417,7 +1402,6 @@ class ForwardEmail {
         );
 
         recipients = _.compact(recipients);
-        console.timeEnd('recipients');
 
         // if no recipients return early with bounces joined together
         if (_.isEmpty(recipients)) {
@@ -1437,7 +1421,6 @@ class ForwardEmail {
         //
         // 8) normalize recipients by host and without "+" symbols
         //
-        console.time('normalize');
         const normalized = [];
 
         for (const recipient of recipients) {
@@ -1481,15 +1464,12 @@ class ForwardEmail {
           }
         }
 
-        console.timeEnd('normalize');
-
         if (normalized.length === 0) return fn();
 
         //
         // 9) send email
         //
 
-        console.time('extra headers');
         // set `X-ForwardEmail-Version`
         headers.update('X-ForwardEmail-Version', pkg.version);
         // and `X-ForwardEmail-Session-ID`
@@ -1500,11 +1480,10 @@ class ForwardEmail {
           `rfc822; ${this.checkSRS(mailFrom.address)}`
         );
         // add and sign Authentication-Results header
-        headers.add('Authentication-Results', authResults.header);
-        console.timeEnd('extra headers');
+        if (authResults && authResults.header)
+          headers.add('Authentication-Results', authResults.header);
 
         // sign message with ARC seal
-        console.time('arc seal');
 
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
@@ -1534,7 +1513,6 @@ class ForwardEmail {
         }
 
         this.config.logger.info('arc signed', { raw, session });
-        console.timeEnd('arc seal');
 
         try {
           const accepted = [];
@@ -1624,9 +1602,7 @@ class ForwardEmail {
             }
           };
 
-          console.time('send emails');
           await Promise.all(normalized.map((recipient) => mapper(recipient)));
-          console.timeEnd('send emails');
 
           //
           // if there were any where the MAIL FROM was equivalent to the recipient
