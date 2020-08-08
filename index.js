@@ -1207,6 +1207,7 @@ class ForwardEmail {
             "The email sent has failed DMARC validation and is rejected due to the domain's DMARC policy."
           );
 
+        /*
         // check if ARC failed then reject if DMARC policy was to reject
         if (
           authResults &&
@@ -1218,6 +1219,7 @@ class ForwardEmail {
           throw new CustomError(
             "The email sent has failed ARC validation and is rejected due to the domain's DMARC policy."
           );
+        */
 
         /*
         //
