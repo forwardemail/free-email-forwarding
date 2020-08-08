@@ -1780,8 +1780,12 @@ class ForwardEmail {
     });
 
     stream.once('error', (err) => {
+      // TODO: we may want to log 5xx err.responseCode as error
+      //       and anything else as warn to keep things clean
       // log original error
-      this.config.logger.error(err, { session });
+      this.config.logger[
+        err && err.message === 'Invalid recipients' ? 'warn' : 'error'
+      ](err, { session });
 
       // parse SMTP code and message
       if (err.message && err.message.startsWith('SMTP code:')) {
@@ -2099,7 +2103,8 @@ class ForwardEmail {
     // if we don't have a forwarding address then throw an error
     if (forwardingAddresses.length === 0)
       throw new CustomError(
-        `${address} domain of ${domain} is not configured properly and does not contain any valid "${this.config.recordPrefix}" TXT records`,
+        // `${address} domain of ${domain} is not configured properly and does not contain any valid "${this.config.recordPrefix}" TXT records`,
+        'Invalid recipients',
         420
       );
 
