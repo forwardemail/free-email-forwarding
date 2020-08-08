@@ -1168,6 +1168,21 @@ class ForwardEmail {
         //   );
 
         //
+        // We will only use SRS if SPF passed and DKIM was not passing
+        //
+        // NOTE: Gmail specifically recommends NOT to use SRS if you're forwarding emails
+        //
+        // TODO: we may not want to do this if ARC was passing, however not all providers implement ARC yet
+        //
+        const from =
+          authResults &&
+          authResults.spf &&
+          authResults.spf.result === 'pass' &&
+          (!authResults.dkim || authResults.dkim !== 'pass')
+            ? this.srs.forward(mailFrom.address, this.config.srsDomain)
+            : mailFrom.address;
+
+        //
         // check if DKIM was valid
         //
         // NOTE: we don't filter out email based off DKIM but we may want to
@@ -1499,13 +1514,17 @@ class ForwardEmail {
         // raw = await getStream(this.dkim.sign(raw));
         //
         if (isSANB(env.DKIM_PRIVATE_KEY_PATH)) {
-          raw = await arcSign(
-            raw,
-            this.config.dkim.keySelector,
-            this.config.dkim.domainName,
-            env.DKIM_PRIVATE_KEY_PATH,
-            name
-          );
+          try {
+            raw = await arcSign(
+              raw,
+              this.config.dkim.keySelector,
+              this.config.dkim.domainName,
+              env.DKIM_PRIVATE_KEY_PATH,
+              name
+            );
+          } catch (err) {
+            this.config.logger.fatal(err);
+          }
         } else {
           this.config.logger.fatal(
             new Error(
@@ -1518,20 +1537,6 @@ class ForwardEmail {
 
         try {
           const accepted = [];
-
-          // preserve original envelope mail from since
-          // Gmail generaly advises not to use SRS when forwarding to their servers
-          const from = mailFrom.address;
-
-          //
-          // NOTE: Gmail specifically recommends NOT to use SRS if you're forwarding emails
-          //
-          // set SRS
-          // const from = this.srs.forward(
-          //   mailFrom.address,
-          //   this.config.srsDomain
-          // );
-
           const selfTestEmails = [];
 
           //
