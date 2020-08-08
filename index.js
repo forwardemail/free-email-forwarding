@@ -649,7 +649,9 @@ class ForwardEmail {
           ['defer', 'slowdown'].includes(bounceInfo.action) ||
           bounceInfo.category === 'blacklist'
         ) {
-          this.config.logger.fatal(err, {
+          this.config.logger[
+            bounceInfo.category === 'blacklist' ? 'fatal' : 'error'
+          ](err, {
             bounce_info: bounceInfo,
             envelope
           });
