@@ -1784,7 +1784,9 @@ class ForwardEmail {
       //       and anything else as warn to keep things clean
       // log original error
       this.config.logger[
-        err && err.message === 'Invalid recipients' ? 'warn' : 'error'
+        err && err.message && err.message.includes('Invalid recipients')
+          ? 'warn'
+          : 'error'
       ](err, { session });
 
       // parse SMTP code and message
