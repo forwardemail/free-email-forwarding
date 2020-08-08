@@ -1505,7 +1505,7 @@ class ForwardEmail {
         // join headers object and body into a full rfc822 formatted email
         // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
         // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
-        let raw = Buffer.concat([headers.build(), ...chunks]);
+        let raw = Buffer.concat([headers.build(), ...chunks]).toString();
         //
         // NOTE: we don't want to sign with DKIM in order to maintain our reputation
         //       instead we should assume that the sender should be signing their emails
@@ -1757,7 +1757,7 @@ class ForwardEmail {
                   from: '',
                   to: this.checkSRS(mailFrom.address)
                 },
-                raw
+                raw: raw.toString()
               };
               try {
                 await this.sendEmail(options);
