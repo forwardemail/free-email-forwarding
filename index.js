@@ -1780,9 +1780,6 @@ class ForwardEmail {
     });
 
     stream.once('error', (err) => {
-      // TODO: we may want to log 5xx err.responseCode as error
-      //       and anything else as warn to keep things clean
-      // log original error
       this.config.logger[
         err && err.message && err.message.includes('Invalid recipients')
           ? 'warn'
@@ -1797,8 +1794,6 @@ class ForwardEmail {
       }
 
       err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
-      // if (originalRaw) meta.email = originalRaw.toString();
-      this.config.logger.error(err, { session });
       fn(err);
     });
 
