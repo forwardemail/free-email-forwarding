@@ -1134,7 +1134,7 @@ class ForwardEmail {
         //
         // email the person once as a courtesy of their invalid SPF setup
         /*
-        if (authResults && ['fail', 'softfail', 'permerror', 'temperror'].includes(authResults.spf.result))
+        if (authResults && authResults.spf && ['fail', 'softfail', 'permerror', 'temperror'].includes(authResults.spf.result))
           superagent
             .post(`${this.config.apiEndpoint}/v1/spf-error`)
             .set('User-Agent', this.config.userAgent)
@@ -1158,7 +1158,7 @@ class ForwardEmail {
         */
 
         // check if SPF was valid
-        // if (authResults && authResults.spf.result === 'fail')
+        // if (authResults && authResults.spf && authResults.spf.result === 'fail')
         //   throw new CustomError(
         //     `The email sent has failed SPF validation.${
         //       authResults.spf.reason
