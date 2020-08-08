@@ -1340,7 +1340,7 @@ class ForwardEmail {
 
               return { address: to.address, addresses, port };
             } catch (err) {
-              this.config.logger.error(err);
+              this.config.logger.warn(err);
               bounces.push({
                 address: to.address,
                 err
@@ -2139,7 +2139,7 @@ class ForwardEmail {
           forwardingAddresses.push(element);
         }
       } catch (err) {
-        this.config.logger.error(err);
+        this.config.logger.warn(err);
       }
     }
 
