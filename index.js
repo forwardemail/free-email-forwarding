@@ -716,9 +716,34 @@ class ForwardEmail {
           port: mx.port,
           name
         });
-        info = await transporter.sendMail({ envelope, raw });
-        if (this.client)
-          await this.client.set(key, count, 'PX', this.config.ttlMs);
+        try {
+          info = await transporter.sendMail({ envelope, raw });
+          if (this.client)
+            await this.client.set(key, count, 'PX', this.config.ttlMs);
+        } catch (err) {
+          //
+          // if there was `err.response` and it had a bounce reason
+          // and if the bounce action was defer, slowdown, or it has a category
+          // of blacklist, then we should retry sending it later and send a 421 code
+          // and alert our team in Slack so they can investigate if IP mitigation needed
+          //
+          if (isSANB(err.response)) {
+            const bounceInfo = zoneMTABounces.check(err.response);
+            // eslint-disable-next-line max-depth
+            if (
+              ['defer', 'slowdown'].includes(bounceInfo.action) ||
+              bounceInfo.category === 'blacklist'
+            ) {
+              this.config.logger.fatal(err, {
+                bounce_info: bounceInfo,
+                envelope
+              });
+              err.responseCode = 421;
+            }
+          }
+
+          throw err;
+        }
       } else {
         //
         // if there was `err.response` and it had a bounce reason
