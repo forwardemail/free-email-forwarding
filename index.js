@@ -13,7 +13,7 @@ const Redis = require('@ladjs/redis');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
-const bounces = require('zone-mta/lib/bounces');
+const zoneMTABounces = require('zone-mta/lib/bounces');
 const bytes = require('bytes');
 const dnsbl = require('dnsbl');
 const getFQDN = require('get-fqdn');
@@ -598,6 +598,8 @@ class ForwardEmail {
         ? Number.parseInt(value, 10) + 1
         : 1;
 
+    // TODO: we probably need to make `getSentKey` only consider the
+    //       standard headers like Date, To, From, Cc, Bcc, and Subject
     if (count > this.config.maxRetry)
       throw new CustomError(
         `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
@@ -644,7 +646,7 @@ class ForwardEmail {
       // and alert our team in Slack so they can investigate if IP mitigation needed
       //
       if (isSANB(err.response)) {
-        const bounceInfo = bounces.check(err.response);
+        const bounceInfo = zoneMTABounces.check(err.response);
         if (
           ['defer', 'slowdown'].includes(bounceInfo.action) ||
           bounceInfo.category === 'blacklist'
@@ -725,7 +727,7 @@ class ForwardEmail {
         // and alert our team in Slack so they can investigate if IP mitigation needed
         //
         if (isSANB(err.response)) {
-          const bounceInfo = bounces.check(err.response);
+          const bounceInfo = zoneMTABounces.check(err.response);
           if (
             ['defer', 'slowdown'].includes(bounceInfo.action) ||
             bounceInfo.category === 'blacklist'
@@ -1141,7 +1143,7 @@ class ForwardEmail {
             .set('Accept', 'json')
             .auth(this.config.apiSecrets[0])
             .timeout(this.config.timeout)
-            // .retry(this.config.retry);
+            .retry(this.config.retry)
             .send({
               // name
               remote_address: session.remoteAddress,
@@ -1291,8 +1293,8 @@ class ForwardEmail {
                   .set('Accept', 'json')
                   .set('User-Agent', this.config.userAgent)
                   .auth(this.config.apiSecrets[0])
-                  .timeout(this.config.timeout);
-                // .retry(this.config.retry);
+                  .timeout(this.config.timeout)
+                  .retry(this.config.retry);
 
                 // body is an Object with `port` Number (a valid port number, defaults to 25)
                 if (
@@ -1557,11 +1559,11 @@ class ForwardEmail {
                   // .type('message/rfc822')
                   .set('User-Agent', this.config.userAgent)
                   .timeout(this.config.timeout)
+                  .retry(this.config.retry)
                   .send({
                     ...mail,
                     raw: originalRaw.toString()
                   });
-                // .retry(this.config.retry);
               } catch (err_) {
                 bounces.push({
                   address: recipient.recipient,
@@ -1631,7 +1633,7 @@ class ForwardEmail {
               .set('Accept', 'json')
               .auth(this.config.apiSecrets[0])
               .timeout(this.config.timeout)
-              // .retry(this.config.retry);
+              .retry(this.config.retry)
               .send({
                 emails: selfTestEmails
               })
@@ -1720,7 +1722,7 @@ class ForwardEmail {
               .set('User-Agent', `forward-email/${pkg.version}`)
               .auth(this.config.apiSecrets[0])
               .timeout(this.config.timeout)
-              // .retry(this.config.retry);
+              .retry(this.config.retry);
 
             if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
               template = body;
@@ -1959,8 +1961,8 @@ class ForwardEmail {
           .set('Accept', 'json')
           .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
-          .timeout(this.config.timeout);
-        // .retry(this.config.retry);
+          .timeout(this.config.timeout)
+          .retry(this.config.retry);
 
         // body is an Array of records that are formatted like TXT records
         if (_.isArray(body)) {
@@ -2178,8 +2180,8 @@ class ForwardEmail {
         .set('Accept', 'json')
         .set('User-Agent', `forward-email/${pkg.version}`)
         .auth(this.config.apiSecrets[0])
-        .timeout(this.config.timeout);
-      // .retry(this.config.retry);
+        .timeout(this.config.timeout)
+        .retry(this.config.retry);
 
       // body is an Object with `max_forwarded_addresses` Number
       if (
