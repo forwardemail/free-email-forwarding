@@ -11,7 +11,6 @@ const getPort = require('get-port');
 const isCI = require('is-ci');
 const nodemailer = require('nodemailer');
 const pify = require('pify');
-const shell = require('shelljs');
 const test = require('ava');
 const { v4 } = require('uuid');
 
@@ -28,7 +27,7 @@ test.beforeEach(async (t) => {
   if (keys.length > 0) await Promise.all(keys.map((key) => client.del(key)));
   const port = await getPort();
   const forwardEmail = new ForwardEmail({ port });
-  // await forwardEmail.scanner.load();
+  await forwardEmail.scanner.load();
   await forwardEmail.listen();
   t.context.forwardEmail = forwardEmail;
 });
@@ -51,6 +50,7 @@ test.cb('rejects auth connections', (t) => {
   connection.once('end', t.end);
   connection.connect(() => {
     connection.login({ user: 'user', pass: 'pass' }, (err) => {
+      // TODO: t.regex(err.message, /someregex/)
       t.is(err.responseCode, 500);
       connection.close();
     });
@@ -83,6 +83,7 @@ test('rejects forwarding a non-FQDN email', async t => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, err => {
+        // TODO: t.regex(err.message, /someregex/)
         t.is(err.responseCode, 550);
         t.regex(err.message, /is not a fully qualified domain name/);
         connection.close();
@@ -114,11 +115,11 @@ test('rejects forwarding a non-registered email address', async (t) => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 550);
         t.regex(
           err.message,
           /is not configured properly and does not contain any valid/
         );
+        t.is(err.responseCode, 550);
         connection.close();
       });
     });
@@ -146,11 +147,11 @@ if (!isCI)
       connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, (err) => {
-          t.is(err.responseCode, 550);
           t.regex(
             err.message,
             /The email you sent has failed SPF validation with a result of "fail"/
           );
+          t.is(err.responseCode, 550);
           connection.close();
         });
       });
@@ -232,8 +233,8 @@ if (!isCI)
       connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, (err) => {
-          t.is(err.responseCode, 550);
           t.regex(err.message, /addresses which exceeds the maximum/);
+          t.is(err.responseCode, 550);
           connection.close();
         });
       });
@@ -260,8 +261,8 @@ if (!isCI)
       connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, (err) => {
-          t.is(err.responseCode, 550);
           t.regex(err.message, /addresses which exceeds the maximum/);
+          t.is(err.responseCode, 550);
           connection.close();
         });
       });
@@ -453,34 +454,33 @@ if (!isCI)
     });
   });
 
-if (!isCI && shell.which('spamassassin') && shell.which('spamc'))
-  test('rejects a spam file', async (t) => {
-    const transporter = nodemailer.createTransport({
-      streamTransport: true
-    });
-    const { port } = t.context.forwardEmail.server.address();
-    const connection = new Client({ port, tls });
+test('rejects a spam file', async (t) => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
 
-    const info = await transporter.sendMail({
-      from: 'foo@forwardemail.net',
-      to: 'Baz <baz@forwardemail.net>',
-      // taken from:
-      // <https://github.com/humantech/node-spamd/blob/master/test/spamd-tests.js#L13-L14>
-      subject: 'Viagra, Cialis, Vicodin: buy medicines without prescription!',
-      html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
-      dkim: t.context.forwardEmail.config.dkim
-    });
-    return new Promise((resolve) => {
-      connection.once('end', resolve);
-      connection.connect(() => {
-        connection.send(info.envelope, info.message, (err) => {
-          t.is(err.responseCode, 551);
-          t.regex(err.message, /Message detected as spam/);
-          connection.close();
-        });
+  const info = await transporter.sendMail({
+    from: 'foo@forwardemail.net',
+    to: 'Baz <baz@forwardemail.net>',
+    // taken from:
+    // <https://github.com/humantech/node-spamd/blob/master/test/spamd-tests.js#L13-L14>
+    subject: 'Viagra, Cialis, Vicodin: buy medicines without prescription!',
+    html: 'Cheap prices on viagra, cialis, vicodin! FPA approved!',
+    dkim: t.context.forwardEmail.config.dkim
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(err.message, /Message detected as spam/);
+        t.is(err.responseCode, 554);
+        connection.close();
       });
     });
   });
+});
 
 test('creates 100 simultaneous connections (w/o rate limiting)', async (t) => {
   const forwardEmail = new ForwardEmail({ limiter: false });
@@ -504,8 +504,8 @@ test('creates 100 simultaneous connections (w/o rate limiting)', async (t) => {
         connection.once('end', resolve);
         connection.connect(() => {
           connection.send(info.envelope, info.message, (err) => {
-            t.is(err.responseCode, 550);
             t.regex(err.message, /You need to reply/);
+            t.is(err.responseCode, 550);
             connection.close();
           });
         });
@@ -537,7 +537,6 @@ test('rejects a file over the limit', async (t) => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 552);
         t.regex(
           err.message,
           new RegExp(
@@ -547,6 +546,7 @@ test('rejects a file over the limit', async (t) => {
             'g'
           )
         );
+        t.is(err.responseCode, 552);
         fs.unlinkSync(filePath);
         connection.close();
       });
@@ -573,6 +573,7 @@ if (!isCI)
       connection.once('end', resolve);
       connection.connect(() => {
         connection.send(info.envelope, info.message, (err) => {
+          // TODO: t.regex(err.message, /someregex/)
           t.is(err.responseCode, 550);
           connection.close();
         });
@@ -607,8 +608,8 @@ Test`.trim()
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 550);
         t.regex(err.message, /please include at least one/);
+        t.is(err.responseCode, 550);
         connection.close();
       });
     });
@@ -845,6 +846,7 @@ test('tests verification record', async (t) => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, (err) => {
+        // TODO: t.regex(err.message, /someregex/)
         t.is(err.responseCode, 550);
         connection.close();
       });
@@ -869,11 +871,11 @@ test('rejects an email to no-reply@forwardemail.net', async (t) => {
     connection.once('end', resolve);
     connection.connect(() => {
       connection.send(info.envelope, info.message, (err) => {
-        t.is(err.responseCode, 550);
         t.regex(
           err.message,
           /You need to reply to the "Reply-To" email address on the email; do not send messages to <no-reply@forwardemail.net>/
         );
+        t.is(err.responseCode, 550);
         connection.close();
       });
     });
@@ -1021,3 +1023,263 @@ if (!isCI)
     t.is(failed, 100);
   });
 */
+
+//
+// these tests are sourced from Spam Scanner
+//
+
+//
+// TODO: re-enable these three tests once classifier is fixed
+//
+/*
+test('should detect spam', async (t) => {
+  const scan = await scanner.scan(fixtures('spam.eml'));
+  t.true(scan.is_spam);
+  t.true(typeof scan.results.classification === 'object');
+  t.is(scan.results.classification.category, 'spam');
+});
+
+test('should detect spam fuzzy', async (t) => {
+  const scan = await scanner.scan(fixtures('spam-fuzzy.eml'));
+  t.true(scan.is_spam);
+  t.true(typeof scan.results.classification === 'object');
+  t.is(scan.results.classification.category, 'spam');
+});
+
+test('should detect ham', async (t) => {
+  const scan = await scanner.scan(fixtures('ham.eml'));
+  t.false(scan.is_spam);
+  t.true(typeof scan.results.classification === 'object');
+  t.is(scan.results.classification.category, 'ham');
+});
+*/
+
+test('should detect not phishing with different org domains (temporary)', async (t) => {
+  const scan = await t.context.forwardEmail.scanner.scan(
+    path.join(__dirname, 'fixtures', 'phishing.eml')
+  );
+  t.false(scan.is_spam);
+  t.true(scan.results.phishing.length === 0);
+});
+
+test('should detect idn masquerading', async (t) => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+
+  const raw = await fs.promises.readFile(
+    path.join(__dirname, 'fixtures', 'idn.eml')
+  );
+  const info = await transporter.sendMail({
+    envelope: {
+      to: 'beep@lad.sh',
+      from: 'niftylettuce@gmail.com'
+    },
+    raw
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(err.message, /Possible IDN homograph attack/);
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('should detect executable files', async (t) => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+
+  const raw = await fs.promises.readFile(
+    path.join(__dirname, 'fixtures', 'executable.eml')
+  );
+  const info = await transporter.sendMail({
+    envelope: {
+      to: 'foo@example.com',
+      from: 'beep@niftylettuce.com'
+    },
+    raw
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(
+          err.message,
+          /file name indicated it was a dangerous executable/
+        );
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('should check against PhishTank', async (t) => {
+  t.true(t.context.forwardEmail.scanner._phishTankLoaded);
+  t.true(Array.isArray(t.context.forwardEmail.scanner._phishTankUrls));
+  t.true(t.context.forwardEmail.scanner._phishTankUrls.length > 0);
+  const link = t.context.forwardEmail.scanner._phishTankUrls[0];
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+
+  const info = await transporter.sendMail({
+    html: `<a href="${link}">test</a>`,
+    text: link,
+    from: 'foo@bar.com',
+    envelope: {
+      to: 'foo@example.com',
+      from: 'beep@niftylettuce.com'
+    }
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(
+          err.message,
+          new RegExp(
+            `Link of "${link}" was detected by PhishTank to be phishing-related.`
+          )
+        );
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('should check against Cloudflare', async (t) => {
+  const link = Buffer.from('eHZpZGVvcy5jb20=', 'base64').toString();
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+
+  const info = await transporter.sendMail({
+    html: `<a href="${link}">test</a>`,
+    text: link,
+    from: 'foo@bar.com',
+    envelope: {
+      to: 'foo@example.com',
+      from: 'beep@niftylettuce.com'
+    }
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(
+          err.message,
+          new RegExp(
+            `Link of "${link}" was detected by Cloudflare to contain malware, phishing, and/or adult content.`
+          )
+        );
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('GTUBE test', async (t) => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+  const info = await transporter.sendMail({
+    raw: `
+Subject: Test spam mail (GTUBE)
+Message-ID: <GTUBE1.1010101@example.net>
+Date: Wed, 23 Jul 2003 23:30:00 +0200
+From: Sender <sender@example.net>
+To: Recipient <recipient@example.net>
+Precedence: junk
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+This is the GTUBE, the
+  Generic
+  Test for
+  Unsolicited
+  Bulk
+  Email
+
+If your spam filter supports it, the GTUBE provides a test by which you
+can verify that the filter is installed correctly and is detecting incoming
+spam. You can send yourself a test mail containing the following string of
+characters (in upper case and with no white spaces and line breaks):
+
+XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X
+
+You should send this test mail from an account outside of your network.
+    `.trim(),
+    envelope: {
+      to: 'foo@example.com',
+      from: 'beep@niftylettuce.com'
+    }
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.regex(
+          err.message,
+          /Message detected to contain the GTUBE test from <https:\/\/spamassassin.apache.org\/gtube\/>/
+        );
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});
+
+test('EICAR test', async (t) => {
+  const transporter = nodemailer.createTransport({
+    streamTransport: true
+  });
+  const { port } = t.context.forwardEmail.server.address();
+  const connection = new Client({ port, tls });
+
+  const info = await transporter.sendMail({
+    html: 'test',
+    text: 'test',
+    attachments: [{ path: path.join(__dirname, 'fixtures', 'eicar.com.txt') }],
+    from: 'foo@bar.com',
+    envelope: {
+      to: 'foo@lad.sh',
+      from: 'beep@niftylettuce.com'
+    }
+  });
+  return new Promise((resolve) => {
+    connection.once('end', resolve);
+    connection.connect(() => {
+      connection.send(info.envelope, info.message, (err) => {
+        t.true(
+          err.message.includes(
+            'Attachment "eicar.com.txt" was infected with "Eicar-Test-Signature".'
+          ) ||
+            err.message.includes(
+              'Attachment "eicar.com.txt" was infected with "Win.Test.EICAR_HDB-1".'
+            )
+        );
+        t.is(err.responseCode, 554);
+        connection.close();
+      });
+    });
+  });
+});

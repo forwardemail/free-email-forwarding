@@ -16,8 +16,8 @@ if (!module.parent) {
 
   (async () => {
     try {
+      await app.spamscanner.load();
       await app.listen(port);
-      // await app.spamscanner.load()
       if (process.send) process.send('ready');
       logger.info(
         `ForwardEmail server listening on ${

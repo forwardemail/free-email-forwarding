@@ -3,17 +3,15 @@ const dns = require('dns');
 const fs = require('fs');
 const util = require('util');
 
-// const SpamScanner = require('spamscanner');
-
 const DKIM = require('nodemailer/lib/dkim');
 const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
+const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
-const zoneMTABounces = require('zone-mta/lib/bounces');
 const bytes = require('bytes');
 const dnsbl = require('dnsbl');
 const getFQDN = require('get-fqdn');
@@ -31,6 +29,7 @@ const sharedConfig = require('@ladjs/shared-config');
 const splitLines = require('split-lines');
 const superagent = require('superagent');
 const validator = require('validator');
+const zoneMTABounces = require('zone-mta/lib/bounces');
 const { Iconv } = require('iconv');
 const { SMTPServer } = require('smtp-server');
 const { SRS } = require('sender-rewriting-scheme');
@@ -257,7 +256,7 @@ class ForwardEmail {
       },
       sendingZone: 'bounces',
       userAgent: `${pkg.name}/${pkg.version}`,
-      // spamScanner: {},
+      spamScanner: {},
       ttlMs: ms('7d'),
       maxRetry: 5,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
@@ -341,7 +340,7 @@ class ForwardEmail {
     });
 
     // expose spamscanner
-    // this.scanner = new SpamScanner(this.config.spamScanner);
+    this.scanner = new SpamScanner(this.config.spamScanner);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -958,7 +957,7 @@ class ForwardEmail {
       // 2) X ensure all email headers were parsed
       // 3) X reverse SRS bounces
       // 4) X prevent replies to no-reply@forwardemail.net (no bottleneck)
-      // 5) O check for spam
+      // 5) X check for spam
       // 6) X validate SPF, DKIM, DMARC, and ARC
       // 7) X lookup forwarding recipients recursively
       // 8) X normalize recipients by host and without "+" symbols
@@ -1065,21 +1064,16 @@ class ForwardEmail {
         //
         // 5) check for spam
         //
-        /*
-        let results;
+        let scan;
         try {
-          results = await this.scanner.scan(originalRaw);
+          scan = await this.scanner.scan(originalRaw);
+          if (scan.is_spam)
+            this.config.logger.fatal(`spam detected: ${JSON.stringify(scan.results)}`);
         } catch (err) {
-          logger.error(err);
+          this.config.logger.fatal(err);
         }
 
-        if (results) {
-          if (results.is_spam)
-            logger.error('spam detected', {
-              originalRaw: originalRaw.toString(),
-              results
-            });
-
+        if (_.isObject(scan) && _.isObject(scan.results)) {
           //
           // NOTE: until we are confident with the accuracy
           // we are not utilizing classification right now
@@ -1087,22 +1081,25 @@ class ForwardEmail {
           //
           const messages = [];
 
-          if (
-            _.isObject(results.phishing) &&
-            _.isArray(results.phishing.messages)
-          )
-            for (const message of results.phishing.messages) {
+          if (_.isArray(scan.results.phishing))
+            for (const message of scan.results.phishing) {
               messages.push(message);
             }
 
-          if (_.isArray(results.executables)) {
-            for (const message of results.executables) {
+          if (_.isArray(scan.results.executables)) {
+            for (const message of scan.results.executables) {
               messages.push(message);
             }
           }
 
-          if (_.isArray(results.arbitrary)) {
-            for (const message of results.arbitrary) {
+          if (_.isArray(scan.results.arbitrary)) {
+            for (const message of scan.results.arbitrary) {
+              messages.push(message);
+            }
+          }
+
+          if (_.isArray(scan.results.viruses)) {
+            for (const message of scan.results.viruses) {
               messages.push(message);
             }
           }
@@ -1110,7 +1107,6 @@ class ForwardEmail {
           if (messages.length > 0)
             throw new CustomError(messages.join(' '), 554);
         }
-        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1820,7 +1816,7 @@ class ForwardEmail {
         err.message = err.message.split('msg:')[1];
       }
 
-      err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}`;
+      err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}.`;
       fn(err);
     });
 
@@ -1976,6 +1972,7 @@ class ForwardEmail {
     if (verifications.length > 0) {
       if (verifications.length > 1)
         throw new CustomError(
+          // TODO: we may want to replace this with "Invalid Recipients"
           `Domain ${domain} has multiple verification TXT records of "${this.config.recordPrefix}-site-verification" and should only have one`
         );
       // if there was a verification record then perform lookup
@@ -2007,6 +2004,7 @@ class ForwardEmail {
     // if the record was blank then throw an error
     if (!isSANB(record))
       throw new CustomError(
+        // TODO: we may want to replace this with "Invalid Recipients"
         `${address} domain of ${domain} has a blank "${this.config.recordPrefix}" TXT record or has zero aliases configured`,
         420
       );
@@ -2025,6 +2023,7 @@ class ForwardEmail {
 
     if (addresses.length === 0)
       throw new CustomError(
+        // TODO: we may want to replace this with "Invalid Recipients"
         `${address} domain of ${domain} has zero forwarded addresses configured in the TXT record with "${this.config.recordPrefix}"`,
         420
       );
@@ -2083,6 +2082,7 @@ class ForwardEmail {
             !validator.isURL(addr[1], this.config.isURLOptions))
         )
           throw new CustomError(
+            // TODO: we may want to replace this with "Invalid Recipients"
             `${lowerCaseAddress} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${element}"`
           );
 
