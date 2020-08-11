@@ -8,7 +8,7 @@ const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
-const SpamScanner = require('spamscanner');
+// const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
@@ -340,7 +340,7 @@ class ForwardEmail {
     });
 
     // expose spamscanner
-    this.scanner = new SpamScanner(this.config.spamScanner);
+    // this.scanner = new SpamScanner(this.config.spamScanner);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -1064,11 +1064,16 @@ class ForwardEmail {
         //
         // 5) check for spam
         //
+        // TODO: this is currently disabled until clustering issue is resolved
+        //       (we may just drop PhishTank entirely and use Cloudflare for phishing detection instead)
+        /*
         let scan;
         try {
           scan = await this.scanner.scan(originalRaw);
           if (scan.is_spam)
-            this.config.logger.fatal(`spam detected: ${JSON.stringify(scan.results)}`);
+            this.config.logger.fatal(
+              `spam detected: ${JSON.stringify(scan.results)}`
+            );
         } catch (err) {
           this.config.logger.fatal(err);
         }
@@ -1107,6 +1112,7 @@ class ForwardEmail {
           if (messages.length > 0)
             throw new CustomError(messages.join(' '), 554);
         }
+        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1540,13 +1546,14 @@ class ForwardEmail {
         //
         if (isSANB(env.DKIM_PRIVATE_KEY_PATH)) {
           try {
-            raw = await arcSign(
+            const arcHeaders = await arcSign(
               raw,
               this.config.dkim.keySelector,
               this.config.dkim.domainName,
               env.DKIM_PRIVATE_KEY_PATH,
               name
             );
+            if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
             this.config.logger.fatal(err);
           }
@@ -1853,7 +1860,11 @@ class ForwardEmail {
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
     return new Promise((resolve, reject) => {
-      if (email === this.config.noReply || !this.limiter) return resolve();
+      if (email === this.config.noReply || !this.limiter) {
+        resolve();
+        return;
+      }
+
       const id = email;
       const limit = new Limiter({ ...this.limiter, id });
       limit.get((err, limit) => {

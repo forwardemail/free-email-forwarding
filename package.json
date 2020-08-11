@@ -37,11 +37,11 @@
     "boolean": "^3.0.1",
     "bytes": "^3.1.0",
     "common-tags": "^1.8.0",
-    "dkimpy": "^2.0.0",
+    "dkimpy": "^3.0.0",
     "dnsbl": "^3.2.0",
     "get-fqdn": "^0.0.4",
     "get-port": "^5.1.1",
-    "get-stream": "^5.2.0",
+    "get-stream": "^6.0.0",
     "iconv": "^3.0.0",
     "ip": "^1.1.5",
     "is-string-and-not-blank": "^0.0.2",
@@ -60,7 +60,7 @@
     "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
     "smtp-server": "^3.7.0",
-    "spamscanner": "^0.0.9",
+    "spamscanner": "^0.0.10",
     "split-lines": "^2.0.0",
     "superagent": "^6.0.0",
     "uuid-by-string": "^3.0.2",
@@ -85,7 +85,7 @@
     "remark-preset-github": "^3.0.0",
     "shelljs": "^0.8.4",
     "uuid": "^8.3.0",
-    "xo": "^0.32.1"
+    "xo": "^0.33.0"
   },
   "engines": {
     "node": ">=12"
