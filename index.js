@@ -256,7 +256,7 @@ class ForwardEmail {
       },
       sendingZone: 'bounces',
       userAgent: `${pkg.name}/${pkg.version}`,
-      spamScanner: {},
+      spamScanner: { logger },
       ttlMs: ms('7d'),
       maxRetry: 5,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
