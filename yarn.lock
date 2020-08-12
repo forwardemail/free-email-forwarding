@@ -8780,10 +8780,10 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^1.0.3:
-  version "1.0.3"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.0.3.tgz#009d0756ab24c85ea6bb147e3bdd257e9afebb5b"
-  integrity sha512-Nio/pUyZHvBhbsS0xm/pVKvFH20P+PsKrJ6jgoLUCa2N1MkzgU8uBWfE+uhEKZIf2wy1zdubpGuXDGAl2rKuJA==
+spamscanner@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.0.5.tgz#517043405e4c6366a9dbe52b227246cb27889e01"
+  integrity sha512-fcpCS2yImlrQooO1Gw1aHQqY2aoWIHG8+a0IPIFpy3zYsVs1SqXD4MSKhmNP3KbDXzCtclaY6BtUq83HqigZBw==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
