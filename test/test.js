@@ -27,7 +27,6 @@ test.beforeEach(async (t) => {
   if (keys.length > 0) await Promise.all(keys.map((key) => client.del(key)));
   const port = await getPort();
   const forwardEmail = new ForwardEmail({ port });
-  // await forwardEmail.scanner.load();
   await forwardEmail.listen();
   t.context.forwardEmail = forwardEmail;
 });
