@@ -8,7 +8,7 @@ const Limiter = require('ratelimiter');
 const MimeNode = require('nodemailer/lib/mime-node');
 const RE2 = require('re2');
 const Redis = require('@ladjs/redis');
-// const SpamScanner = require('spamscanner');
+const SpamScanner = require('spamscanner');
 const _ = require('lodash');
 const addressParser = require('nodemailer/lib/addressparser');
 const arrayJoinConjunction = require('array-join-conjunction');
@@ -340,7 +340,7 @@ class ForwardEmail {
     });
 
     // expose spamscanner
-    // this.scanner = new SpamScanner(this.config.spamScanner);
+    this.scanner = new SpamScanner(this.config.spamScanner);
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
@@ -1064,9 +1064,6 @@ class ForwardEmail {
         //
         // 5) check for spam
         //
-        // TODO: this is currently disabled until clustering issue is resolved
-        //       (we may just drop PhishTank entirely and use Cloudflare for phishing detection instead)
-        /*
         let scan;
         try {
           scan = await this.scanner.scan(originalRaw);
@@ -1112,7 +1109,6 @@ class ForwardEmail {
           if (messages.length > 0)
             throw new CustomError(messages.join(' '), 554);
         }
-        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC

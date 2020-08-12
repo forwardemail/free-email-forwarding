@@ -16,7 +16,6 @@ if (!module.parent) {
 
   (async () => {
     try {
-      // await app.spamscanner.load();
       await app.listen(port);
       if (process.send) process.send('ready');
       logger.info(
