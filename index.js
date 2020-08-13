@@ -966,10 +966,12 @@ class ForwardEmail {
       // - Barracuda = b.barracudacentral.org
       // - Lashback = ubl.unsubscore.com
       // - PSBL = psbl.surriel.com
+      //
+      // TODO: if someone hits the blacklist we should ratelimit them too
+      //
       const message = await this.checkBlacklists(session.remoteAddress);
       if (message) throw new CustomError(message, 554);
     } catch (err) {
-      this.config.logger.fatal(err);
       stream.destroy(err);
       return;
     }
