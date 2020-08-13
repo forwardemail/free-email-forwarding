@@ -1946,7 +1946,6 @@ class ForwardEmail {
   }
 
   async onMailFrom(address, session, fn) {
-    console.log('address', address, 'session', session);
     fn();
     /*
     try {
