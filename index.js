@@ -1946,6 +1946,9 @@ class ForwardEmail {
   }
 
   async onMailFrom(address, session, fn) {
+    console.log('address', address, 'session', session);
+    fn();
+    /*
     try {
       if (!address.address)
         throw new Error('Envelope MAIL FROM is missing on your message');
@@ -1968,6 +1971,7 @@ class ForwardEmail {
     } catch (err) {
       fn(err);
     }
+    */
   }
 
   // this returns the forwarding address for a given email address
