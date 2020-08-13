@@ -843,6 +843,7 @@ class ForwardEmail {
         this.config.logger.warn(
           new Error('DNS lookup failed to get IP', { ip })
         );
+        return false;
       }
     }
 
