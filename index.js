@@ -1219,7 +1219,7 @@ class ForwardEmail {
         //
         // TODO: we may not want to do this if ARC was passing, however not all providers implement ARC yet
         //
-        const from =
+        let from =
           authResults &&
           authResults.spf &&
           authResults.spf.result === 'pass' &&
@@ -1571,13 +1571,11 @@ class ForwardEmail {
             );
             if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
-            this.config.logger.fatal(
-              new Error(
-                `ARC signature error message: ${
-                  err.message
-                } with data: ${JSON.stringify({ raw, name })}`
-              )
-            );
+            this.config.logger.fatal(err);
+            this.config.logger.fatal(new Error(JSON.stringify(raw)));
+            // temporary until exception cause is determined
+            console.error(raw);
+            from = this.srs.forward(mailFrom.address, this.config.srsDomain);
           }
         } else {
           this.config.logger.fatal(
