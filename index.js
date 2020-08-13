@@ -1949,9 +1949,9 @@ class ForwardEmail {
     try {
       // if (!address.address)
       //   throw new Error('Envelope MAIL FROM is missing on your message');
-      if (address && address.address)
-        await this.validateRateLimit(address.address);
-      else throw new Error('Missing MAIL FROM');
+      // if (address && address.address)
+      //   await this.validateRateLimit(address.address);
+      // else throw new Error('Missing MAIL FROM');
       /*
       await Promise.all([
         this.validateRateLimit(address.address),
