@@ -735,7 +735,9 @@ class ForwardEmail {
               ['defer', 'slowdown'].includes(bounceInfo.action) ||
               bounceInfo.category === 'blacklist'
             ) {
-              this.config.logger.fatal(err, {
+              this.config.logger[
+                bounceInfo.category === 'blacklist' ? 'fatal' : 'error'
+              ](err, {
                 bounce_info: bounceInfo,
                 envelope
               });
@@ -758,7 +760,9 @@ class ForwardEmail {
             ['defer', 'slowdown'].includes(bounceInfo.action) ||
             bounceInfo.category === 'blacklist'
           ) {
-            this.config.logger.fatal(err, {
+            this.config.logger[
+              bounceInfo.category === 'blacklist' ? 'fatal' : 'error'
+            ](err, {
               bounce_info: bounceInfo,
               envelope
             });
@@ -1568,7 +1572,7 @@ class ForwardEmail {
             );
             if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
-            this.config.logger.fatal(err);
+            this.config.logger.error(err);
             from = this.srs.forward(
               this.checkSRS(mailFrom.address),
               this.config.srsDomain
