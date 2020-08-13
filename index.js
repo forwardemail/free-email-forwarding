@@ -888,7 +888,48 @@ class ForwardEmail {
   async onConnect(session, fn) {
     // set arrival date for future use by bounce handler
     session.arrivalDate = Date.now();
-    fn();
+
+    try {
+      // check against blacklist
+      if (
+        validator.isFQDN(session.clientHostname) &&
+        this.isBlacklisted(session.clientHostname)
+      )
+        throw new CustomError(
+          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`,
+          554
+        );
+      if (this.isBlacklisted(session.remoteAddress))
+        throw new CustomError(
+          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`,
+          554
+        );
+
+      // validate against rate limiting
+      await this.validateRateLimit(session.remoteAddress);
+
+      //
+      // TODO: check blacklist against MAIL FROM
+      //
+      // ensure that it's not on the DNS blacklist
+      // X Spamhaus = zen.spamhaus.org
+      // - SpamCop = bl.spamcop.net
+      // - Barracuda = b.barracudacentral.org
+      // - Lashback = ubl.unsubscore.com
+      // - PSBL = psbl.surriel.com
+      //
+      // TODO: if someone hits the blacklist we should ratelimit them too
+      //
+      const message = await this.checkBlacklists(session.remoteAddress);
+      if (message) {
+        this.config.blacklist.push(session.remoteAddress);
+        throw new CustomError(message, 554);
+      }
+
+      fn();
+    } catch (err) {
+      fn(err);
+    }
   }
 
   async onData(stream, session, fn) {
@@ -940,47 +981,6 @@ class ForwardEmail {
     // which causes `session.envelope.mailFrom` to be set to `false
     //
     const { mailFrom } = session.envelope;
-
-    try {
-      // check against blacklist
-      if (
-        validator.isFQDN(session.clientHostname) &&
-        this.isBlacklisted(session.clientHostname)
-      )
-        throw new CustomError(
-          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`,
-          554
-        );
-      if (this.isBlacklisted(session.remoteAddress))
-        throw new CustomError(
-          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`,
-          554
-        );
-
-      // validate against rate limiting
-      await this.validateRateLimit(session.remoteAddress);
-
-      //
-      // TODO: check blacklist against MAIL FROM
-      //
-      // ensure that it's not on the DNS blacklist
-      // X Spamhaus = zen.spamhaus.org
-      // - SpamCop = bl.spamcop.net
-      // - Barracuda = b.barracudacentral.org
-      // - Lashback = ubl.unsubscore.com
-      // - PSBL = psbl.surriel.com
-      //
-      // TODO: if someone hits the blacklist we should ratelimit them too
-      //
-      const message = await this.checkBlacklists(session.remoteAddress);
-      if (message) {
-        this.config.blacklist.push(session.remoteAddress);
-        throw new CustomError(message, 554);
-      }
-    } catch (err) {
-      stream.destroy(err);
-      return;
-    }
 
     //
     // read the message headers and message itself
@@ -1125,13 +1125,11 @@ class ForwardEmail {
         //
         let scan;
 
-        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
-        */
 
         if (_.isObject(scan) && _.isObject(scan.results)) {
           //
