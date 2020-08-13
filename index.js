@@ -901,9 +901,7 @@ class ForwardEmail {
           err.responseCode === 554) ||
         (err &&
           err.responseCode &&
-          (err.responseCode < 500 ||
-            err.responseCode === 452 ||
-            err.responseCode === 451))
+          (err.responseCode < 500 || err.responseCode === 452))
           ? 'warn'
           : 'error'
       ](err, { session });
@@ -971,6 +969,7 @@ class ForwardEmail {
       const message = await this.checkBlacklists(session.remoteAddress);
       if (message) throw new CustomError(message, 554);
     } catch (err) {
+      this.config.logger.fatal(err);
       stream.destroy(err);
       return;
     }
@@ -1118,11 +1117,13 @@ class ForwardEmail {
         //
         let scan;
 
+        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
+        */
 
         if (_.isObject(scan) && _.isObject(scan.results)) {
           //
