@@ -637,7 +637,7 @@ class ForwardEmail {
       if (this.client)
         await this.client.set(key, count, 'PX', this.config.ttlMs);
     } catch (err) {
-      this.config.logger.error(err, { options, envelope });
+      this.config.logger.warn(err, { options, envelope });
 
       //
       // if there was `err.response` and it had a bounce reason
