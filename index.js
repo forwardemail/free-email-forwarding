@@ -808,7 +808,8 @@ class ForwardEmail {
     // check against blacklist
     if (this.isBlacklisted(domain))
       throw new CustomError(
-        `The domain ${domain} is blacklisted by ${this.config.website}.`
+        `The domain ${domain} is blacklisted by ${this.config.website}.`,
+        554
       );
 
     // ensure fully qualified domain name
@@ -947,11 +948,13 @@ class ForwardEmail {
         this.isBlacklisted(session.clientHostname)
       )
         throw new CustomError(
-          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`
+          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`,
+          554
         );
       if (this.isBlacklisted(session.remoteAddress))
         throw new CustomError(
-          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`
+          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`,
+          554
         );
 
       // validate against rate limiting
