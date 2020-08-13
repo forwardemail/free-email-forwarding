@@ -1085,10 +1085,6 @@ class ForwardEmail {
         let scan;
         try {
           scan = await this.scanner.scan(originalRaw);
-          if (scan.is_spam)
-            this.config.logger.fatal(
-              `spam detected: ${JSON.stringify(scan.results)}`
-            );
         } catch (err) {
           this.config.logger.fatal(err);
         }
@@ -1159,16 +1155,12 @@ class ForwardEmail {
             session
           });
         } catch (err) {
+          this.config.logger.error(err);
+          //
+          // TODO: if an error occurs here then we should use SRS
+          //
           // TODO: probably just want to log this and let the message go through until
           //       we have all the python package bugs sorted out at least
-          this.config.logger.fatal(
-            JSON.stringify({
-              err,
-              name,
-              session,
-              mailFrom
-            })
-          );
           // err.responseCode = 421;
           // throw err;
         }
@@ -1224,7 +1216,10 @@ class ForwardEmail {
           authResults.spf &&
           authResults.spf.result === 'pass' &&
           (!authResults.dkim || authResults.dkim !== 'pass')
-            ? this.srs.forward(mailFrom.address, this.config.srsDomain)
+            ? this.srs.forward(
+                this.checkSRS(mailFrom.address),
+                this.config.srsDomain
+              )
             : mailFrom.address;
 
         //
@@ -1547,6 +1542,8 @@ class ForwardEmail {
         if (authResults && authResults.header)
           headers.add('Authentication-Results', authResults.header);
 
+        // TODO: if MAIL FROM missing then parse From header (?) for MAIL FROM (?)
+
         // sign message with ARC seal
 
         // join headers object and body into a full rfc822 formatted email
@@ -1572,10 +1569,10 @@ class ForwardEmail {
             if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
             this.config.logger.fatal(err);
-            this.config.logger.fatal(new Error(JSON.stringify(raw)));
-            // temporary until exception cause is determined
-            console.error(raw);
-            from = this.srs.forward(mailFrom.address, this.config.srsDomain);
+            from = this.srs.forward(
+              this.checkSRS(mailFrom.address),
+              this.config.srsDomain
+            );
           }
         } else {
           this.config.logger.fatal(
