@@ -1832,6 +1832,11 @@ class ForwardEmail {
     stream.once('error', (err) => {
       this.config.logger[
         (err && err.message && err.message.includes('Invalid recipients')) ||
+        (err &&
+          err.message &&
+          err.message.includes('DNS blacklist') &&
+          err.responseCode &&
+          err.responseCode === 554) ||
         (err && err.responseCode && err.responseCode < 500)
           ? 'warn'
           : 'error'
