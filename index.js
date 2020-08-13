@@ -1946,11 +1946,13 @@ class ForwardEmail {
   }
 
   async onMailFrom(address, session, fn) {
-    fn();
-    /*
     try {
-      if (!address.address)
-        throw new Error('Envelope MAIL FROM is missing on your message');
+      // if (!address.address)
+      //   throw new Error('Envelope MAIL FROM is missing on your message');
+      if (address && address.address)
+        await this.validateRateLimit(address.address);
+      else throw new Error('Missing MAIL FROM');
+      /*
       await Promise.all([
         this.validateRateLimit(address.address),
         (async () => {
@@ -1966,11 +1968,14 @@ class ForwardEmail {
           throw new CustomError(message, 554);
         })()
       ]);
+      */
       fn();
     } catch (err) {
+      this.config.logger.error(
+        `${err.message} (${JSON.stringify({ address, session })}`
+      );
       fn(err);
     }
-    */
   }
 
   // this returns the forwarding address for a given email address
