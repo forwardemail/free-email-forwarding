@@ -1087,11 +1087,14 @@ class ForwardEmail {
         // 5) check for spam
         //
         let scan;
+
+        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
+        */
 
         if (_.isObject(scan) && _.isObject(scan.results)) {
           //
