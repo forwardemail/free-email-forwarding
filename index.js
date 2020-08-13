@@ -838,8 +838,11 @@ class ForwardEmail {
           hints: dns.ADDRCONFIG
         });
         value = object.address;
-      } catch {
-        this.config.logger.error(`DNS lookup failed to get IP for ${value}`);
+      } catch (err) {
+        this.config.logger.warn(err);
+        this.config.logger.warn(
+          new Error('DNS lookup failed to get IP', { ip })
+        );
       }
     }
 
@@ -1830,7 +1833,8 @@ class ForwardEmail {
 
     stream.once('error', (err) => {
       this.config.logger[
-        err && err.message && err.message.includes('Invalid recipients')
+        (err && err.message && err.message.includes('Invalid recipients')) ||
+        (err && err.responseCode && err.responseCode < 500)
           ? 'warn'
           : 'error'
       ](err, { session });
