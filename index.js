@@ -970,7 +970,10 @@ class ForwardEmail {
       // TODO: if someone hits the blacklist we should ratelimit them too
       //
       const message = await this.checkBlacklists(session.remoteAddress);
-      if (message) throw new CustomError(message, 554);
+      if (message) {
+        this.config.blacklist.push(session.remoteAddress);
+        throw new CustomError(message, 554);
+      }
     } catch (err) {
       stream.destroy(err);
       return;
