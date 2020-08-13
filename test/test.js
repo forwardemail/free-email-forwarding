@@ -1122,43 +1122,6 @@ test('should detect executable files', async (t) => {
   });
 });
 
-test('should check against PhishTank', async (t) => {
-  t.true(t.context.forwardEmail.scanner._phishTankLoaded);
-  t.true(Array.isArray(t.context.forwardEmail.scanner._phishTankUrls));
-  t.true(t.context.forwardEmail.scanner._phishTankUrls.length > 0);
-  const link = t.context.forwardEmail.scanner._phishTankUrls[0];
-  const transporter = nodemailer.createTransport({
-    streamTransport: true
-  });
-  const { port } = t.context.forwardEmail.server.address();
-  const connection = new Client({ port, tls });
-
-  const info = await transporter.sendMail({
-    html: `<a href="${link}">test</a>`,
-    text: link,
-    from: 'foo@bar.com',
-    envelope: {
-      to: 'foo@example.com',
-      from: 'beep@niftylettuce.com'
-    }
-  });
-  return new Promise((resolve) => {
-    connection.once('end', resolve);
-    connection.connect(() => {
-      connection.send(info.envelope, info.message, (err) => {
-        t.regex(
-          err.message,
-          new RegExp(
-            `Link of "${link}" was detected by PhishTank to be phishing-related.`
-          )
-        );
-        t.is(err.responseCode, 554);
-        connection.close();
-      });
-    });
-  });
-});
-
 test('should check against Cloudflare', async (t) => {
   const link = Buffer.from('eHZpZGVvcy5jb20=', 'base64').toString();
   const transporter = nodemailer.createTransport({
@@ -1183,7 +1146,7 @@ test('should check against Cloudflare', async (t) => {
         t.regex(
           err.message,
           new RegExp(
-            `Link of "${link}" was detected by Cloudflare to contain malware, phishing, and/or adult content.`
+            `Link hostname of "${link}" was detected by Cloudflare to contain malware, phishing, and/or adult content.`
           )
         );
         t.is(err.responseCode, 554);

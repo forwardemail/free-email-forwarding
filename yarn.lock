@@ -1175,10 +1175,10 @@ atomic-sleep@^1.0.0:
   resolved "https://registry.yarnpkg.com/atomic-sleep/-/atomic-sleep-1.0.0.tgz#eb85b77a601fc932cfe432c5acd364a9e2c9075b"
   integrity sha512-kNOjDqAh7px0XWNI+4QbzoiR/nTkHAWNud2uvnJquD1/x5a7EQZMJT0AczqK0Qn67oY/TTQ1LbUKajZpp3I9tQ==
 
-authheaders@^2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/authheaders/-/authheaders-2.0.1.tgz#f210e872af92b19f24de3197f673c32ef644bc58"
-  integrity sha512-RE4D2GYiQidA7I3c7WxEF9kkew8fwHtGUaj0bi/2bv7IdeIGNCVwu8dtx15PmAyM3ChzV2LFs0QBAu9aqXMs6w==
+authheaders@^2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/authheaders/-/authheaders-2.0.2.tgz#784261005efdf448096d3b797b53c30962ad60bd"
+  integrity sha512-x0lOWMXEUYncKjX7QzyVBsRlNlVF9oyHZrdVDyLRyC0/XBLzHd5w+rgWHY3sXvB34+tvucW7Vo7Y6xJtnk1QSg==
   dependencies:
     debug "^4.1.1"
     ms "^2.1.2"
@@ -1263,9 +1263,9 @@ aws-sign2@~0.7.0:
   integrity sha1-tG6JCTSpWR8tL2+G1+ap8bP+dqg=
 
 aws4@^1.8.0:
-  version "1.10.0"
-  resolved "https://registry.yarnpkg.com/aws4/-/aws4-1.10.0.tgz#a17b3a8ea811060e74d47d306122400ad4497ae2"
-  integrity sha512-3YDiu347mtVtjpyV3u5kVqQLP242c06zwDOgpeRnybmXlYYsLbtTrUBUm8i8srONt+FWobl5aibnU1030PeeuA==
+  version "1.10.1"
+  resolved "https://registry.yarnpkg.com/aws4/-/aws4-1.10.1.tgz#e1e82e4f3e999e2cfd61b161280d16a111f86428"
+  integrity sha512-zg7Hz2k5lI8kb7U32998pRRFin7zJlkfezGJjUc2heaD4Pw2wObakCDVzkKztTm/Ln7eiVvYsjqak0Ed4LkMDA==
 
 axe@^6.0.5:
   version "6.0.5"
@@ -1807,10 +1807,10 @@ cipher-base@^1.0.0, cipher-base@^1.0.1, cipher-base@^1.0.3:
     inherits "^2.0.1"
     safe-buffer "^5.0.1"
 
-clamscan@^1.3.1:
-  version "1.3.1"
-  resolved "https://registry.yarnpkg.com/clamscan/-/clamscan-1.3.1.tgz#8c27b89ddc850fbac16d12084437c232d8323718"
-  integrity sha512-PhKK9CMuvvfPYDuoPCM5/X18+23lnuqRudm1aysPyNEW7TAwYgNxzMfGYFFpgpI30j8ctUcJyusCzd5g1kmBxw==
+clamscan@^1.3.3:
+  version "1.3.3"
+  resolved "https://registry.yarnpkg.com/clamscan/-/clamscan-1.3.3.tgz#0cf84dc3278cf7a3c81101d3e647842c34c1a825"
+  integrity sha512-AwaZeyECbqTWwrc5l7lLbA/cbYBTMW+VC77CnIjK3WCwTm1kGL6PHSXgDaEFsVkfrcRvPvSD1oxJpMzET9lqKg==
 
 class-utils@^0.3.5:
   version "0.3.6"
@@ -2560,10 +2560,10 @@ dir-glob@^3.0.1:
   dependencies:
     path-type "^4.0.0"
 
-dkimpy@^3.0.0:
-  version "3.0.0"
-  resolved "https://registry.yarnpkg.com/dkimpy/-/dkimpy-3.0.0.tgz#a98f0ff1ef429b585cb38eec36d0f7189a4055e4"
-  integrity sha512-6P5UTso3juHiX4Zjaf+0Au15H4yznHsU6GAfboja3Ymrh0wLfyv4HcdbiDcoYihrG33oXDoAlvUgJWI0XYddMQ==
+dkimpy@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/dkimpy/-/dkimpy-3.0.1.tgz#4f2a9045548c6c209f29dfaa14475ffd6f118405"
+  integrity sha512-7V01Rt/T0xHiRjhvjAvT833Ds2zhy6Dxt0YzXxE8+yI0+n3oWxLjQJFfE2FA1X4bsaCaMQNmJJeKa9Ok3gCDMQ==
   dependencies:
     debug "^4.1.1"
     ms "^2.1.2"
@@ -8470,10 +8470,10 @@ safe-regex@^2.1.1:
   resolved "https://registry.yarnpkg.com/safer-buffer/-/safer-buffer-2.1.2.tgz#44fa161b0187b9549dd84bb91802f9bd8385cd6a"
   integrity sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==
 
-sanitize-html@^1.27.2:
-  version "1.27.2"
-  resolved "https://registry.yarnpkg.com/sanitize-html/-/sanitize-html-1.27.2.tgz#08c0cee76e594c677ab1c466594f72cb1142f399"
-  integrity sha512-REZETvhFFChM3zyQS8XoR02j5U56HtyQkxsc8cb5HEi3XU0AAX9TuKvWe3ESR0F0IA81ZghA+5YpJg8C35AFyQ==
+sanitize-html@^1.27.3:
+  version "1.27.3"
+  resolved "https://registry.yarnpkg.com/sanitize-html/-/sanitize-html-1.27.3.tgz#dc7419b075f96737055c98764aea40c42d978df9"
+  integrity sha512-79tcPlgJ3fuK0/TtUCIBdPeQSvktTSTJP9O/dzrteaO98qw5UV6CATh3ZyPjUzv1LtNjHDlhbq9XOXiKf0zA1w==
   dependencies:
     htmlparser2 "^4.1.0"
     lodash "^4.17.15"
@@ -8572,10 +8572,10 @@ serialize-error@^2.1.0:
   resolved "https://registry.yarnpkg.com/serialize-error/-/serialize-error-2.1.0.tgz#50b679d5635cdf84667bdc8e59af4e5b81d5f60a"
   integrity sha1-ULZ51WNc34Rme9yOWa9OW4HV9go=
 
-serialize-javascript@^3.1.0:
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/serialize-javascript/-/serialize-javascript-3.1.0.tgz#8bf3a9170712664ef2561b44b691eafe399214ea"
-  integrity sha512-JIJT1DGiWmIKhzRsG91aS6Ze4sFUrYbltlkg2onR5OrnNM02Kl/hnY/T4FN2omvyeBbQmMJv+K4cPOpGzOTFBg==
+serialize-javascript@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/serialize-javascript/-/serialize-javascript-4.0.0.tgz#b525e1238489a5ecfc42afacc3fe99e666f4b1aa"
+  integrity sha512-GaNA54380uFefWghODBWEGisLZFj00nS5ACs6yHa9nLqlLpVLO8ChDGeKRjZnV4Nh4n0Qi7nhYZD/9fCPzEqkw==
   dependencies:
     randombytes "^2.1.0"
 
@@ -8780,14 +8780,14 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^1.0.5:
-  version "1.0.5"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.0.5.tgz#517043405e4c6366a9dbe52b227246cb27889e01"
-  integrity sha512-fcpCS2yImlrQooO1Gw1aHQqY2aoWIHG8+a0IPIFpy3zYsVs1SqXD4MSKhmNP3KbDXzCtclaY6BtUq83HqigZBw==
+spamscanner@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.0.6.tgz#d3e02b4ce582e4c0683d72741697b57758744bd3"
+  integrity sha512-OqTDrL4y0pN+u6GoNWsUGFG8RjflhdgqYZfOtuzOuEkF59MQDQjw06Pyk1ZcahNdYoRaUzASq+OZKVtMtCNvEQ==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
-    clamscan "^1.3.1"
+    clamscan "^1.3.3"
     credit-card-regex "^3.0.0"
     crypto-random-string "^3.2.0"
     currency-codes "^2.1.0"
@@ -8824,7 +8824,7 @@ spamscanner@^1.0.5:
     phone-regex "^2.1.0"
     punycode "^2.1.1"
     re2 "^1.15.4"
-    sanitize-html "^1.27.2"
+    sanitize-html "^1.27.3"
     stopword "^1.0.1"
     striptags "^3.1.1"
     superagent "^6.0.0"
@@ -9350,15 +9350,15 @@ term-size@^2.1.0:
   integrity sha512-a6sumDlzyHVJWb8+YofY4TW112G6p2FCPEAFk+59gIYHv3XHRhm9ltVQ9kli4hNWeQBwSpe8cRN25x0ROunMOw==
 
 terser-webpack-plugin@^1.4.3:
-  version "1.4.4"
-  resolved "https://registry.yarnpkg.com/terser-webpack-plugin/-/terser-webpack-plugin-1.4.4.tgz#2c63544347324baafa9a56baaddf1634c8abfc2f"
-  integrity sha512-U4mACBHIegmfoEe5fdongHESNJWqsGU+W0S/9+BmYGVQDw1+c2Ow05TpMhxjPK1sRb7cuYq1BPl1e5YHJMTCqA==
+  version "1.4.5"
+  resolved "https://registry.yarnpkg.com/terser-webpack-plugin/-/terser-webpack-plugin-1.4.5.tgz#a217aefaea330e734ffacb6120ec1fa312d6040b"
+  integrity sha512-04Rfe496lN8EYruwi6oPQkG0vo8C+HT49X687FZnpPF0qMAIHONI6HEXYPKDOE8e5HjXTyKfqRd/agHtH0kOtw==
   dependencies:
     cacache "^12.0.2"
     find-cache-dir "^2.1.0"
     is-wsl "^1.1.0"
     schema-utils "^1.0.0"
-    serialize-javascript "^3.1.0"
+    serialize-javascript "^4.0.0"
     source-map "^0.6.1"
     terser "^4.1.2"
     webpack-sources "^1.4.0"
