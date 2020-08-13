@@ -161,9 +161,9 @@ class ForwardEmail {
       logger,
       smtp: {
         size: bytes(env.SMTP_MESSAGE_MAX_SIZE),
-        onConnect: this.onConnect.bind(this),
         onData: this.onData.bind(this),
-        onMailFrom: this.onMailFrom.bind(this),
+        onConnect: this.onConnect.bind(this),
+        // onMailFrom: this.onMailFrom.bind(this),
         // onRcptTo: this.onRcptTo.bind(this),
         disabledCommands: ['AUTH'],
         logInfo: true,
@@ -887,41 +887,38 @@ class ForwardEmail {
   async onConnect(session, fn) {
     // set arrival date for future use by bounce handler
     session.arrivalDate = Date.now();
-
-    if (env.NODE_ENV === 'test') return fn();
-
-    try {
-      // check against blacklist
-      if (
-        validator.isFQDN(session.clientHostname) &&
-        this.isBlacklisted(session.clientHostname)
-      )
-        throw new CustomError(
-          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`
-        );
-
-      if (this.isBlacklisted(session.remoteAddress))
-        throw new CustomError(
-          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`
-        );
-
-      // ensure that it's not on the DNS blacklist
-      // X Spamhaus = zen.spamhaus.org
-      // - SpamCop = bl.spamcop.net
-      // - Barracuda = b.barracudacentral.org
-      // - Lashback = ubl.unsubscore.com
-      // - PSBL = psbl.surriel.com
-      const message = await this.checkBlacklists(session.remoteAddress);
-      if (!message) return fn();
-      const err = new CustomError(message, 554);
-      fn(err);
-    } catch (err) {
-      this.config.logger.error(err);
-      fn();
-    }
+    fn();
   }
 
   async onData(stream, session, fn) {
+    stream.once('error', (err) => {
+      this.config.logger[
+        (err && err.message && err.message.includes('Invalid recipients')) ||
+        (err &&
+          err.message &&
+          err.message.includes('DNS blacklist') &&
+          err.responseCode &&
+          err.responseCode === 554) ||
+        (err &&
+          err.responseCode &&
+          (err.responseCode < 500 ||
+            err.responseCode === 452 ||
+            err.responseCode === 451))
+          ? 'warn'
+          : 'error'
+      ](err, { session });
+
+      // parse SMTP code and message
+      if (err.message && err.message.startsWith('SMTP code:')) {
+        if (!err.responseCode)
+          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+        err.message = err.message.split('msg:')[1];
+      }
+
+      err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}.`;
+      fn(err);
+    });
+
     //
     // debugging
     //
@@ -944,6 +941,39 @@ class ForwardEmail {
     // which causes `session.envelope.mailFrom` to be set to `false
     //
     const { mailFrom } = session.envelope;
+
+    try {
+      // check against blacklist
+      if (
+        validator.isFQDN(session.clientHostname) &&
+        this.isBlacklisted(session.clientHostname)
+      )
+        throw new CustomError(
+          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`
+        );
+      if (this.isBlacklisted(session.remoteAddress))
+        throw new CustomError(
+          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`
+        );
+
+      // validate against rate limiting
+      await this.validateRateLimit(session.remoteAddress);
+
+      //
+      // TODO: check blacklist against MAIL FROM
+      //
+      // ensure that it's not on the DNS blacklist
+      // X Spamhaus = zen.spamhaus.org
+      // - SpamCop = bl.spamcop.net
+      // - Barracuda = b.barracudacentral.org
+      // - Lashback = ubl.unsubscore.com
+      // - PSBL = psbl.surriel.com
+      const message = await this.checkBlacklists(session.remoteAddress);
+      if (message) throw new CustomError(message, 554);
+    } catch (err) {
+      stream.destroy(err);
+      return;
+    }
 
     //
     // read the message headers and message itself
@@ -1088,13 +1118,11 @@ class ForwardEmail {
         //
         let scan;
 
-        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
-        */
 
         if (_.isObject(scan) && _.isObject(scan.results)) {
           //
@@ -1219,6 +1247,7 @@ class ForwardEmail {
         // TODO: we may not want to do this if ARC was passing, however not all providers implement ARC yet
         //
         let from =
+          mailFrom.address &&
           authResults &&
           authResults.spf &&
           authResults.spf.result === 'pass' &&
@@ -1543,7 +1572,11 @@ class ForwardEmail {
         // and `X-ForwardEmai-Sender`
         headers.update(
           'X-ForwardEmail-Sender',
-          `rfc822; ${this.checkSRS(mailFrom.address)}`
+          `rfc822; ${
+            mailFrom.address
+              ? this.checkSRS(mailFrom.address)
+              : session.remoteAddress
+          }`
         );
         // add and sign Authentication-Results header
         if (authResults && authResults.header)
@@ -1576,10 +1609,11 @@ class ForwardEmail {
             if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
             this.config.logger.error(err);
-            from = this.srs.forward(
-              this.checkSRS(mailFrom.address),
-              this.config.srsDomain
-            );
+            if (mailFrom.address)
+              from = this.srs.forward(
+                this.checkSRS(mailFrom.address),
+                this.config.srsDomain
+              );
           }
         } else {
           this.config.logger.fatal(
@@ -1789,7 +1823,9 @@ class ForwardEmail {
                 this.dkim.sign(
                   this.getBounceStream({
                     headers,
-                    from: this.checkSRS(mailFrom.address),
+                    from: mailFrom.address
+                      ? this.checkSRS(mailFrom.address)
+                      : mailFrom.address,
                     name,
                     bounce,
                     id: session.id,
@@ -1801,7 +1837,9 @@ class ForwardEmail {
                 )
               );
               const options = {
-                host: this.checkSRS(mailFrom.address),
+                host: mailFrom.address
+                  ? this.checkSRS(mailFrom.address)
+                  : mailFrom.address,
                 //
                 // NOTE: bounces to custom ports won't work
                 //       we would require custom logic here
@@ -1811,7 +1849,9 @@ class ForwardEmail {
                 name,
                 envelope: {
                   from: '',
-                  to: this.checkSRS(mailFrom.address)
+                  to: mailFrom.address
+                    ? this.checkSRS(mailFrom.address)
+                    : mailFrom.address
                 },
                 raw: raw.toString()
               };
@@ -1831,32 +1871,6 @@ class ForwardEmail {
       } catch (err) {
         stream.destroy(err);
       }
-    });
-
-    stream.once('error', (err) => {
-      this.config.logger[
-        (err && err.message && err.message.includes('Invalid recipients')) ||
-        (err &&
-          err.message &&
-          err.message.includes('DNS blacklist') &&
-          err.responseCode &&
-          err.responseCode === 554) ||
-        (err &&
-          err.responseCode &&
-          (err.responseCode < 500 || err.responseCode === 452))
-          ? 'warn'
-          : 'error'
-      ](err, { session });
-
-      // parse SMTP code and message
-      if (err.message && err.message.startsWith('SMTP code:')) {
-        if (!err.responseCode)
-          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
-        err.message = err.message.split('msg:')[1];
-      }
-
-      err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}.`;
-      fn(err);
     });
 
     stream.pipe(messageSplitter);
