@@ -830,8 +830,21 @@ class ForwardEmail {
       return false;
     }
 
+    // if it is a FQDN then look it up by IP address
+    let value = ip;
+    if (validator.isFQDN(value)) {
+      try {
+        const object = await dns.promises.lookup(value, {
+          hints: dns.ADDRCONFIG
+        });
+        value = object.address;
+      } catch {
+        this.config.logger.error(`DNS lookup failed to get IP for ${value}`);
+      }
+    }
+
     if (_.isArray(this.config.dnsbl.domains)) {
-      const results = await dnsbl.batch(ip, this.config.dnsbl.domains, {
+      const results = await dnsbl.batch(value, this.config.dnsbl.domains, {
         servers: this.config.dns
       });
       if (!_.isArray(results) || results.length === 0) return false;
@@ -841,7 +854,7 @@ class ForwardEmail {
         .map((result) =>
           util.format(
             this.config.blacklistedStr,
-            ip,
+            value,
             result.blacklist,
             this.config.dnsbl.removals[
               this.config.dnsbl.domains.indexOf(result.blacklist)
@@ -851,13 +864,13 @@ class ForwardEmail {
         .join(' ');
     }
 
-    const result = await dnsbl.lookup(ip, this.config.dnsbl.domains, {
+    const result = await dnsbl.lookup(value, this.config.dnsbl.domains, {
       servers: this.config.dns
     });
     if (!result) return false;
     return util.format(
       this.config.blacklistedStr,
-      ip,
+      value === ip ? ip : `${ip} (${value})`,
       this.config.dnsbl.domains,
       this.config.dnsbl.removals
     );
@@ -1119,7 +1132,9 @@ class ForwardEmail {
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
-          const object = await dns.promises.lookup(this.config.exchanges[0]);
+          const object = await dns.promises.lookup(this.config.exchanges[0], {
+            hints: dns.ADDRCONFIG
+          });
           ipAddress = object.address;
         } else {
           ipAddress = ip.address();
@@ -1553,7 +1568,13 @@ class ForwardEmail {
             );
             if (arcHeaders) raw = arcHeaders + raw;
           } catch (err) {
-            this.config.logger.fatal(err);
+            this.config.logger.fatal(
+              new Error(
+                `ARC signature error message: ${
+                  err.message
+                } with data: ${JSON.stringify({ raw, name })}`
+              )
+            );
           }
         } else {
           this.config.logger.fatal(
@@ -1917,15 +1938,22 @@ class ForwardEmail {
 
   async onMailFrom(address, session, fn) {
     try {
+      if (!address.address)
+        throw new Error('Envelope MAIL FROM is missing on your message');
       await Promise.all([
-        this.validateRateLimit(
-          address.address || session.clientHostname || session.remoteAddress
-        ),
-        address.address
-          ? Promise.resolve()
-          : Promise.reject(
-              new Error('Envelope MAIL FROM is missing on your message')
-            )
+        this.validateRateLimit(address.address),
+        (async () => {
+          // ensure that it's not on the DNS blacklist
+          // X Spamhaus = zen.spamhaus.org
+          // - SpamCop = bl.spamcop.net
+          // - Barracuda = b.barracudacentral.org
+          // - Lashback = ubl.unsubscore.com
+          // - PSBL = psbl.surriel.com
+          const domain = this.parseDomain(address.address);
+          const message = await this.checkBlacklists(domain);
+          if (!message) return;
+          throw new CustomError(message, 554);
+        })()
       ]);
       fn();
     } catch (err) {
