@@ -56,6 +56,15 @@ You'll also need the following dependencies installed:
     sudo ufw enable
     ```
 
+* libstemmer for Spam Scanner
+
+  * Ubuntu
+
+  ```sh
+  sudo apt-get install libstemmer-dev libstemmer-tools
+  ```
+
+
 * [authbind][] - for allowing non-root users to run on restricted ports
 
   * Ubuntu:
