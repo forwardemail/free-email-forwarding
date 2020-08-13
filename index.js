@@ -1836,7 +1836,9 @@ class ForwardEmail {
           err.message.includes('DNS blacklist') &&
           err.responseCode &&
           err.responseCode === 554) ||
-        (err && err.responseCode && err.responseCode < 500)
+        (err &&
+          err.responseCode &&
+          (err.responseCode < 500 || err.responseCode === 452))
           ? 'warn'
           : 'error'
       ](err, { session });
