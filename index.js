@@ -909,7 +909,6 @@ class ForwardEmail {
       const message = await this.checkBlacklists(session.remoteAddress);
       if (!message) return fn();
       const err = new CustomError(message, 554);
-      this.config.logger.error(err);
       fn(err);
     } catch (err) {
       this.config.logger.error(err);
