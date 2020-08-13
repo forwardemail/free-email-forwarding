@@ -626,6 +626,7 @@ class ForwardEmail {
         logger: this.config.logger,
         host: mx.host,
         port: mx.port,
+        ...(mx.socket ? { connection: mx.socket } : {}),
         name,
         tls: {
           ...(mx.hostname ? { servername: mx.hostname } : {}),
@@ -713,6 +714,7 @@ class ForwardEmail {
           logger: this.config.logger,
           host: mx.host,
           port: mx.port,
+          ...(mx.socket ? { connection: mx.socket } : {}),
           name
         });
         try {
