@@ -1131,41 +1131,6 @@ class ForwardEmail {
           this.config.logger.fatal(err);
         }
 
-        if (_.isObject(scan) && _.isObject(scan.results)) {
-          //
-          // NOTE: until we are confident with the accuracy
-          // we are not utilizing classification right now
-          // however we still want to use other detections
-          //
-          const messages = [];
-
-          if (_.isArray(scan.results.phishing))
-            for (const message of scan.results.phishing) {
-              messages.push(message);
-            }
-
-          if (_.isArray(scan.results.executables)) {
-            for (const message of scan.results.executables) {
-              messages.push(message);
-            }
-          }
-
-          if (_.isArray(scan.results.arbitrary)) {
-            for (const message of scan.results.arbitrary) {
-              messages.push(message);
-            }
-          }
-
-          if (_.isArray(scan.results.viruses)) {
-            for (const message of scan.results.viruses) {
-              messages.push(message);
-            }
-          }
-
-          if (messages.length > 0)
-            throw new CustomError(messages.join(' '), 554);
-        }
-
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
         //
@@ -1344,9 +1309,13 @@ class ForwardEmail {
         // 7) lookup forwarding recipients recursively
         //
         let recipients = await Promise.all(
+          // eslint-disable-next-line complexity
           session.envelope.rcptTo.map(async (to) => {
             try {
               let port = '25';
+              let hasPhishingProtection = true;
+              let hasExecutableProtection = true;
+              let hasVirusProtection = true;
 
               // if it was a bounce then return early
               if (to.isBounce)
@@ -1369,7 +1338,7 @@ class ForwardEmail {
                 const domain = this.parseDomain(to.address, false);
 
                 const { body } = await superagent
-                  .get(`${this.config.apiEndpoint}/v1/port`)
+                  .get(`${this.config.apiEndpoint}/v1/settings`)
                   .query({ domain })
                   .set('Accept', 'json')
                   .set('User-Agent', this.config.userAgent)
@@ -1377,20 +1346,30 @@ class ForwardEmail {
                   .timeout(this.config.timeout)
                   .retry(this.config.retry);
 
-                // body is an Object with `port` Number (a valid port number, defaults to 25)
-                if (
-                  _.isObject(body) &&
-                  isSANB(body.port) &&
-                  validator.isPort(body.port) &&
-                  body.port !== '25'
-                ) {
-                  port = body.port;
-                  this.config.logger.debug(
-                    `Custom port for ${to.address} detected`,
-                    {
-                      port
-                    }
-                  );
+                // body is an Object
+                if (_.isObject(body)) {
+                  // `port` (String) - a valid port number, defaults to 25
+                  if (
+                    isSANB(body.port) &&
+                    validator.isPort(body.port) &&
+                    body.port !== '25'
+                  ) {
+                    port = body.port;
+                    this.config.logger.debug(
+                      `Custom port for ${to.address} detected`,
+                      {
+                        port
+                      }
+                    );
+                  }
+
+                  // Spam Scanner boolean values adjusted by user in Advanced Settings page
+                  if (_.isBoolean(body.has_phishing_protection))
+                    hasPhishingProtection = body.has_phishing_protection;
+                  if (_.isBoolean(body.has_executable_protection))
+                    hasExecutableProtection = body.has_executable_protection;
+                  if (_.isBoolean(body.has_virus_protection))
+                    hasVirusProtection = body.has_virus_protection;
                 }
               } catch (err) {
                 this.config.logger.error(err);
@@ -1421,7 +1400,55 @@ class ForwardEmail {
               }
               */
 
-              return { address: to.address, addresses, port };
+              //
+              // NOTE: here is where we check if Spam Scanner settings
+              // were either enabled or disabled, and if they were enabled
+              // and the respective policy did not pass, then throw that error as a bounce
+              //
+              if (_.isObject(scan) && _.isObject(scan.results)) {
+                //
+                // NOTE: until we are confident with the accuracy
+                // we are not utilizing classification right now
+                // however we still want to use other detections
+                //
+                const messages = [];
+
+                if (hasPhishingProtection && _.isArray(scan.results.phishing))
+                  for (const message of scan.results.phishing) {
+                    messages.push(message);
+                  }
+
+                if (
+                  hasExecutableProtection &&
+                  _.isArray(scan.results.executables)
+                ) {
+                  for (const message of scan.results.executables) {
+                    messages.push(message);
+                  }
+                }
+
+                // TODO: this could probably be moved outside of the loop
+                if (_.isArray(scan.results.arbitrary)) {
+                  for (const message of scan.results.arbitrary) {
+                    messages.push(message);
+                  }
+                }
+
+                if (hasVirusProtection && _.isArray(scan.results.viruses)) {
+                  for (const message of scan.results.viruses) {
+                    messages.push(message);
+                  }
+                }
+
+                if (messages.length > 0)
+                  throw new CustomError(messages.join(' '), 554);
+              }
+
+              return {
+                address: to.address,
+                addresses,
+                port
+              };
             } catch (err) {
               this.config.logger.warn(err);
               bounces.push({
