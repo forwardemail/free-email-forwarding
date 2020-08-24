@@ -58,6 +58,7 @@ const CODES_TO_RESPONSE_CODES = {
   EAI_AGAIN: 421
 };
 
+const RETRY_CODE_NUMBERS = _.values(CODES_TO_RESPONSE_CODES);
 const RETRY_CODES = _.keys(CODES_TO_RESPONSE_CODES);
 
 const TLS_RETRY_CODES = new Set(['ETLS', 'ECONNRESET']);
@@ -603,6 +604,9 @@ class ForwardEmail {
       throw new CustomError(
         `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
       );
+
+    // TODO: we should parse minutes and seconds, and if it's less than 2 minutes, then use `delay`
+    // TODO: we should retry on defer's, and not just fallback to plaintext without TLS if that fails
 
     // try it once with opportunisticTLS otherwise ignoreTLS
     // (e.g. in case of a bad altname on a certificate)
@@ -1838,7 +1842,47 @@ class ForwardEmail {
           // and we also need to make bounces unique by address here
           // (will basically pick the first that was pushed to the list)
           //
-          const uniqueBounces = _.uniqBy(bounces, 'address');
+          const uniqueBounces = _.uniqBy(bounces, 'address').filter(
+            (bounce) => {
+              // extra safeguards to prevent exception and let us know of any weirdness
+              if (!_.isObject(bounce)) {
+                this.config.logger.error(
+                  new Error('Bounce was not an object', { bounce })
+                );
+                return false;
+              }
+
+              if (!_.isError(bounce.err)) {
+                this.config.logger.error(
+                  new Error('Bounce was missing error object', { bounce })
+                );
+                return false;
+              }
+
+              if (
+                isSANB(bounce.err.code) &&
+                RETRY_CODES.includes(bounce.err.code)
+              )
+                return false;
+
+              if (
+                _.isNumber(bounce.err.responseCode) &&
+                RETRY_CODE_NUMBERS.includes(bounce.err.responseCode)
+              )
+                return false;
+
+              if (isSANB(bounce.err.response)) {
+                const bounceInfo = zoneMTABounces.check(err.response);
+                if (['defer', 'slowdown'].includes(bounceInfo.action))
+                  return false;
+              }
+
+              return true;
+            }
+          );
+
+          // if all of the bounces were defer/slowdown then return early
+          if (uniqueBounces.length === 0) return;
 
           //
           // TODO: get the latest bounce template rendered for the user from our API
