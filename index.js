@@ -1872,7 +1872,7 @@ class ForwardEmail {
                 return false;
 
               if (isSANB(bounce.err.response)) {
-                const bounceInfo = zoneMTABounces.check(err.response);
+                const bounceInfo = zoneMTABounces.check(bounce.err.response);
                 if (['defer', 'slowdown'].includes(bounceInfo.action))
                   return false;
               }
