@@ -475,10 +475,10 @@
     p-queue "^2.4.2"
     p-retry "^4.0.0"
 
-"@spamscanner/compound-binary-file-js@^1.0.10":
-  version "1.0.10"
-  resolved "https://registry.yarnpkg.com/@spamscanner/compound-binary-file-js/-/compound-binary-file-js-1.0.10.tgz#60dd54398304ff8567296ec455ac09967434a047"
-  integrity sha512-6x5fnRXHYrYIQMiCOp96M47BIwPTc4puHmlkHMTmRT7JaH0z/eXFVzmGbMosScWV0grmrgOeu60FsJg2aZaQmQ==
+"@spamscanner/compound-binary-file-js@^1.0.12":
+  version "1.0.12"
+  resolved "https://registry.yarnpkg.com/@spamscanner/compound-binary-file-js/-/compound-binary-file-js-1.0.12.tgz#b5dffb00e9da8db771c202072f8c0db3de966c4e"
+  integrity sha512-b7rht6k2ohiiRNqh5Z9ur9QVBCB3uys//MNuYjplP6xL2hjeMHwFuvS1IcbBjHh1B7NWjHd9f/+gqVZ9nN9QJA==
   dependencies:
     "@types/long" "^4.0.1"
     long "^4.0.0"
@@ -1216,10 +1216,10 @@ auto-parse@^1.3.0:
   dependencies:
     typpy "2.3.11"
 
-ava@^3.12.0:
-  version "3.12.0"
-  resolved "https://registry.yarnpkg.com/ava/-/ava-3.12.0.tgz#82c837cfcd3bec980f491cabb7ca1e2b071a16c7"
-  integrity sha512-NRzhU/w4lIzZqJ2sLYZ6C91ZNl5v6JOWC6gb89/9NaN05vXMQylJPbVFMF3aIah5e6Lo4Ub86aey0wZ+uL+FiQ==
+ava@^3.12.1:
+  version "3.12.1"
+  resolved "https://registry.yarnpkg.com/ava/-/ava-3.12.1.tgz#0181b5ca10d178539a0d503e0fc9244146303717"
+  integrity sha512-cS41+X+UfrcPed+CIgne/YV/6eWxaUjHEPH+W8WvNSqWTWku5YitjZGE5cMHFuJxwHELdR541xTBRn8Uwi4PSw==
   dependencies:
     "@concordance/react" "^2.0.0"
     acorn "^8.0.1"
@@ -3555,9 +3555,9 @@ find-cache-dir@^3.2.0, find-cache-dir@^3.3.1:
     pkg-dir "^4.1.0"
 
 find-my-way@^2.0.1:
-  version "2.2.3"
-  resolved "https://registry.yarnpkg.com/find-my-way/-/find-my-way-2.2.3.tgz#529f5969dbd1e6ebed674a7a1087c3430988e39e"
-  integrity sha512-C7dxfbX8pV1maLd31ygkBEOaD51Ls4dROuHjeSQZf1FeQinUzq3UA/kSPecLSDy9iAQufd8w1zgp7j64kyLdhw==
+  version "2.2.4"
+  resolved "https://registry.yarnpkg.com/find-my-way/-/find-my-way-2.2.4.tgz#cbda5ade45fe221529ca064f76c3086fdf09e8c4"
+  integrity sha512-GYP5M6SS6Tblv4fNgADLmrWIgaWK62WiTn+rEWhEGZtU1ZhVfClaFFQwdkXgZ/tmZY4+BpkKIXrqh0Iv9iP4dg==
   dependencies:
     fast-decode-uri-component "^1.0.0"
     safe-regex2 "^2.0.0"
@@ -8715,13 +8715,13 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^1.2.1:
-  version "1.2.1"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.2.1.tgz#65c21ab42558dc51b1429acf6aa66653d698af85"
-  integrity sha512-dcjudjKiSvw9fE2+KJP41dALXgEkJofm01H+N29cZ3TertjMIbbIp2To/HU9u8EyvkAylDaHyJNZU/KVNd9avw==
+spamscanner@^1.2.2:
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.2.2.tgz#c2e67ff5b55c858b8df5aecb2a21c103900ba430"
+  integrity sha512-8EfDLLY1SX8u2kU43OtFEqhLiInrfBKOd5si3PE8MsIhxZLrhRksbPozronV7RZKeMJfFD2BaHDlQylbc/BCag==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
-    "@spamscanner/compound-binary-file-js" "^1.0.10"
+    "@spamscanner/compound-binary-file-js" "^1.0.12"
     bitcoin-regex "^2.0.0"
     clamscan "^1.3.3"
     credit-card-regex "^3.0.0"
