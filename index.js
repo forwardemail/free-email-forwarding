@@ -1313,6 +1313,7 @@ class ForwardEmail {
           session.envelope.rcptTo.map(async (to) => {
             try {
               let port = '25';
+              let hasAdultContentProtection = true;
               let hasPhishingProtection = true;
               let hasExecutableProtection = true;
               let hasVirusProtection = true;
@@ -1364,6 +1365,9 @@ class ForwardEmail {
                   }
 
                   // Spam Scanner boolean values adjusted by user in Advanced Settings page
+                  if (_.isBoolean(body.has_adult_content_protection))
+                    hasAdultContentProtection =
+                      body.has_adult_content_protection;
                   if (_.isBoolean(body.has_phishing_protection))
                     hasPhishingProtection = body.has_phishing_protection;
                   if (_.isBoolean(body.has_executable_protection))
@@ -1415,6 +1419,13 @@ class ForwardEmail {
 
                 if (hasPhishingProtection && _.isArray(scan.results.phishing))
                   for (const message of scan.results.phishing) {
+                    // if we're not filtering for adult-related content then continue early
+                    // eslint-disable-next-line max-depth
+                    if (
+                      !hasAdultContentProtection &&
+                      message.includes('adult-related content')
+                    )
+                      continue;
                     messages.push(message);
                   }
 
