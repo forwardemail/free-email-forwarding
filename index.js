@@ -259,7 +259,7 @@ class ForwardEmail {
       userAgent: `${pkg.name}/${pkg.version}`,
       spamScanner: { logger },
       ttlMs: ms('7d'),
-      maxRetry: 5,
+      maxRetry: 10,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
       ...config
     };
@@ -583,7 +583,7 @@ class ForwardEmail {
 
     // if there was a value (non-null) then that means it was already sent
     // so we can return early here and not re-send the message twice
-    if (value)
+    if (value && value === 'true')
       return {
         accepted: [envelope.to],
         rejected: [],
@@ -591,7 +591,7 @@ class ForwardEmail {
       };
 
     //
-    // only allow up to 5 retries (greylist attempts) for this message
+    // only allow up to X retries (greylist attempts) for this message
     //
     const count =
       _.isString(value) && _.isFinite(Number.parseInt(value, 10))
@@ -604,6 +604,9 @@ class ForwardEmail {
       throw new CustomError(
         `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
       );
+
+    if (this.client)
+      await this.client.set(key, count.toString(), 'PX', this.config.ttlMs);
 
     // TODO: we should parse minutes and seconds, and if it's less than 2 minutes, then use `delay`
     // TODO: we should retry on defer's, and not just fallback to plaintext without TLS if that fails
@@ -623,6 +626,7 @@ class ForwardEmail {
           port: mx.port,
           localHostname: name
         });
+
       transporter = nodemailer.createTransport({
         ...transporterConfig,
         ...this.config.ssl,
@@ -637,9 +641,11 @@ class ForwardEmail {
           rejectUnauthorized: false
         }
       });
+
       info = await transporter.sendMail({ envelope, raw });
+
       if (this.client)
-        await this.client.set(key, count, 'PX', this.config.ttlMs);
+        await this.client.set(key, 'true', 'PX', this.config.ttlMs);
     } catch (err) {
       this.config.logger.warn(err, { options, envelope });
 
@@ -723,8 +729,9 @@ class ForwardEmail {
         });
         try {
           info = await transporter.sendMail({ envelope, raw });
+
           if (this.client)
-            await this.client.set(key, count, 'PX', this.config.ttlMs);
+            await this.client.set(key, 'true', 'PX', this.config.ttlMs);
         } catch (err) {
           //
           // if there was `err.response` and it had a bounce reason
@@ -1588,6 +1595,7 @@ class ForwardEmail {
                 replacements[recipient.address] = address.to; // normal;
                 normalized.push({
                   webhook: address.to,
+                  to: [address.to],
                   recipient: recipient.address,
                   replacements
                 });
@@ -1700,10 +1708,44 @@ class ForwardEmail {
           const mapper = async (recipient) => {
             if (recipient.webhook) {
               try {
+                const raw = originalRaw.toString();
+                const key = this.getSentKey(recipient.to, raw);
+                const value = this.client ? await this.client.get(key) : null;
+
+                // if there was a value set to true then it means it was sent
+                // so we can return early here and not re-send the message twice
+                if (value && value === 'true') {
+                  accepted.push(recipient.recipient);
+                  return;
+                }
+
+                //
+                // only allow up to X retries (greylist attempts) for this message
+                //
+                const count =
+                  _.isString(value) && _.isFinite(Number.parseInt(value, 10))
+                    ? Number.parseInt(value, 10) + 1
+                    : 1;
+
+                // TODO: we probably need to make `getSentKey` only consider the
+                //       standard headers like Date, To, From, Cc, Bcc, and Subject
+                if (count > this.config.maxRetry)
+                  throw new CustomError(
+                    `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
+                  );
+
                 const mail = await simpleParser(
                   originalRaw,
                   this.config.simpleParser
                 );
+
+                if (this.client)
+                  await this.client.set(
+                    key,
+                    count.toString(),
+                    'PX',
+                    this.config.ttlMs
+                  );
 
                 await superagent
                   .post(recipient.webhook)
@@ -1713,8 +1755,14 @@ class ForwardEmail {
                   .retry(this.config.retry)
                   .send({
                     ...mail,
-                    raw: originalRaw.toString()
+                    raw
                   });
+
+                if (this.client)
+                  await this.client.set(key, 'true', 'PX', this.config.ttlMs);
+
+                accepted.push(recipient.recipient);
+                return;
               } catch (err_) {
                 this.config.logger.error(err_);
                 for (const address of Object.keys(recipient.replacements)) {
