@@ -1573,10 +1573,26 @@ class ForwardEmail {
           for (const address of recipient.addresses) {
             // if it's a webhook then return early
             if (address.is_webhook) {
-              normalized.push({
-                webhook: address.to,
-                recipient: recipient.address
-              });
+              // get normalized form without `+` symbol
+              // const normal = `${this.parseUsername(
+              //   address.to
+              // )}@${this.parseDomain(address.to, false)}`;
+              const match = normalized.find((r) => r.webhook === address.to);
+              // eslint-disable-next-line max-depth
+              if (match) {
+                // eslint-disable-next-line max-depth
+                if (!match.replacements[recipient.address])
+                  match.replacements[recipient.address] = address.to; // normal;
+              } else {
+                const replacements = {};
+                replacements[recipient.address] = address.to; // normal;
+                normalized.push({
+                  webhook: address.to,
+                  recipient: recipient.address,
+                  replacements
+                });
+              }
+
               continue;
             }
 
@@ -1700,6 +1716,18 @@ class ForwardEmail {
                     raw: originalRaw.toString()
                   });
               } catch (err_) {
+                this.config.logger.error(err_);
+                for (const address of Object.keys(recipient.replacements)) {
+                  err_.message = err_.message.replace(
+                    new RegExp(recipient.webhook, 'gi'),
+                    recipient.replacements[address]
+                  );
+                  err_.message = err_.message.replace(
+                    new RegExp(address, 'gi'),
+                    recipient.replacements[address]
+                  );
+                }
+
                 bounces.push({
                   address: recipient.recipient,
                   err: err_,
