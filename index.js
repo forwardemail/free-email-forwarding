@@ -1587,6 +1587,9 @@ class ForwardEmail {
               const match = normalized.find((r) => r.webhook === address.to);
               // eslint-disable-next-line max-depth
               if (match) {
+                // if (!match.to.includes(normal)) match.to.push(normal);
+                // eslint-disable-next-line max-depth
+                if (!match.to.includes(address.to)) match.to.push(address.to);
                 // eslint-disable-next-line max-depth
                 if (!match.replacements[recipient.address])
                   match.replacements[recipient.address] = address.to; // normal;
@@ -1765,11 +1768,15 @@ class ForwardEmail {
                 return;
               } catch (err_) {
                 this.config.logger.error(err_);
+
+                // hide the webhook endpoint
+                err_.message = err_.message.replace(
+                  new RegExp(recipient.webhook, 'gi'),
+                  'a webhook endpoint'
+                );
+
+                // in case the response had sensitive email user information hide it too
                 for (const address of Object.keys(recipient.replacements)) {
-                  err_.message = err_.message.replace(
-                    new RegExp(recipient.webhook, 'gi'),
-                    recipient.replacements[address]
-                  );
                   err_.message = err_.message.replace(
                     new RegExp(address, 'gi'),
                     recipient.replacements[address]
