@@ -569,7 +569,7 @@ class ForwardEmail {
 
     // `raw` seems to have trailing line break
     // so normalizing it is a safeguard
-    const lines = splitLines(raw.trim().toLowerCase());
+    const lines = splitLines(raw.trim());
 
     let headers = '';
 
