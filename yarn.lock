@@ -1386,9 +1386,9 @@ bitcoin-regex@^2.0.0:
   integrity sha1-r0/MC/CbPv6KkznHvyHC3LFSTBk=
 
 bl@^2.2.0:
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/bl/-/bl-2.2.0.tgz#e1a574cdf528e4053019bb800b041c0ac88da493"
-  integrity sha512-wbgvOpqopSr7uq6fJrLH8EsvYMJf9gzfo2jCsL2eTy75qXPukA4pCgHamOQkZtY5vmfVtjB+P3LNlMHW5CEZXA==
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/bl/-/bl-2.2.1.tgz#8c11a7b730655c5d56898cdc871224f40fd901d5"
+  integrity sha512-6Pesp1w0DEX1N550i/uGV/TqucVL4AM/pgThFSN/Qq9si1/DF9aIHs1BxD8V/QU0HoeHO6cQRTAuYnLPKq1e4g==
   dependencies:
     readable-stream "^2.3.5"
     safe-buffer "^5.1.1"
@@ -8695,10 +8695,10 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^1.2.4:
-  version "1.2.4"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.2.4.tgz#e965d386cf398be229793db0119659345bcc84e7"
-  integrity sha512-RiwUxyOLKr6mMhY7Kl6khvEtz9sep9qohnCZ86wX9oIg08WQvCX0eZS5M3yBuJ8tv4g7L1MXPAvb2NzNRAgQtw==
+spamscanner@^1.2.5:
+  version "1.2.5"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.2.5.tgz#5d5dbb4ef88106bc115f434d191a7882e28d15d0"
+  integrity sha512-jdSgvjiDmkQHPom3fbxsPzS8lQZOniLNHsIKbSDJAu8y6dbYJ/j7KKWZrnWgjE1nlqYoVpDJeRuDo4g/FFNeiQ==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
@@ -8731,6 +8731,7 @@ spamscanner@^1.2.4:
     macos-version "^5.2.0"
     mailparser "^2.8.1"
     mime-types "^2.1.27"
+    ms "^2.1.2"
     natural "^2.1.5"
     newline-remove "^1.0.2"
     node-html-parser "^1.2.20"
