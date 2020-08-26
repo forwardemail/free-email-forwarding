@@ -585,13 +585,15 @@ class ForwardEmail {
         headers.push(line);
     }
 
-    const bodyHash = body ? lines.slice(body) : ['none'];
+    // TODO: we could probably use body length as a string e.g. "423123" in future
+    // const bodyHash = body ? lines.slice(body) : ['none'];
 
     // format is:
     // "sent:$to:$headersHash:$bodyHash"
     return `sent:${revHash(JSON.stringify(to))}:${revHash(
       JSON.stringify(headers)
-    )}:${revHash(JSON.stringify(bodyHash))}`;
+    )}`;
+    // )}:${revHash(JSON.stringify(bodyHash))}`;
   }
 
   // TODO: implement ARF parser
