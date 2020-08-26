@@ -47,38 +47,6 @@ const {
   logger
 } = require('./helpers');
 
-const SENT_KEY_HEADERS = [
-  'Bcc',
-  'Cc',
-  'Content-Description',
-  'Content-ID',
-  'Content-Transfer-Encoding',
-  'Content-Type',
-  'Date',
-  'From',
-  'In-Reply-To',
-  'List-Archive',
-  'List-Help',
-  'List-Id',
-  'List-Owner',
-  'List-Post',
-  'List-Subscribe',
-  'List-Unsubscribe',
-  'MIME-Version',
-  'Message-ID',
-  'References',
-  'Reply-To',
-  'Resent-Cc',
-  'Resent-Date',
-  'Resent-From',
-  'Resent-Message-ID',
-  'Resent-Sender',
-  'Resent-To',
-  'Sender',
-  'Subject',
-  'To'
-].map((header) => header.toLowerCase());
-
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
   ECONNRESET: 442,
@@ -175,6 +143,40 @@ const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
 const REGEX_TLS_ERR = new RE2(
   /ssl23_get_server_hello|\/deps\/openssl|ssl3_check|ssl routines/gim
 );
+
+const SENT_KEY_HEADERS = [
+  'Bcc',
+  'Cc',
+  'Content-Description',
+  'Content-ID',
+  'Content-Transfer-Encoding',
+  'Content-Type',
+  'Date',
+  'From',
+  'In-Reply-To',
+  'List-Archive',
+  'List-Help',
+  'List-Id',
+  'List-Owner',
+  'List-Post',
+  'List-Subscribe',
+  'List-Unsubscribe',
+  'MIME-Version',
+  'Message-ID',
+  'References',
+  'Reply-To',
+  'Resent-Cc',
+  'Resent-Date',
+  'Resent-From',
+  'Resent-Message-ID',
+  'Resent-Sender',
+  'Resent-To',
+  'Sender',
+  'Subject',
+  'To'
+].map((string) => string + ': ');
+
+const REGEX_SENT_KEY_HEADERS = new RE2(`^(${SENT_KEY_HEADERS.join('|')})`, 'i');
 
 class ForwardEmail {
   constructor(config = {}) {
@@ -569,7 +571,7 @@ class ForwardEmail {
     // so normalizing it is a safeguard
     const lines = splitLines(raw.trim().toLowerCase());
 
-    const headers = [];
+    let headers = '';
 
     // first line break indicate body split
     let body;
@@ -581,19 +583,13 @@ class ForwardEmail {
 
       // only build a key based off specific common headers
       // (e.g. we ignore "Received-By")
-      if (SENT_KEY_HEADERS.some((header) => line.startsWith(header)))
-        headers.push(line);
+      if (REGEX_SENT_KEY_HEADERS.test(line)) headers += line;
     }
 
     // TODO: we could probably use body length as a string e.g. "423123" in future
     // const bodyHash = body ? lines.slice(body) : ['none'];
 
-    // format is:
-    // "sent:$to:$headersHash:$bodyHash"
-    return `sent:${revHash(JSON.stringify(to))}:${revHash(
-      JSON.stringify(headers)
-    )}`;
-    // )}:${revHash(JSON.stringify(bodyHash))}`;
+    return `sent:${revHash(JSON.stringify(to))}:${revHash(headers)}`;
   }
 
   // TODO: implement ARF parser
