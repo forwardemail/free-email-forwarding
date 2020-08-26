@@ -47,6 +47,38 @@ const {
   logger
 } = require('./helpers');
 
+const SENT_KEY_HEADERS = [
+  'Bcc',
+  'Cc',
+  'Content-Description',
+  'Content-ID',
+  'Content-Transfer-Encoding',
+  'Content-Type',
+  'Date',
+  'From',
+  'In-Reply-To',
+  'List-Archive',
+  'List-Help',
+  'List-Id',
+  'List-Owner',
+  'List-Post',
+  'List-Subscribe',
+  'List-Unsubscribe',
+  'MIME-Version',
+  'Message-ID',
+  'References',
+  'Reply-To',
+  'Resent-Cc',
+  'Resent-Date',
+  'Resent-From',
+  'Resent-Message-ID',
+  'Resent-Sender',
+  'Resent-To',
+  'Sender',
+  'Subject',
+  'To'
+].map((header) => header.toLowerCase());
+
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
   ECONNRESET: 442,
@@ -197,7 +229,7 @@ class ForwardEmail {
         //
         // This header must also be stripped from the email (replaced)
         //
-        // <https://github.com/nodemailer/nodemailer/blob/11121b88c58259a0374d8b22ec6509c43d1656cb/lib/dkim/sign.js#L22
+        // https://github.com/nodemailer/nodemailer/blob/11121b88c58259a0374d8b22ec6509c43d1656cb/lib/dkim/sign.js#L22
         /*
         headerFieldNames: [
           'From',
@@ -367,6 +399,7 @@ class ForwardEmail {
     );
     this.getBounceStream = this.getBounceStream.bind(this);
     this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
+    this.getSentKey = this.getSentKey.bind(this);
   }
 
   async listen(port, ...args) {
@@ -530,31 +563,34 @@ class ForwardEmail {
     // safeguards for development
     if (_.isString(to)) to = [to];
     if (!_.isArray(to)) throw new Error('to must be an Array.');
-    if (!_.isString(raw)) throw new Error('raw must be String.');
 
     // `raw` seems to have trailing line break
     // so normalizing it is a safeguard
-    let lines = splitLines(raw.trim());
+    const lines = splitLines(raw.trim().toLowerCase());
 
-    // strip first DKIM-Signature (the first will always be ours)
-    let lastDKIMIndex = 0;
-    for (const [i, line] of lines.entries()) {
-      if (
-        (i === 0 && !line.startsWith('DKIM-Signature')) ||
-        (i > 0 && !line.startsWith(' '))
-      )
+    const headers = [];
+
+    // first line break indicate body split
+    let body;
+    for (const [l, line] of lines.entries()) {
+      if (!body && line === '' && typeof lines[l + 1] === 'string') {
+        body = l + 1;
         break;
-      lastDKIMIndex++;
+      }
+
+      // only build a key based off specific common headers
+      // (e.g. we ignore "Received-By")
+      if (SENT_KEY_HEADERS.some((header) => line.startsWith(header)))
+        headers.push(line);
     }
 
-    lines = lines.slice(lastDKIMIndex);
+    const bodyHash = body ? lines.slice(body) : ['none'];
 
-    // strip all X-ForwardEmail header lines (since versions can change in between greylisting)
-    lines = lines.filter((line) => !line.startsWith('X-ForwardEmail-'));
-
+    // format is:
+    // "sent:$to:$headersHash:$bodyHash"
     return `sent:${revHash(JSON.stringify(to))}:${revHash(
-      JSON.stringify(lines)
-    )}`;
+      JSON.stringify(headers)
+    )}:${revHash(JSON.stringify(bodyHash))}`;
   }
 
   // TODO: implement ARF parser
@@ -598,8 +634,6 @@ class ForwardEmail {
         ? Number.parseInt(value, 10) + 1
         : 1;
 
-    // TODO: we probably need to make `getSentKey` only consider the
-    //       standard headers like Date, To, From, Cc, Bcc, and Subject
     if (count > this.config.maxRetry)
       throw new CustomError(
         `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
@@ -1730,8 +1764,6 @@ class ForwardEmail {
                     ? Number.parseInt(value, 10) + 1
                     : 1;
 
-                // TODO: we probably need to make `getSentKey` only consider the
-                //       standard headers like Date, To, From, Cc, Bcc, and Subject
                 if (count > this.config.maxRetry)
                   throw new CustomError(
                     `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
