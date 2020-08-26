@@ -563,6 +563,7 @@ class ForwardEmail {
     // safeguards for development
     if (_.isString(to)) to = [to];
     if (!_.isArray(to)) throw new Error('to must be an Array.');
+    if (!_.isString(raw)) throw new Error('raw must be String.');
 
     // `raw` seems to have trailing line break
     // so normalizing it is a safeguard
