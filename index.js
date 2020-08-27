@@ -1170,7 +1170,8 @@ class ForwardEmail {
         let scan;
 
         try {
-          scan = await this.scanner.scan(originalRaw);
+          // TODO: temporarily disabled until URL matches from a email match is fixed
+          // scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
