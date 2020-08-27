@@ -3113,9 +3113,9 @@ eslint-plugin-unicorn@^21.0.0:
     semver "^7.3.2"
 
 eslint-rule-docs@^1.1.5:
-  version "1.1.205"
-  resolved "https://registry.yarnpkg.com/eslint-rule-docs/-/eslint-rule-docs-1.1.205.tgz#05df8791c5941d6831b6f181bc88629b46ec3dce"
-  integrity sha512-yguHHAkBG9L09YoaOpXXi3MsvEwPlqhas8yDnnaykbA6I8BAxUpa3FkCspxyzdnDPuLWEy+vVmrZHXL2M4zFTQ==
+  version "1.1.206"
+  resolved "https://registry.yarnpkg.com/eslint-rule-docs/-/eslint-rule-docs-1.1.206.tgz#bdbe29583467f3a39362dd3f8c9c166bdbce6741"
+  integrity sha512-xEHu3DuY/3rAhyp6Hg3zrMWvpNYE7ez3DaV7ywlLBmqaybnjbYtZnU7b+xY5V3sjPwhqrj27sqjM0vxkFIBEWg==
 
 eslint-scope@^4.0.3:
   version "4.0.3"
@@ -8394,10 +8394,10 @@ safe-regex@^2.1.1:
   resolved "https://registry.yarnpkg.com/safer-buffer/-/safer-buffer-2.1.2.tgz#44fa161b0187b9549dd84bb91802f9bd8385cd6a"
   integrity sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==
 
-sanitize-html@^1.27.3:
-  version "1.27.3"
-  resolved "https://registry.yarnpkg.com/sanitize-html/-/sanitize-html-1.27.3.tgz#dc7419b075f96737055c98764aea40c42d978df9"
-  integrity sha512-79tcPlgJ3fuK0/TtUCIBdPeQSvktTSTJP9O/dzrteaO98qw5UV6CATh3ZyPjUzv1LtNjHDlhbq9XOXiKf0zA1w==
+sanitize-html@^1.27.4:
+  version "1.27.4"
+  resolved "https://registry.yarnpkg.com/sanitize-html/-/sanitize-html-1.27.4.tgz#3864e7562fc708cefabcb0d51bbacde3411504cb"
+  integrity sha512-VvY1hxVvMXzSos/LzqeBl9/KYu3mkEOtl5NMwz6jER318dSHDCig0AOjZOtnoCwAC3HMs9LhfWkPCmQGttb4ng==
   dependencies:
     htmlparser2 "^4.1.0"
     lodash "^4.17.15"
@@ -8695,10 +8695,10 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.1:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^1.2.5:
-  version "1.2.5"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-1.2.5.tgz#5d5dbb4ef88106bc115f434d191a7882e28d15d0"
-  integrity sha512-jdSgvjiDmkQHPom3fbxsPzS8lQZOniLNHsIKbSDJAu8y6dbYJ/j7KKWZrnWgjE1nlqYoVpDJeRuDo4g/FFNeiQ==
+spamscanner@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-2.0.0.tgz#0d83e21785844a371f76c24c67343d5a16f98247"
+  integrity sha512-/g8M0vOcMkGpt9EDeMkdqh2FZ/qeSISAxcp8glJe+a6O9uaZ/PF1Vf3XlgTcoIKweWs80A3HLrQteFmyC/xfXg==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
@@ -8741,13 +8741,13 @@ spamscanner@^1.2.5:
     phone-regex "^2.1.0"
     punycode "^2.1.1"
     re2 "^1.15.4"
-    sanitize-html "^1.27.3"
+    sanitize-html "^1.27.4"
     stopword "^1.0.1"
     striptags "^3.1.1"
     superagent "^6.0.0"
     trim-leading-whitespace "^0.1.1"
     universalify "^2.0.0"
-    url-regex-safe "^1.0.1"
+    url-regex-safe "^1.0.2"
     validator "^13.1.1"
 
 sparse-bitfield@^3.0.3:
@@ -9350,7 +9350,7 @@ tlds@1.208.0:
   resolved "https://registry.yarnpkg.com/tlds/-/tlds-1.208.0.tgz#f9a85c272aa500e56c92e7d342fbfdfbddaa9757"
   integrity sha512-6kbY7GJpRQXwBddSOAbVUZXjObbCGFXliWWN+kOSEoRWIOyRWLB6zdeKC/Tguwwenl/KsUx016XR50EdHYsxZw==
 
-tlds@^1.208.0:
+tlds@^1.208.0, tlds@^1.209.0:
   version "1.209.0"
   resolved "https://registry.yarnpkg.com/tlds/-/tlds-1.209.0.tgz#13cfdc039331d49730ca7bfa9526fc9b319e2cec"
   integrity sha512-KVsZ1NSpBodpo42/JIwTyau7SqUxV/qQMp2epSDPa99885LpHWLaVCCt8CWzGe4X5YIVNr+b6bUys9e9eEb5OA==
@@ -9890,14 +9890,14 @@ url-parse@^1.4.7:
     querystringify "^2.1.1"
     requires-port "^1.0.0"
 
-url-regex-safe@^1.0.1:
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/url-regex-safe/-/url-regex-safe-1.0.1.tgz#c2d530a69aef8673bfa4f9eae37e2506819b14e0"
-  integrity sha512-41pjyt94B/d4p/mtmxlazxZFr5BbYHGShAO2T5ADwaC1g3Pt0bNcEwV50uUOZKZ0F8n64zwtaIGqMKZpj2fvbw==
+url-regex-safe@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/url-regex-safe/-/url-regex-safe-1.0.2.tgz#822cbab107d7f4f80342f0f0798acf63cac9fd1d"
+  integrity sha512-t1doIKbYDBRyqXZz7A98AXH/zimKmYapxFjBZwcz3BmqjB921rUPEUokAaShKyenaX3McOM8FbkWLvFvX3Jsyw==
   dependencies:
     ip-regex "^4.1.0"
     re2 "^1.15.4"
-    tlds "^1.208.0"
+    tlds "^1.209.0"
 
 url@^0.11.0:
   version "0.11.0"
