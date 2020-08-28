@@ -460,7 +460,7 @@ class ForwardEmail {
   }
 
   getDiagnosticCode(err) {
-    if (err.response && REGEX_DIAGNOSTIC_CODE.test(err.response))
+    if (isSANB(err.response) && REGEX_DIAGNOSTIC_CODE.test(err.response))
       return err.response;
     return `${
       err.responseCode || err.code || err.statusCode || err.status || 500
@@ -513,14 +513,16 @@ class ForwardEmail {
               .replace(REGEX_BOUNCE_ADDRESS, options.bounce.address)
               .replace(
                 REGEX_BOUNCE_ERROR_MESSAGE,
-                options.bounce.err.response || options.bounce.err.message
+                options.bounce.err.message
+                // isSANB(options.bounce.err.response) ? options.bounce.err.response : options.bounce.err.message
               )
           : [
               `Your message wasn't delivered to ${options.bounce.address} due to an error.`,
               '',
               'The response was:',
               '',
-              options.bounce.err.response || options.bounce.err.message,
+              options.bounce.error.message,
+              // options.bounce.err.response || options.bounce.err.message,
               '',
               `If you need help, forward this to ${this.config.email} or visit ${this.config.website}.`
             ].join('\n')
@@ -535,7 +537,8 @@ class ForwardEmail {
             .replace(REGEX_BOUNCE_ADDRESS, options.bounce.address)
             .replace(
               REGEX_BOUNCE_ERROR_MESSAGE,
-              options.bounce.err.response || options.bounce.err.message
+              options.bounce.err.message
+              // options.bounce.err.response || options.bounce.err.message
             )
         );
 
@@ -960,9 +963,6 @@ class ForwardEmail {
           554
         );
 
-      // validate against rate limiting
-      await this.validateRateLimit(session.remoteAddress);
-
       //
       // TODO: check blacklist against MAIL FROM
       //
@@ -1108,6 +1108,10 @@ class ForwardEmail {
         // <https://github.com/zone-eu/zone-mta/blob/2557a975ee35ed86e4d95d6cfe78d1b249dec1a0/plugins/core/email-bounce.js#L97>
         if (headers.get('Received').length > 25)
           throw new CustomError('Message was stuck in a redirect loop.');
+
+        // NOTE: we can't have this in onConnect because otherwise it would not retry properly
+        // validate against rate limiting
+        await this.validateRateLimit(session.remoteAddress);
 
         //
         // TODO: all the SRS stuff can be removed around September 2020
@@ -1811,6 +1815,10 @@ class ForwardEmail {
               } catch (err_) {
                 this.config.logger.error(err_);
 
+                // alias `responseCode` for consistency with SMTP responseCode
+                if (!_.isNumber(err_.responseCode) && _.isNumber(err_.status))
+                  err_.responseCode = err_.status;
+
                 // hide the webhook endpoint
                 err_.message = err_.message.replace(
                   new RegExp(recipient.webhook, 'gi'),
@@ -1995,6 +2003,12 @@ class ForwardEmail {
               )
                 return false;
 
+              if (
+                _.isNumber(bounce.err.status) &&
+                RETRY_CODE_NUMBERS.includes(bounce.err.status)
+              )
+                return false;
+
               if (isSANB(bounce.err.response)) {
                 const bounceInfo = zoneMTABounces.check(bounce.err.response);
                 if (['defer', 'slowdown'].includes(bounceInfo.action))
@@ -2119,7 +2133,7 @@ class ForwardEmail {
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
     return new Promise((resolve, reject) => {
-      if (email === this.config.noReply || !this.limiter) {
+      if (!this.limiter) {
         resolve();
         return;
       }
@@ -2128,8 +2142,10 @@ class ForwardEmail {
       const limit = new Limiter({ ...this.limiter, id });
       limit.get((err, limit) => {
         if (err) {
-          err.responseCode = 421;
-          return reject(err);
+          // if an error occurs we don't want to limit it
+          this.config.logger.fatal(err);
+          resolve();
+          return;
         }
 
         if (limit.remaining) {
@@ -2138,7 +2154,8 @@ class ForwardEmail {
               limit.total
             }.`
           );
-          return resolve();
+          resolve();
+          return;
         }
 
         const delta = (limit.reset * 1000 - Date.now()) | 0;
@@ -2147,7 +2164,11 @@ class ForwardEmail {
             `Rate limit exceeded for ${id}, retry in ${ms(delta, {
               long: true
             })}.`,
-            451
+            // NOTE: this used to be 451, which is not consistent
+            // <https://smtpfieldmanual.com/code/421>
+            // <https://smtpfieldmanual.com/code/451>
+            // 451
+            421
           )
         );
       });
