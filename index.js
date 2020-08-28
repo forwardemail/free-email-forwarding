@@ -468,7 +468,7 @@ class ForwardEmail {
       // original to address that we were trying to send to
       for (const address of Object.keys(replacements)) {
         err.message = err.message.replace(
-          new RegExp(address, 'gi'),
+          new RE2(address, 'gi'),
           replacements[address]
         );
       }
@@ -1848,27 +1848,25 @@ class ForwardEmail {
                     HTTP_RETRY_STATUS_CODES.has(err_.status))
                 ) {
                   err_.responseCode = 421;
-                } else if (_.isNumber(err_.status)) {
-                  //
-                  // NOTE: this is not mapped from HTTP -> SMTP codes (as they differ slightly)
-                  //       so we should fix this in the future at some point to keep it tidy
-                  //
-                  // alias `responseCode` for consistency with SMTP responseCode
-                  err_.responseCode = err_.status;
                 } else {
+                  // alias `responseCode` for consistency with SMTP responseCode
+                  // TODO: map HTTP to SMTP codes appropriately
+                  // if (_.isNumber(err_.status))
+                  //   err_.responseCode = err_.status;
+                  // else
                   err_.responseCode = 550;
                 }
 
                 // hide the webhook endpoint
                 err_.message = err_.message.replace(
-                  new RegExp(recipient.webhook, 'gi'),
+                  new RE2(recipient.webhook, 'gi'),
                   'a webhook endpoint'
                 );
 
                 // in case the response had sensitive email user information hide it too
                 for (const address of Object.keys(recipient.replacements)) {
                   err_.message = err_.message.replace(
-                    new RegExp(address, 'gi'),
+                    new RE2(address, 'gi'),
                     recipient.replacements[address]
                   );
                 }
