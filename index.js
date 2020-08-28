@@ -1838,22 +1838,23 @@ class ForwardEmail {
                 accepted.push(recipient.recipient);
                 return;
               } catch (err_) {
-                this.config.logger.error(err_);
+                this.config.logger.fatal(err_);
 
                 // determine if code or status is retryable here and set it as `err._responseCode`
                 if (
-                  (isSANB(err.code) && HTTP_RETRY_ERROR_CODES.has(err.code)) ||
-                  (_.isNumber(err.status) &&
-                    HTTP_RETRY_STATUS_CODES.has(err.status))
+                  (isSANB(err_.code) &&
+                    HTTP_RETRY_ERROR_CODES.has(err_.code)) ||
+                  (_.isNumber(err_.status) &&
+                    HTTP_RETRY_STATUS_CODES.has(err_.status))
                 ) {
                   err_.responseCode = 421;
-                } else if (_.isNumber(err.status)) {
+                } else if (_.isNumber(err_.status)) {
                   //
                   // NOTE: this is not mapped from HTTP -> SMTP codes (as they differ slightly)
                   //       so we should fix this in the future at some point to keep it tidy
                   //
                   // alias `responseCode` for consistency with SMTP responseCode
-                  err_.responseCode = err.status;
+                  err_.responseCode = err_.status;
                 } else {
                   err_.responseCode = 550;
                 }
