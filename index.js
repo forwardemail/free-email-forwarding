@@ -554,7 +554,7 @@ class ForwardEmail {
           `Final-Recipient: rfc822; ${options.bounce.address}`,
           `Action: failed`,
           `Status: 5.0.0`,
-          `Remote-MTA: dns; ${options.bounce.host}`,
+          `Remote-MTA: dns; ${options.bounce.host || 'webhook'}`,
           `Diagnostic-Code: smtp; ${this.getDiagnosticCode(options.bounce.err)}`
         ].join('\n')
       );
@@ -1827,8 +1827,7 @@ class ForwardEmail {
 
                 bounces.push({
                   address: recipient.recipient,
-                  err: err_,
-                  host: recipient.webhook
+                  err: err_
                 });
               }
 
