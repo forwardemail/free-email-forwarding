@@ -1838,7 +1838,7 @@ class ForwardEmail {
                 accepted.push(recipient.recipient);
                 return;
               } catch (err_) {
-                this.config.logger.fatal(err_);
+                this.config.logger.warn(err_);
 
                 // determine if code or status is retryable here and set it as `err._responseCode`
                 if (
