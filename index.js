@@ -47,6 +47,30 @@ const {
   logger
 } = require('./helpers');
 
+const HTTP_RETRY_ERROR_CODES = new Set([
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'EADDRINUSE',
+  'ECONNREFUSED',
+  'EPIPE',
+  'ENOTFOUND',
+  'ENETUNREACH',
+  'EAI_AGAIN'
+]);
+
+const HTTP_RETRY_STATUS_CODES = new Set([
+  408,
+  413,
+  429,
+  500,
+  502,
+  503,
+  504,
+  521,
+  522,
+  524
+]);
+
 const CODES_TO_RESPONSE_CODES = {
   ETIMEDOUT: 420,
   ECONNRESET: 442,
@@ -281,7 +305,7 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
-      timeout: ms('20s'),
+      timeout: ms('10s'),
       retry: 3,
       simpleParser: { Iconv },
       isURLOptions: {
@@ -1756,6 +1780,7 @@ class ForwardEmail {
           //
           // this is the core function that sends the email
           //
+          // eslint-disable-next-line complexity
           const mapper = async (recipient) => {
             if (recipient.webhook) {
               try {
@@ -1801,7 +1826,7 @@ class ForwardEmail {
                   // .type('message/rfc822')
                   .set('User-Agent', this.config.userAgent)
                   .timeout(this.config.timeout)
-                  .retry(this.config.retry)
+                  // .retry(this.config.retry)
                   .send({
                     ...mail,
                     raw
@@ -1815,9 +1840,23 @@ class ForwardEmail {
               } catch (err_) {
                 this.config.logger.error(err_);
 
-                // alias `responseCode` for consistency with SMTP responseCode
-                if (!_.isNumber(err_.responseCode) && _.isNumber(err_.status))
-                  err_.responseCode = err_.status;
+                // determine if code or status is retryable here and set it as `err._responseCode`
+                if (
+                  (isSANB(err.code) && HTTP_RETRY_ERROR_CODES.has(err.code)) ||
+                  (_.isNumber(err.status) &&
+                    HTTP_RETRY_STATUS_CODES.has(err.status))
+                ) {
+                  err_.responseCode = 421;
+                } else if (_.isNumber(err.status)) {
+                  //
+                  // NOTE: this is not mapped from HTTP -> SMTP codes (as they differ slightly)
+                  //       so we should fix this in the future at some point to keep it tidy
+                  //
+                  // alias `responseCode` for consistency with SMTP responseCode
+                  err_.responseCode = err.status;
+                } else {
+                  err_.responseCode = 550;
+                }
 
                 // hide the webhook endpoint
                 err_.message = err_.message.replace(
