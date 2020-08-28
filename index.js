@@ -144,33 +144,36 @@ const REGEX_TLS_ERR = new RE2(
   /ssl23_get_server_hello|\/deps\/openssl|ssl3_check|ssl routines/gim
 );
 
+const MESSAGE_ID_LENGTH = 'Message-ID: '.length;
+const REGEX_MESSAGE_ID = new RE2('^Message-ID: ', 'i');
+
 const SENT_KEY_HEADERS = [
   'Bcc',
   'Cc',
-  'Content-Description',
-  'Content-ID',
-  'Content-Transfer-Encoding',
-  'Content-Type',
-  'Date',
+  // 'Content-Description',
+  // 'Content-ID',
+  // 'Content-Transfer-Encoding',
+  // 'Content-Type',
+  // 'Date',
   'From',
   'In-Reply-To',
-  'List-Archive',
-  'List-Help',
-  'List-Id',
-  'List-Owner',
-  'List-Post',
-  'List-Subscribe',
-  'List-Unsubscribe',
-  'MIME-Version',
-  'Message-ID',
+  // 'List-Archive',
+  // 'List-Help',
+  // 'List-Id',
+  // 'List-Owner',
+  // 'List-Post',
+  // 'List-Subscribe',
+  // 'List-Unsubscribe',
+  // 'MIME-Version',
+  // 'Message-ID',
   'References',
   'Reply-To',
-  'Resent-Cc',
-  'Resent-Date',
-  'Resent-From',
-  'Resent-Message-ID',
-  'Resent-Sender',
-  'Resent-To',
+  // 'Resent-Cc',
+  // 'Resent-Date',
+  // 'Resent-From',
+  // 'Resent-Message-ID',
+  // 'Resent-Sender',
+  // 'Resent-To',
   'Sender',
   'Subject',
   'To'
@@ -576,18 +579,26 @@ class ForwardEmail {
     // first line break indicate body split
     let body;
     for (const [l, line] of lines.entries()) {
-      if (!body && line === '' && typeof lines[l + 1] === 'string') {
+      if (line === '' && typeof lines[l + 1] === 'string') {
         body = l + 1;
         break;
       }
+
+      // if it starts with "Message-ID" then we can just use that as the key
+      if (REGEX_MESSAGE_ID.test(line))
+        return `sent:${revHash(JSON.stringify(to))}:${revHash(
+          line.slice(MESSAGE_ID_LENGTH)
+        )}`;
 
       // only build a key based off specific common headers
       // (e.g. we ignore "Received-By")
       if (REGEX_SENT_KEY_HEADERS.test(line)) headers += line;
     }
 
-    // TODO: we could probably use body length as a string e.g. "423123" in future
-    // const bodyHash = body ? lines.slice(body) : ['none'];
+    // since we don't want to spam our end-users due to senders not
+    // setting a proper Message-ID header value, we will use
+    // a combination of the headers with the body number of lines affixed
+    if (body) headers += (lines.length - body).toString();
 
     return `sent:${revHash(JSON.stringify(to))}:${revHash(headers)}`;
   }
