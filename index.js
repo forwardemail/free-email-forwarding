@@ -545,7 +545,7 @@ class ForwardEmail {
               '',
               'The response was:',
               '',
-              options.bounce.error.message,
+              options.bounce.err.message,
               // options.bounce.err.response || options.bounce.err.message,
               '',
               `If you need help, forward this to ${this.config.email} or visit ${this.config.website}.`
@@ -2574,6 +2574,13 @@ class ForwardEmail {
     if (!address.includes('+')) return forwardingAddresses;
 
     return forwardingAddresses.map((forwardingAddress) => {
+      if (
+        validator.isFQDN(forwardingAddress) ||
+        validator.isIP(forwardingAddress) ||
+        validator.isURL(forwardingAddress, this.config.isURLOptions)
+      )
+        return forwardingAddress;
+
       return `${this.parseUsername(forwardingAddress)}+${this.parseFilter(
         address
       )}@${this.parseDomain(forwardingAddress, false)}`;
