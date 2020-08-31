@@ -318,7 +318,19 @@ class ForwardEmail {
       },
       sendingZone: 'bounces',
       userAgent: `${pkg.name}/${pkg.version}`,
-      spamScanner: { logger },
+      spamScanner: {
+        logger,
+        memoize: {
+          // since memoizee doesn't support supplying mb or gb of cache size
+          // we can calculate how much the maximum could potentially be
+          // the max length of a domain name is 253 characters (bytes)
+          // and if we want to store up to 1 GB in memory, that's
+          // `Math.floor(bytes('1GB') / 253)` = 4244038 (domains)
+          // note that this is per thread, so if you have 4 core server
+          // you will have 4 threads, and therefore need 4 GB of free memory
+          size: Math.floor(bytes('0.5GB') / 253)
+        }
+      },
       ttlMs: ms('7d'),
       maxRetry: 10,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
@@ -385,7 +397,7 @@ class ForwardEmail {
       );
 
     // setup rate limiting with redis
-    if (this.config.rateLimit) {
+    if (this.client && this.config.rateLimit) {
       this.limiter = {
         db: this.client,
         ...this.config.rateLimit
@@ -402,7 +414,10 @@ class ForwardEmail {
     });
 
     // expose spamscanner
-    this.scanner = new SpamScanner(this.config.spamScanner);
+    this.scanner = new SpamScanner({
+      ...this.config.spamScanner,
+      ...(this.client ? { client: this.client } : {})
+    });
 
     this.listen = this.listen.bind(this);
     this.close = this.close.bind(this);
