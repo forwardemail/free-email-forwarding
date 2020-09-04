@@ -60,7 +60,7 @@
     "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
     "smtp-server": "^3.7.0",
-    "spamscanner": "^2.2.0",
+    "spamscanner": "^2.2.2",
     "split-lines": "^2.0.0",
     "superagent": "^6.1.0",
     "uuid-by-string": "^3.0.2",
@@ -73,18 +73,18 @@
     "ava": "^3.12.1",
     "codecov": "^3.7.2",
     "cross-env": "^7.0.2",
-    "eslint": "^7.7.0",
+    "eslint": "^7.8.1",
     "eslint-config-xo-lass": "^1.0.3",
     "fixpack": "^3.0.6",
     "husky": "^4.2.5",
     "ioredis": "^4.17.3",
     "is-ci": "^2.0.0",
-    "lint-staged": "^10.2.13",
+    "lint-staged": "^10.3.0",
     "nyc": "^15.1.0",
     "remark-cli": "^8.0.1",
     "remark-preset-github": "^3.0.0",
     "uuid": "^8.3.0",
-    "xo": "^0.33.0"
+    "xo": "^0.33.1"
   },
   "engines": {
     "node": ">=12"
