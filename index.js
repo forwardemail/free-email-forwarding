@@ -25,6 +25,7 @@ const pify = require('pify');
 const pkg = require('./package');
 const punycode = require('punycode/');
 const revHash = require('rev-hash');
+const safeStringify = require('fast-safe-stringify');
 const sharedConfig = require('@ladjs/shared-config');
 const splitLines = require('split-lines');
 const superagent = require('superagent');
@@ -38,6 +39,8 @@ const { authenticateMessage } = require('authheaders');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 const { simpleParser } = require('mailparser');
+
+const DNS_QUERY_TYPES = new Set(['a', 'mx', 'txt', 'dnsbl_batch', 'dnsbl']);
 
 const {
   CustomError,
@@ -334,6 +337,9 @@ class ForwardEmail {
       ttlMs: ms('7d'),
       maxRetry: 10,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
+      dnsCachePrefix: 'dns',
+      dnsCacheMs: ms('3m'),
+      dnsBlacklistCacheMs: ms('1d'),
       ...config
     };
 
@@ -444,6 +450,7 @@ class ForwardEmail {
     this.getBounceStream = this.getBounceStream.bind(this);
     this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
     this.getSentKey = this.getSentKey.bind(this);
+    this.dnsQuery = this.dnsQuery.bind(this);
   }
 
   async listen(port, ...args) {
@@ -628,7 +635,7 @@ class ForwardEmail {
 
       // if it starts with "Message-ID" then we can just use that as the key
       if (REGEX_MESSAGE_ID.test(line))
-        return `sent:${revHash(JSON.stringify(to))}:${revHash(
+        return `sent:${revHash(safeStringify(to))}:${revHash(
           line.slice(MESSAGE_ID_LENGTH)
         )}`;
 
@@ -642,7 +649,7 @@ class ForwardEmail {
     // a combination of the headers with the body number of lines affixed
     if (body) headers += (lines.length - body).toString();
 
-    return `sent:${revHash(JSON.stringify(to))}:${revHash(headers)}`;
+    return `sent:${revHash(safeStringify(to))}:${revHash(headers)}`;
   }
 
   // TODO: implement ARF parser
@@ -920,6 +927,83 @@ class ForwardEmail {
     return domain;
   }
 
+  // type can be one of the following: a, mx, or txt
+  // lookup => a
+  // resolveMx => mx
+  // resolveTxt => txt
+  // dnsbl.batch => dnsbl_batch
+  // dnsbl.lookup => dnsbl
+  async dnsQuery(type, name, reset = false, client = this.client) {
+    // validate the type against enumerable list
+    if (!DNS_QUERY_TYPES.has(type))
+      throw new CustomError('Invalid DNS query type', 420);
+
+    // ensure name is set
+    if (!name) throw new CustomError('Invalid name passed to DNS query', 420);
+
+    const key = `${this.config.dnsCachePrefix}:${type}:${name}`
+      .toLowerCase()
+      .trim();
+
+    // attempt to fetch from cache and return early
+    let value;
+    if (client && !reset) {
+      try {
+        value = await client.get(key);
+        if (value) {
+          this.config.logger.debug('cache hit', { key, value });
+          const parsed = JSON.parse(value);
+          return parsed;
+        }
+
+        this.config.logger.debug('cache not hit', { key, value });
+      } catch (err) {
+        this.config.logger.error(err);
+      }
+    }
+
+    //
+    // perform lookup and cache value
+    //
+    let ttl = this.config.dnsCacheMs;
+
+    // lookup
+    if (type === 'a') {
+      value = await dns.promises.lookup(name, { hints: dns.ADDRCONFIG });
+    } else if (type === 'mx') {
+      // resolveMx
+      value = await dns.promises.resolveMx(name);
+    } else if (type === 'txt') {
+      // resolveTxt
+      value = await dns.promises.resolveTxt(name);
+    } else if (type === 'dnsbl_batch') {
+      // override ttl for dnsbl
+      ttl = this.config.dnsBlacklistCacheMs;
+      // dnsbl.batch
+      value = await dnsbl.batch(name, this.config.dnsbl.domains, {
+        servers: this.config.dns
+      });
+    } else if (type === 'dnsbl') {
+      // override ttl for dnsbl
+      ttl = this.config.dnsBlacklistCacheMs;
+      // dnsbl.lookup
+      value = await dnsbl.lookup(name, this.config.dnsbl.domains, {
+        servers: this.config.dns
+      });
+    }
+
+    // store it in the cache in the background
+    if (client) {
+      client
+        .set(key, safeStringify(value), 'PX', ttl)
+        // eslint-disable-next-line promise/prefer-await-to-then
+        .then(this.config.logger.info)
+        .catch(this.config.logger.error);
+    }
+
+    return value;
+  }
+
   async checkBlacklists(ip) {
     // if no blacklists are provided then return early
     if (
@@ -936,9 +1020,9 @@ class ForwardEmail {
     let value = ip;
     if (validator.isFQDN(value)) {
       try {
-        const object = await dns.promises.lookup(value, {
-          hints: dns.ADDRCONFIG
-        });
+        // TODO: may want to also lookup the AAAA value too besides A
+        // by passing `{ all: true }` option to return an Array of addresses
+        const object = await this.dnsQuery('a', value);
         value = object.address;
       } catch (err) {
         this.config.logger.warn(err);
@@ -950,9 +1034,7 @@ class ForwardEmail {
     }
 
     if (_.isArray(this.config.dnsbl.domains)) {
-      const results = await dnsbl.batch(value, this.config.dnsbl.domains, {
-        servers: this.config.dns
-      });
+      const results = await this.dnsQuery('dnsbl_batch', value);
       if (!_.isArray(results) || results.length === 0) return false;
       const blacklistedResults = results.filter((result) => result.listed);
       if (blacklistedResults.length === 0) return false;
@@ -970,9 +1052,7 @@ class ForwardEmail {
         .join(' ');
     }
 
-    const result = await dnsbl.lookup(value, this.config.dnsbl.domains, {
-      servers: this.config.dns
-    });
+    const result = await this.dnsQuery('dnsbl', value);
     if (!result) return false;
     return util.format(
       this.config.blacklistedStr,
@@ -1236,9 +1316,7 @@ class ForwardEmail {
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
-          const object = await dns.promises.lookup(this.config.exchanges[0], {
-            hints: dns.ADDRCONFIG
-          });
+          const object = await this.dnsQuery('a', this.config.exchanges[0]);
           ipAddress = object.address;
         } else {
           ipAddress = ip.address();
@@ -2139,7 +2217,7 @@ class ForwardEmail {
                 await this.sendEmail(options);
               } catch (err_) {
                 this.config.logger.error(
-                  `${err_.message} (Session: ${JSON.stringify(session)})`
+                  `${err_.message} (Session: ${safeStringify(session)})`
                 );
                 this.config.logger.error(err_);
               }
@@ -2159,7 +2237,7 @@ class ForwardEmail {
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await dns.promises.resolveMx(domain);
+      const addresses = await this.dnsQuery('mx', domain);
       if (!addresses || addresses.length === 0)
         throw new CustomError(
           `DNS lookup for ${domain} did not return any valid MX records.`,
@@ -2277,7 +2355,7 @@ class ForwardEmail {
       fn();
     } catch (err) {
       this.config.logger.error(
-        `${err.message} (${JSON.stringify({ address, session })}`
+        `${err.message} (${safeStringify({ address, session })}`
       );
       fn(err);
     }
@@ -2289,7 +2367,7 @@ class ForwardEmail {
     const domain = this.parseDomain(address, false);
     let records;
     try {
-      records = await dns.promises.resolveTxt(domain);
+      records = await this.dnsQuery('txt', domain);
     } catch (err) {
       this.config.logger.warn(err);
       // support retries

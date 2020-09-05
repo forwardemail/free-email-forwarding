@@ -39,6 +39,7 @@
     "common-tags": "^1.8.0",
     "dkimpy": "^3.0.1",
     "dnsbl": "^3.2.0",
+    "fast-safe-stringify": "^2.0.7",
     "get-fqdn": "^0.0.4",
     "get-port": "^5.1.1",
     "get-stream": "^6.0.0",

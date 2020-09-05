@@ -1,6 +1,7 @@
 const Axe = require('axe');
-const { WebClient } = require('@slack/web-api');
+const safeStringify = require('fast-safe-stringify');
 const signale = require('signale');
+const { WebClient } = require('@slack/web-api');
 const pino = require('pino')({
   customLevels: {
     log: 30
@@ -79,14 +80,14 @@ if (env.SLACK_API_TOKEN) {
       if (meta.bounce_info)
         fields.push({
           title: 'Bounce Info',
-          value: JSON.stringify(meta.bounce_info),
+          value: safeSringify(meta.bounce_info),
           short: true
         });
 
       if (meta.envelope)
         fields.push({
           title: 'Envelope',
-          value: JSON.stringify(meta.envelope),
+          value: safeStringify(meta.envelope),
           short: true
         });
 
