@@ -2308,7 +2308,8 @@ class ForwardEmail {
 
   isBlacklisted(domain) {
     return _.isArray(this.config.blacklist)
-      ? this.config.blacklist.includes(domain)
+      ? this.config.blacklist.includes(domain) ||
+          this.config.blacklist.some((blacklist) => domain.endsWith(blacklist))
       : false;
   }
 
