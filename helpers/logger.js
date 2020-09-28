@@ -80,7 +80,7 @@ if (env.SLACK_API_TOKEN) {
       if (meta.bounce_info)
         fields.push({
           title: 'Bounce Info',
-          value: safeSringify(meta.bounce_info),
+          value: safeStringify(meta.bounce_info),
           short: true
         });
 
