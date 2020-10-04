@@ -94,7 +94,10 @@
     "helpers/**/*",
     ".env.defaults",
     ".env.schema",
-    "index.js"
+    "index.js",
+    "app.js",
+    "proxy.js",
+    "ecosystem.json"
   ],
   "homepage": "http://forwardemail.net",
   "husky": {
