@@ -441,7 +441,7 @@ class ForwardEmail {
     this.validateRateLimit = this.validateRateLimit.bind(this);
     this.isBlacklisted = this.isBlacklisted.bind(this);
     this.checkSRS = this.checkSRS.bind(this);
-    this.onMailFrom = this.onMailFrom.bind(this);
+    // this.onMailFrom = this.onMailFrom.bind(this);
     this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
     // this.onRcptTo = this.onRcptTo.bind(this);
     this.conditionallyRemoveSignatures = this.conditionallyRemoveSignatures.bind(
@@ -1096,7 +1096,7 @@ class ForwardEmail {
       //
       const message = await this.checkBlacklists(session.remoteAddress);
       if (message) {
-        this.config.blacklist.push(session.remoteAddress);
+        // this.config.blacklist.push(session.remoteAddress);
         throw new CustomError(message, 554);
       }
 
@@ -1303,11 +1303,13 @@ class ForwardEmail {
         //
         let scan;
 
+        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err);
         }
+        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -2329,6 +2331,7 @@ class ForwardEmail {
     }
   }
 
+  /*
   async onMailFrom(address, session, fn) {
     try {
       // if (!address.address)
@@ -2336,23 +2339,21 @@ class ForwardEmail {
       // if (address && address.address)
       //   await this.validateRateLimit(address.address);
       // else throw new Error('Missing MAIL FROM');
-      /*
-      await Promise.all([
-        this.validateRateLimit(address.address),
-        (async () => {
-          // ensure that it's not on the DNS blacklist
-          // X Spamhaus = zen.spamhaus.org
-          // - SpamCop = bl.spamcop.net
-          // - Barracuda = b.barracudacentral.org
-          // - Lashback = ubl.unsubscore.com
-          // - PSBL = psbl.surriel.com
-          const domain = this.parseDomain(address.address);
-          const message = await this.checkBlacklists(domain);
-          if (!message) return;
-          throw new CustomError(message, 554);
-        })()
-      ]);
-      */
+      // await Promise.all([
+      //   this.validateRateLimit(address.address),
+      //   (async () => {
+      //     // ensure that it's not on the DNS blacklist
+      //     // X Spamhaus = zen.spamhaus.org
+      //     // - SpamCop = bl.spamcop.net
+      //     // - Barracuda = b.barracudacentral.org
+      //     // - Lashback = ubl.unsubscore.com
+      //     // - PSBL = psbl.surriel.com
+      //     const domain = this.parseDomain(address.address);
+      //     const message = await this.checkBlacklists(domain);
+      //     if (!message) return;
+      //     throw new CustomError(message, 554);
+      //   })()
+      // ]);
       fn();
     } catch (err) {
       this.config.logger.error(
@@ -2361,6 +2362,7 @@ class ForwardEmail {
       fn(err);
     }
   }
+  */
 
   // this returns the forwarding address for a given email address
   // eslint-disable-next-line complexity
