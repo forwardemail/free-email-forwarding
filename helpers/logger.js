@@ -51,7 +51,7 @@ if (env.SLACK_API_TOKEN) {
   axe.setCallback(async (level, message, meta) => {
     try {
       // if meta did not have `slack: true` or not a specific level
-      //if (!meta.slack && !['error', 'fatal'].includes(level)) return;
+      // if (!meta.slack && !['error', 'fatal'].includes(level)) return;
       if (!meta.slack && level !== 'fatal') return;
 
       // otherwise post a message to the slack channel

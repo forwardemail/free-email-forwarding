@@ -2291,7 +2291,7 @@ class ForwardEmail {
           return;
         }
 
-        const delta = (limit.reset * 1000 - Date.now()) | 0;
+        const delta = Math.trunc(limit.reset * 1000 - Date.now());
         reject(
           new CustomError(
             `Rate limit exceeded for ${id}, retry in ${ms(delta, {
@@ -2615,7 +2615,9 @@ class ForwardEmail {
     // make the forwarding addresses unique
     // and omit the addresses recursively forwarded
     forwardingAddresses = _.uniq(forwardingAddresses);
-    _.pullAll(forwardingAddresses, recursivelyForwardedAddresses);
+
+    // NOTE: this causes recursive forwarding to fail
+    // _.pullAll(forwardingAddresses, recursivelyForwardedAddresses);
 
     // NOTE:
     // issue is that people could work around the limit
