@@ -65,12 +65,7 @@ class MessageSplitter extends Transform {
       i < length;
       i++
     ) {
-      let chr;
-      if (i < lblen) {
-        chr = this.lastBytes[i];
-      } else {
-        chr = data[i - lblen];
-      }
+      const chr = i < lblen ? this.lastBytes[i] : data[i - lblen];
 
       if (chr === 0x0a && i) {
         const pr1 = i - 1 < lblen ? this.lastBytes[i - 1] : data[i - 1 - lblen];
