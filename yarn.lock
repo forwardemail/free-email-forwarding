@@ -4786,6 +4786,11 @@ is-extglob@^2.1.0, is-extglob@^2.1.1:
   resolved "https://registry.yarnpkg.com/is-extglob/-/is-extglob-2.1.1.tgz#a88c02535791f02ed37c76a1b9ea9773c833f8c2"
   integrity sha1-qIwCU1eR8C7TfHahueqXc8gz+MI=
 
+is-fqdn@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/is-fqdn/-/is-fqdn-2.0.1.tgz#2c47b17007b780cd034922ef86a4b3aad0901352"
+  integrity sha512-oQgLvyS2gWO5ZT3EbgdpkIN5fORg5Sadn0SQ4seTwt/fuKxQHrg8k/BaI02dGgcek+Gc2zxrd1tBo7h5HyBdNA==
+
 is-fullwidth-code-point@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/is-fullwidth-code-point/-/is-fullwidth-code-point-1.0.0.tgz#ef9e31386f031a7f0d643af82fde50c457ef00cb"

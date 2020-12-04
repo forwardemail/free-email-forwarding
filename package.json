@@ -45,6 +45,7 @@
     "get-stream": "^6.0.0",
     "iconv": "^3.0.0",
     "ip": "^1.1.5",
+    "is-fqdn": "^2.0.1",
     "is-string-and-not-blank": "^0.0.2",
     "lodash": "^4.17.20",
     "mailparser": "^2.8.1",

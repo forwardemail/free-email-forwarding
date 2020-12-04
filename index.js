@@ -17,6 +17,7 @@ const dnsbl = require('dnsbl');
 const getFQDN = require('get-fqdn');
 const getStream = require('get-stream');
 const ip = require('ip');
+const isFQDN = require('is-fqdn');
 const isSANB = require('is-string-and-not-blank');
 const ms = require('ms');
 const mxConnect = require('mx-connect');
@@ -918,7 +919,7 @@ class ForwardEmail {
 
     // ensure fully qualified domain name
     /*
-    if (!validator.isFQDN(domain))
+    if (!isFQDN(domain))
       throw new CustomError(
         `${domain} is not a fully qualified domain name ("FQDN")`
       );
@@ -1018,7 +1019,7 @@ class ForwardEmail {
 
     // if it is a FQDN then look it up by IP address
     let value = ip;
-    if (validator.isFQDN(value)) {
+    if (isFQDN(value)) {
       try {
         // TODO: may want to also lookup the AAAA value too besides A
         // by passing `{ all: true }` option to return an Array of addresses
@@ -1069,7 +1070,7 @@ class ForwardEmail {
     try {
       // check against blacklist
       if (
-        validator.isFQDN(session.clientHostname) &&
+        isFQDN(session.clientHostname) &&
         this.isBlacklisted(session.clientHostname)
       )
         throw new CustomError(
@@ -2516,7 +2517,7 @@ class ForwardEmail {
         if (
           addr.length !== 2 ||
           !_.isString(addr[1]) ||
-          (!validator.isFQDN(addr[1]) &&
+          (!isFQDN(addr[1]) &&
             !validator.isIP(addr[1]) &&
             !validator.isEmail(addr[1]) &&
             !validator.isURL(addr[1], this.config.isURLOptions))
@@ -2531,17 +2532,14 @@ class ForwardEmail {
             forwardingAddresses.push(addr[1]);
           else forwardingAddresses.push(addr[1].toLowerCase());
         }
-      } else if (
-        validator.isFQDN(lowerCaseAddress) ||
-        validator.isIP(lowerCaseAddress)
-      ) {
+      } else if (isFQDN(lowerCaseAddress) || validator.isIP(lowerCaseAddress)) {
         // allow domain alias forwarding
         // (e.. the record is just "b.com" if it's not a valid email)
         globalForwardingAddresses.push(`${username}@${lowerCaseAddress}`);
       } else if (validator.isEmail(lowerCaseAddress)) {
         const domain = this.parseDomain(lowerCaseAddress, false);
         if (
-          (validator.isFQDN(domain) || validator.isIP(domain)) &&
+          (isFQDN(domain) || validator.isIP(domain)) &&
           validator.isEmail(lowerCaseAddress)
         ) {
           globalForwardingAddresses.push(lowerCaseAddress);
@@ -2673,7 +2671,7 @@ class ForwardEmail {
 
     return forwardingAddresses.map((forwardingAddress) => {
       if (
-        validator.isFQDN(forwardingAddress) ||
+        isFQDN(forwardingAddress) ||
         validator.isIP(forwardingAddress) ||
         validator.isURL(forwardingAddress, this.config.isURLOptions)
       )
