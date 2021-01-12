@@ -336,7 +336,7 @@ class ForwardEmail {
         }
       },
       ttlMs: ms('7d'),
-      maxRetry: 10,
+      maxRetry: 50,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
       dnsCachePrefix: 'dns',
       dnsCacheMs: ms('3m'),
