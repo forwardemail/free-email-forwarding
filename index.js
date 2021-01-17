@@ -2487,7 +2487,7 @@ class ForwardEmail {
       // convert addresses to lowercase
       const lowerCaseAddress = element.toLowerCase();
       if (
-        (lowerCaseAddress.includes(':') ||
+        (lowerCaseAddress.substring(lowerCaseAddress.lastIndexOf('/').includes(':')) ||
           lowerCaseAddress.indexOf('!') === 0) &&
         !validator.isURL(element, this.config.isURLOptions)
       ) {
@@ -2527,7 +2527,14 @@ class ForwardEmail {
             `${lowerCaseAddress} domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid email address of "${element}"`
           );
 
-        if (_.isString(addr[0]) && username === addr[0].toLowerCase()) {
+        if (addr[0].startsWith('/') && addr[0].endsWith('/')) {
+          let regex = RegExp(`^${addr[0].slice(1, -1)}$`, 'i');
+          if (regex.test(username)) {
+            if (validator.isURL(addr[1], this.config.isURLOptions))
+              forwardingAddresses.push(addr[1]);
+            else forwardingAddresses.push(addr[1].toLowerCase());
+          }
+        } else if (_.isString(addr[0]) && username === addr[0].toLowerCase()) {
           if (validator.isURL(addr[1], this.config.isURLOptions))
             forwardingAddresses.push(addr[1]);
           else forwardingAddresses.push(addr[1].toLowerCase());
