@@ -21,7 +21,9 @@ class MessageSplitter extends Transform {
     this.headerChunks = [];
     this.rawHeaders = false;
     this.dataBytes = 0;
-    this._maxBytes = (options.maxBytes && Number(options.maxBytes)) || Infinity;
+    this._maxBytes =
+      (options.maxBytes && Number(options.maxBytes)) ||
+      Number.POSITIVE_INFINITY;
     this.sizeExceeded = false;
   }
 

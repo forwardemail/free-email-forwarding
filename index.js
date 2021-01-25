@@ -2410,6 +2410,11 @@ class ForwardEmail {
         );
     }
 
+    // check if we have a specific redirect and store global redirects (if any)
+    // get username from recipient email address
+    // (e.g. hello@niftylettuce.com => hello)
+    const username = this.parseUsername(address);
+
     if (verifications.length > 0) {
       if (verifications.length > 1)
         throw new CustomError(
@@ -2420,7 +2425,7 @@ class ForwardEmail {
       try {
         const { body } = await superagent
           .get(`${this.config.apiEndpoint}/v1/lookup`)
-          .query({ verification_record: verifications[0] })
+          .query({ domain, username, verification_record: verifications[0] })
           .set('Accept', 'json')
           .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
@@ -2477,11 +2482,6 @@ class ForwardEmail {
 
     // store if we have a global redirect or not
     const globalForwardingAddresses = [];
-
-    // check if we have a specific redirect and store global redirects (if any)
-    // get username from recipient email address
-    // (e.g. hello@niftylettuce.com => hello)
-    const username = this.parseUsername(address);
 
     for (const element of addresses) {
       // convert addresses to lowercase

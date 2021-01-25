@@ -22,7 +22,7 @@ You'll also need the following dependencies installed:
 
 * [Redis][] (v4.x+) - this is a fast key-value store database used for rate-limiting and preventing spammers
 
-  > _NOTE_: You can pass `rateLimit: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ rateLimit: false });`
+  > *NOTE*: You can pass `rateLimit: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ rateLimit: false });`
 
   * Mac (via [brew][]): `brew install redis && brew services start redis`
   * Ubuntu:
@@ -63,7 +63,6 @@ You'll also need the following dependencies installed:
   ```sh
   sudo apt-get install libstemmer-dev libstemmer-tools
   ```
-
 
 * [authbind][] - for allowing non-root users to run on restricted ports
 
@@ -178,7 +177,7 @@ See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more ins
 [Business Source License 1.1](LICENSE) © [Niftylettuce, LLC.](https://niftylettuce.com/)
 
 
-## 
+##
 
 [npm]: https://www.npmjs.com/
 

@@ -68,6 +68,6 @@ Read our [Terms](https://forwardemail.net/terms).
 [Business Source License 1.1](LICENSE) © [Niftylettuce, LLC.](https://niftylettuce.com/)
 
 
-## 
+##
 
 <a href="#"><img src="https://raw.githubusercontent.com/forwardemail/free-email-forwarding/master/media/footer.png" alt="#" /></a>
