@@ -23,7 +23,6 @@ const ms = require('ms');
 const mxConnect = require('mx-connect');
 const nodemailer = require('nodemailer');
 const pify = require('pify');
-const pkg = require('./package');
 const punycode = require('punycode/');
 const revHash = require('rev-hash');
 const safeStringify = require('fast-safe-stringify');
@@ -35,14 +34,12 @@ const zoneMTABounces = require('zone-mta/lib/bounces');
 const { Iconv } = require('iconv');
 const { SMTPServer } = require('smtp-server');
 const { SRS } = require('sender-rewriting-scheme');
-const { arcSign } = require('dkimpy');
-const { authenticateMessage } = require('authheaders');
+const { authenticate } = require('mailauth');
 const { boolean } = require('boolean');
 const { oneLine } = require('common-tags');
 const { simpleParser } = require('mailparser');
 
-const DNS_QUERY_TYPES = new Set(['a', 'mx', 'txt', 'dnsbl_batch', 'dnsbl']);
-
+const pkg = require('./package');
 const {
   CustomError,
   MessageSplitter,
@@ -451,7 +448,7 @@ class ForwardEmail {
     this.getBounceStream = this.getBounceStream.bind(this);
     this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
     this.getSentKey = this.getSentKey.bind(this);
-    this.dnsQuery = this.dnsQuery.bind(this);
+    this.resolver = this.resolver.bind(this);
   }
 
   async listen(port, ...args) {
@@ -614,10 +611,14 @@ class ForwardEmail {
     return rootNode.createReadStream();
   }
 
-  getSentKey(to, raw) {
+  getSentKey(to, originalRaw) {
     // safeguards for development
     if (_.isString(to)) to = [to];
     if (!_.isArray(to)) throw new Error('to must be an Array.');
+
+    const raw = _.isBuffer(originalRaw)
+      ? originalRaw.toString('binary')
+      : originalRaw;
     if (!_.isString(raw)) throw new Error('raw must be String.');
 
     // `raw` seems to have trailing line break
@@ -928,74 +929,51 @@ class ForwardEmail {
     return domain;
   }
 
-  // type can be one of the following: a, mx, or txt
-  // lookup => a
-  // resolveMx => mx
-  // resolveTxt => txt
-  // dnsbl.batch => dnsbl_batch
-  // dnsbl.lookup => dnsbl
-  async dnsQuery(type, name, reset = false, client = this.client) {
-    // validate the type against enumerable list
-    if (!DNS_QUERY_TYPES.has(type))
-      throw new CustomError('Invalid DNS query type', 420);
-
-    // ensure name is set
-    if (!name) throw new CustomError('Invalid name passed to DNS query', 420);
-
-    const key = `${this.config.dnsCachePrefix}:${type}:${name}`
+  async resolver(name, rr) {
+    const key = `${this.config.dnsCachePrefix}:${rr}:${name}`
       .toLowerCase()
       .trim();
 
+    //
     // attempt to fetch from cache and return early
-    let value;
-    if (client && !reset) {
+    //
+    if (this.client) {
       try {
-        value = await client.get(key);
+        const value = await this.client.get(key);
         if (value) {
           this.config.logger.debug('cache hit', { key, value });
-          const parsed = JSON.parse(value);
-          return parsed;
+          return JSON.parse(value);
         }
 
-        this.config.logger.debug('cache not hit', { key, value });
+        this.config.logger.debug('cache miss', { key, value });
       } catch (err) {
         this.config.logger.error(err);
       }
     }
 
-    //
-    // perform lookup and cache value
-    //
+    // perform dns or dnsbl lookup
+    let value;
     let ttl = this.config.dnsCacheMs;
 
-    // lookup
-    if (type === 'a') {
-      value = await dns.promises.lookup(name, { hints: dns.ADDRCONFIG });
-    } else if (type === 'mx') {
-      // resolveMx
-      value = await dns.promises.resolveMx(name);
-    } else if (type === 'txt') {
-      // resolveTxt
-      value = await dns.promises.resolveTxt(name);
-    } else if (type === 'dnsbl_batch') {
+    if (rr === 'DNSBL_BATCH') {
       // override ttl for dnsbl
       ttl = this.config.dnsBlacklistCacheMs;
-      // dnsbl.batch
       value = await dnsbl.batch(name, this.config.dnsbl.domains, {
         servers: this.config.dns
       });
-    } else if (type === 'dnsbl') {
+    } else if (rr === 'DNSBL') {
       // override ttl for dnsbl
       ttl = this.config.dnsBlacklistCacheMs;
-      // dnsbl.lookup
       value = await dnsbl.lookup(name, this.config.dnsbl.domains, {
         servers: this.config.dns
       });
+    } else {
+      value = await dns.promises.resolve(name, rr);
     }
 
     // store it in the cache in the background
-    if (client) {
-      client
+    if (this.client) {
+      this.client
         .set(key, safeStringify(value), 'PX', ttl)
         // eslint-disable-next-line promise/prefer-await-to-then
         .then(this.config.logger.info)
@@ -1018,13 +996,10 @@ class ForwardEmail {
     }
 
     // if it is a FQDN then look it up by IP address
-    let value = ip;
-    if (isFQDN(value)) {
+    if (isFQDN(ip)) {
       try {
-        // TODO: may want to also lookup the AAAA value too besides A
-        // by passing `{ all: true }` option to return an Array of addresses
-        const object = await this.dnsQuery('a', value);
-        value = object.address;
+        const values = await this.resolver(ip, 'A');
+        return Promise.all(values.map((value) => this.checkBlacklists(value)));
       } catch (err) {
         this.config.logger.warn(err);
         this.config.logger.warn(
@@ -1035,7 +1010,7 @@ class ForwardEmail {
     }
 
     if (_.isArray(this.config.dnsbl.domains)) {
-      const results = await this.dnsQuery('dnsbl_batch', value);
+      const results = await this.resolver(ip, 'DNSBL_BATCH');
       if (!_.isArray(results) || results.length === 0) return false;
       const blacklistedResults = results.filter((result) => result.listed);
       if (blacklistedResults.length === 0) return false;
@@ -1043,7 +1018,7 @@ class ForwardEmail {
         .map((result) =>
           util.format(
             this.config.blacklistedStr,
-            value,
+            ip,
             result.blacklist,
             this.config.dnsbl.removals[
               this.config.dnsbl.domains.indexOf(result.blacklist)
@@ -1053,11 +1028,11 @@ class ForwardEmail {
         .join(' ');
     }
 
-    const result = await this.dnsQuery('dnsbl', value);
+    const result = await this.resolver(ip, 'DNSBL');
     if (!result) return false;
     return util.format(
       this.config.blacklistedStr,
-      value === ip ? ip : `${ip} (${value})`,
+      ip,
       this.config.dnsbl.domains,
       this.config.dnsbl.removals
     );
@@ -1234,26 +1209,15 @@ class ForwardEmail {
         await this.validateRateLimit(session.remoteAddress);
 
         //
-        // TODO: all the SRS stuff can be removed around September 2020
-        //       as we have removed SRS rewrites in early August 2020 and its not used anymore
-        //       (so basically all of step 3 below and the function `conditionallyRemoveSignatures`)
-        //
-        //
         // 3) reverse SRS bounces
         //
-        const changes = [];
-        for (const header of ['To']) {
-          const originalValue = headers.getFirst(header);
-          const reversedValue = this.checkSRS(originalValue);
-          if (originalValue !== reversedValue) {
-            headers.update(header, reversedValue);
-            changes.push(header);
-          }
+        const originalValue = headers.getFirst('To');
+        const reversedValue = this.checkSRS(originalValue);
+        if (originalValue !== reversedValue) {
+          headers.update('To', reversedValue);
+          // conditionally remove signatures necessary
+          headers = this.conditionallyRemoveSignatures(headers, ['To']);
         }
-
-        // conditionally remove signatures necessary
-        if (changes.length > 0)
-          headers = this.conditionallyRemoveSignatures(headers, changes);
 
         // clean up the rcptTo list of recipients
         session.envelope.rcptTo = session.envelope.rcptTo.map((to) => {
@@ -1304,13 +1268,12 @@ class ForwardEmail {
         //
         let scan;
 
-        /*
-        try {
-          scan = await this.scanner.scan(originalRaw);
-        } catch (err) {
-          this.config.logger.fatal(err);
-        }
-        */
+        // TODO: re-enable this ASAP
+        // try {
+        //   scan = await this.scanner.scan(originalRaw);
+        // } catch (err) {
+        //   this.config.logger.fatal(err);
+        // }
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1319,37 +1282,59 @@ class ForwardEmail {
         // get the fully qualified domain name ("FQDN") of this server
         let ipAddress;
         if (env.NODE_ENV === 'test') {
-          const object = await this.dnsQuery('a', this.config.exchanges[0]);
-          ipAddress = object.address;
+          const object = await this.resolver(this.config.exchanges[0], 'A');
+          ipAddress = object[0];
         } else {
           ipAddress = ip.address();
         }
 
         const name = await getFQDN(ipAddress);
 
-        let authResults;
-        try {
-          authResults = await authenticateMessage(
-            originalRaw.toString(),
-            name,
-            session.remoteAddress,
-            mailFrom.address,
-            session.hostNameAppearsAs
-          );
-          this.config.logger.info('auth results', {
-            authResults,
-            session
-          });
-        } catch (err) {
-          this.config.logger.error(err);
-          //
-          // TODO: if an error occurs here then we should use SRS
-          //
-          // TODO: probably just want to log this and let the message go through until
-          //       we have all the python package bugs sorted out at least
-          // err.responseCode = 421;
-          // throw err;
-        }
+        // set `X-ForwardEmail-Version`
+        headers.update('X-ForwardEmail-Version', pkg.version);
+        // and `X-ForwardEmail-Session-ID`
+        headers.update('X-ForwardEmail-Session-ID', session.id);
+        // and `X-ForwardEmail-Sender`
+        headers.update(
+          'X-ForwardEmail-Sender',
+          `rfc822; ${
+            mailFrom.address
+              ? this.checkSRS(mailFrom.address)
+              : session.remoteAddress
+          }`
+        );
+
+        const {
+          dkim,
+          spf,
+          arc,
+          dmarc,
+          headers: arcSealedHeaders
+        } = await authenticate(originalRaw, {
+          ip: session.remoteAddress,
+          helo: session.hostNameAppearsAs,
+          sender: mailFrom.address,
+          mta: name,
+          ...(_.isObject(this.config.dkim) &&
+          isSANB(this.config.dkim.domainName) &&
+          isSANB(this.config.dkim.keySelector) &&
+          isSANB(this.config.dkim.privateKey)
+            ? {
+                seal: {
+                  signingDomain: this.config.dkim.domainName,
+                  selector: this.config.dkim.keySelector,
+                  privateKey: this.config.dkim.privateKey
+                }
+              }
+            : {}),
+          resolver: this.resolver
+        });
+
+        const raw = Buffer.concat([
+          Buffer.from(arcSealedHeaders),
+          headers.build(),
+          ...chunks
+        ]);
 
         //
         // TODO: we may want to re-enable this in the future but we have this currently disabled
@@ -1380,109 +1365,63 @@ class ForwardEmail {
             });
         */
 
-        // check if SPF was valid
-        // if (authResults && authResults.spf && authResults.spf.result === 'fail')
-        //   throw new CustomError(
-        //     `The email sent has failed SPF validation.${
-        //       authResults.spf.reason
-        //         ? ` The reason given was "${authResults.spf.reason}".`
-        //         : ''
-        //     }`
-        //   );
-
         //
-        // We will only use SRS if SPF passed and DKIM was not passing
-        //
-        // NOTE: Gmail specifically recommends NOT to use SRS if you're forwarding emails
-        //
-        // TODO: we may not want to do this if ARC was passing, however not all providers implement ARC yet
-        //
-        let from =
-          mailFrom.address &&
-          authResults &&
-          authResults.spf &&
-          authResults.spf.result === 'pass' &&
-          (!authResults.dkim || authResults.dkim !== 'pass')
-            ? this.srs.forward(
-                this.checkSRS(mailFrom.address),
-                this.config.srsDomain
-              )
-            : mailFrom.address;
-
-        //
-        // check if DKIM was valid
-        //
-        // NOTE: we don't filter out email based off DKIM but we may want to
-        //       iterate over DKIM-Signatures like we did in versions prior to v7.0.0
-        //       for DKIM-Signature headers that match the domain but fail
-        //       and we could either reject them if none passed and there was at least one matching
-        //       and/or we can email the admins or technical contacts of the domains
+        // only reject if ARC was not passing
+        // and DMARC fail with p=reject policy
         //
 
-        // check if DMARC was valid
         if (
-          // NOTE: we may want to further investigate this
-          // only reject if ARC failed
-          authResults &&
-          authResults.arc &&
-          authResults.arc.result !== 'pass' &&
-          authResults.dmarc &&
-          authResults.dmarc.result === 'fail' &&
-          authResults.dmarc.policy === 'reject'
+          _.isObject(arc) &&
+          _.isObject(arc.status) &&
+          arc.status.result !== 'pass' &&
+          _.isObject(dmarc) &&
+          _.isObject(dmarc.status) &&
+          dmarc.status.result === 'fail' &&
+          dmarc.policy === 'reject'
         )
           throw new CustomError(
             "The email sent has failed DMARC validation and is rejected due to the domain's DMARC policy."
           );
 
-        /*
-        // check if ARC failed then reject if DMARC policy was to reject
+        //
+        // TODO: better abuse prevention around this
+        //
+        // only use SRS if:
+        // - ARC none
+        // - SPF pass
+        // - DMARC none OR p=reject and pass
+        // - no passing DKIM
+        //
+        let from = mailFrom.address;
+
         if (
-          authResults &&
-          authResults.arc &&
-          authResults.arc.result === 'fail' &&
-          authResults.dmarc &&
-          authResults.dmarc.policy === 'reject'
+          // - ARC none
+          _.isObject(arc) &&
+          _.isObject(arc.status) &&
+          arc.status.result === 'none' &&
+          // - SPF pass
+          _.isObject(spf) &&
+          _.isObject(spf.status) &&
+          spf.status.result === 'pass' &&
+          // - DMARC none OR p=reject and pass
+          _.isObject(dmarc) &&
+          _.isObject(dmarc.status) &&
+          (dmarc.status.result === 'none' ||
+            (dmarc.policy === 'reject' && dmarc.status.result === 'pass')) &&
+          // - no passing DKIM
+          _.isObject(dkim) &&
+          _.isObject(dkim.results) &&
+          dkim.results.every(
+            (result) =>
+              !_.isObject(result) ||
+              !_.isObject(result.status) ||
+              result.status.result !== 'pass'
+          )
         )
-          throw new CustomError(
-            "The email sent has failed ARC validation and is rejected due to the domain's DMARC policy."
+          from = this.srs.forward(
+            this.checkSRS(mailFrom.address),
+            this.config.srsDomain
           );
-        */
-
-        /*
-        //
-        // NOTE: we don't need to do this anymore since we're using ARC, but this is left here
-        //       for historical purposes and as a reference for the future
-        //
-        // conditionally rewrite with friendly from if DMARC were to fail
-        //
-        // we have to do this because if DKIM fails BUT SPF passes
-        // then when we forward the message along, the DMARC SPF check
-        // would fail on the FROM (e.g. message@netflix.com)
-        // and the new SPF check would be against @forwardemail.net due to SRS
-        // which would fail DMARC since the SPF check would be netflix.com versus forwardemail.net
-        //
-        if (reject && !hasPassingDKIM && hasPassingSPF) {
-          const replyTo = headers.getFirst('Reply-To');
-          //
-          // if the DKIM signature signs the Reply-To and the From
-          // then we will probably want to remove it since it won't be valid anymore
-          //
-          const changes = ['from', 'x-original-from'];
-          headers.update('From', this.rewriteFriendlyFrom(originalFrom));
-          headers.update('X-Original-From', originalFrom);
-          //
-          // if there was an original reply-to on the email
-          // then we don't want to modify it of course
-          //
-          if (!replyTo) {
-            changes.push('Reply-To');
-            headers.update('Reply-To', originalFrom);
-          }
-
-          // conditionally remove signatures necessary
-          headers = this.conditionallyRemoveSignatures(headers, changes);
-        }
-        */
 
         //
         // 7) lookup forwarding recipients recursively
@@ -1557,31 +1496,6 @@ class ForwardEmail {
               } catch (err) {
                 this.config.logger.error(err);
               }
-
-              //
-              // NOTE: we actually don't need to do this anymore because of
-              //       our new approach with `getSentKey` elsewhere in this code
-              //
-              /*
-              // get or create a new Message-ID that may or may not be used
-              // by looking up a hash of the original raw message
-              const createdMessageId = createMessageID(
-                this.config.messageIdDomain,
-                headers,
-                chunks
-              );
-
-              this.config.logger.debug('created message id', createdMessageId);
-
-              // always add a Message-ID to outbound messages
-              if (!messageId) {
-                headers.update('Message-ID', createdMessageId);
-                // NOTE: we don't remove any signatures but we may want to in the future
-                // const changes = ['Message-ID'];
-                // conditionally remove signatures necessary
-                // headers = this.conditionallyRemoveSignatures(headers, changes);
-              }
-              */
 
               //
               // NOTE: here is where we check if Spam Scanner settings
@@ -1808,360 +1722,288 @@ class ForwardEmail {
         //
         // 9) send email
         //
+        const accepted = [];
+        const selfTestEmails = [];
 
-        // set `X-ForwardEmail-Version`
-        headers.update('X-ForwardEmail-Version', pkg.version);
-        // and `X-ForwardEmail-Session-ID`
-        headers.update('X-ForwardEmail-Session-ID', session.id);
-        // and `X-ForwardEmai-Sender`
-        headers.update(
-          'X-ForwardEmail-Sender',
-          `rfc822; ${
-            mailFrom.address
-              ? this.checkSRS(mailFrom.address)
-              : session.remoteAddress
-          }`
-        );
-        // add and sign Authentication-Results header
-        if (authResults && authResults.header)
-          headers.add('Authentication-Results', authResults.header);
-
-        // TODO: if MAIL FROM missing then parse From header (?) for MAIL FROM (?)
-
-        // sign message with ARC seal
-
-        // join headers object and body into a full rfc822 formatted email
-        // headers.build() compiles headers into a Buffer with the \r\n\r\n separator
-        // (eventually we call `dkim.sign(raw)` and pass it to nodemailer's `raw` option)
-        let raw = Buffer.concat([headers.build(), ...chunks]).toString();
         //
-        // NOTE: we don't want to sign with DKIM in order to maintain our reputation
-        //       instead we should assume that the sender should be signing their emails
-        //       this code is merely left here for reference and historical purposes
+        // this is the core function that sends the email
         //
-        // raw = await getStream(this.dkim.sign(raw));
-        //
-        if (isSANB(env.DKIM_PRIVATE_KEY_PATH)) {
-          try {
-            const arcHeaders = await arcSign(
-              raw,
-              this.config.dkim.keySelector,
-              this.config.dkim.domainName,
-              env.DKIM_PRIVATE_KEY_PATH,
-              name
-            );
-            if (arcHeaders) raw = arcHeaders + raw;
-          } catch (err) {
-            this.config.logger.error(err);
-            if (mailFrom.address)
-              from = this.srs.forward(
-                this.checkSRS(mailFrom.address),
-                this.config.srsDomain
+        // eslint-disable-next-line complexity
+        const mapper = async (recipient) => {
+          if (recipient.webhook) {
+            try {
+              const key = this.getSentKey(recipient.to, originalRaw);
+              const value = this.client ? await this.client.get(key) : null;
+
+              // if there was a value set to true then it means it was sent
+              // so we can return early here and not re-send the message twice
+              if (value && value === 'true') {
+                accepted.push(recipient.recipient);
+                return;
+              }
+
+              //
+              // only allow up to X retries (greylist attempts) for this message
+              //
+              const count =
+                _.isString(value) && _.isFinite(Number.parseInt(value, 10))
+                  ? Number.parseInt(value, 10) + 1
+                  : 1;
+
+              if (count > this.config.maxRetry)
+                throw new CustomError(
+                  `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
+                );
+
+              const mail = await simpleParser(
+                originalRaw,
+                this.config.simpleParser
               );
+
+              if (this.client)
+                await this.client.set(
+                  key,
+                  count.toString(),
+                  'PX',
+                  this.config.ttlMs
+                );
+
+              await superagent
+                .post(recipient.webhook)
+                // .type('message/rfc822')
+                .set('User-Agent', this.config.userAgent)
+                .timeout(this.config.timeout)
+                // .retry(this.config.retry)
+                .send({
+                  ...mail,
+                  raw
+                });
+
+              if (this.client)
+                await this.client.set(key, 'true', 'PX', this.config.ttlMs);
+
+              accepted.push(recipient.recipient);
+              return;
+            } catch (err_) {
+              this.config.logger.warn(err_);
+
+              // determine if code or status is retryable here and set it as `err._responseCode`
+              if (
+                (isSANB(err_.code) && HTTP_RETRY_ERROR_CODES.has(err_.code)) ||
+                (_.isNumber(err_.status) &&
+                  HTTP_RETRY_STATUS_CODES.has(err_.status))
+              ) {
+                err_.responseCode = 421;
+              } else {
+                // alias `responseCode` for consistency with SMTP responseCode
+                // TODO: map HTTP to SMTP codes appropriately
+                // if (_.isNumber(err_.status))
+                //   err_.responseCode = err_.status;
+                // else
+                err_.responseCode = 550;
+              }
+
+              // hide the webhook endpoint
+              err_.message = err_.message.replace(
+                new RE2(recipient.webhook, 'gi'),
+                'a webhook endpoint'
+              );
+
+              // in case the response had sensitive email user information hide it too
+              for (const address of Object.keys(recipient.replacements)) {
+                err_.message = err_.message.replace(
+                  new RE2(address, 'gi'),
+                  recipient.replacements[address]
+                );
+              }
+
+              bounces.push({
+                address: recipient.recipient,
+                err: err_
+              });
+            }
+
+            return;
           }
-        } else {
-          this.config.logger.fatal(
-            new Error(
-              'ARC signature is not set up properly, you are missing a DKIM key path option'
-            )
+
+          const result = await this.processRecipient({
+            recipient,
+            name,
+            raw,
+            from
+          });
+
+          if (result.accepted.length > 0) {
+            // add to the
+            for (const a of result.accepted) {
+              // get normalized form without `+` symbol
+              const normal = `${this.parseUsername(a)}@${this.parseDomain(
+                a,
+                false
+              )}`;
+              if (
+                !selfTestEmails.includes(normal) &&
+                normal === this.checkSRS(mailFrom.address)
+              )
+                selfTestEmails.push(normal);
+            }
+
+            accepted.push(recipient.recipient);
+          }
+
+          if (result.rejected.length === 0) return;
+          for (let x = 0; x < result.rejected.length; x++) {
+            const err = result.rejectedErrors[x];
+            bounces.push({
+              // TODO: in future handle this port: recipient.port
+              // and also handle it in `async processAddress(replacements, opts)`
+              address: recipient.recipient,
+              host: recipient.host,
+              err
+            });
+          }
+        };
+
+        await Promise.all(normalized.map((recipient) => mapper(recipient)));
+
+        //
+        // if there were any where the MAIL FROM was equivalent to the recipient
+        // then we'll send them a one-time email to let them know it was successful
+        // and also that they made need to check their "Sent" folder since many email
+        // hosts like Gmail will not show a message you send from yourself to yourself
+        // unless we rewrite the Message-Id header, which was previously did, but even
+        // then it causes problems, as it prepends "This email looks suspicious" warning
+        //
+        // <https://support.google.com/a/answer/1703601?hl=en>
+        // <https://stackoverflow.com/a/52534520>
+        //
+        if (selfTestEmails.length > 0)
+          superagent
+            .post(`${this.config.apiEndpoint}/v1/self-test`)
+            .set('User-Agent', this.config.userAgent)
+            .set('Accept', 'json')
+            .auth(this.config.apiSecrets[0])
+            .timeout(this.config.timeout)
+            .retry(this.config.retry)
+            .send({
+              emails: selfTestEmails
+            })
+            // eslint-disable-next-line promise/prefer-await-to-then
+            .then(() => {})
+            .catch((err) => {
+              this.config.logger.error(err);
+            });
+
+        // if there weren't any bounces then return early
+        if (bounces.length === 0) return fn();
+
+        const codes = bounces.map((bounce) => {
+          if (_.isNumber(bounce.err.responseCode))
+            return bounce.err.responseCode;
+          if (
+            _.isString(bounce.err.code) &&
+            RETRY_CODES.includes(bounce.err.code)
+          )
+            return CODES_TO_RESPONSE_CODES[bounce.err.code];
+          return 550;
+        });
+
+        // sort the codes and get the lowest one
+        // (that way 4xx retries are attempted)
+        const [code] = codes.sort();
+
+        const messages = [];
+
+        if (accepted.length > 0)
+          messages.push(
+            `Message was sent successfully to ${arrayJoinConjunction(accepted)}`
+          );
+
+        for (const element of bounces) {
+          messages.push(
+            `Error for ${element.host || element.address} of "${
+              element.err.message
+            }"`
           );
         }
 
-        this.config.logger.info('arc signed', { raw, session });
+        // join the messages together and make them unique
+        const err = new CustomError(_.uniq(messages).join(', '), code);
 
-        try {
-          const accepted = [];
-          const selfTestEmails = [];
+        // send error to user
+        fn(err);
 
-          //
-          // this is the core function that sends the email
-          //
-          // eslint-disable-next-line complexity
-          const mapper = async (recipient) => {
-            if (recipient.webhook) {
-              try {
-                const raw = originalRaw.toString();
-                const key = this.getSentKey(recipient.to, raw);
-                const value = this.client ? await this.client.get(key) : null;
+        //
+        // if the message had any of these headers then don't send bounce
+        // <https://www.jitbit.com/maxblog/18-detecting-outlook-autoreplyout-of-office-emails-and-x-auto-response-suppress-header/>
+        // <https://github.com/nodemailer/smtp-server/issues/129>
+        //
+        if (
+          headers.hasHeader('X-Autoreply') ||
+          headers.hasHeader('X-Autorespond') ||
+          (headers.hasHeader('Auto-Submitted') &&
+            headers.getFirst('Auto-Submitted') === 'auto-replied')
+        )
+          return;
 
-                // if there was a value set to true then it means it was sent
-                // so we can return early here and not re-send the message twice
-                if (value && value === 'true') {
-                  accepted.push(recipient.recipient);
-                  return;
-                }
-
-                //
-                // only allow up to X retries (greylist attempts) for this message
-                //
-                const count =
-                  _.isString(value) && _.isFinite(Number.parseInt(value, 10))
-                    ? Number.parseInt(value, 10) + 1
-                    : 1;
-
-                if (count > this.config.maxRetry)
-                  throw new CustomError(
-                    `This message has been retried the maximum of (${this.config.maxRetry}) times and has permanently failed.`
-                  );
-
-                const mail = await simpleParser(
-                  originalRaw,
-                  this.config.simpleParser
-                );
-
-                if (this.client)
-                  await this.client.set(
-                    key,
-                    count.toString(),
-                    'PX',
-                    this.config.ttlMs
-                  );
-
-                await superagent
-                  .post(recipient.webhook)
-                  // .type('message/rfc822')
-                  .set('User-Agent', this.config.userAgent)
-                  .timeout(this.config.timeout)
-                  // .retry(this.config.retry)
-                  .send({
-                    ...mail,
-                    raw
-                  });
-
-                if (this.client)
-                  await this.client.set(key, 'true', 'PX', this.config.ttlMs);
-
-                accepted.push(recipient.recipient);
-                return;
-              } catch (err_) {
-                this.config.logger.warn(err_);
-
-                // determine if code or status is retryable here and set it as `err._responseCode`
-                if (
-                  (isSANB(err_.code) &&
-                    HTTP_RETRY_ERROR_CODES.has(err_.code)) ||
-                  (_.isNumber(err_.status) &&
-                    HTTP_RETRY_STATUS_CODES.has(err_.status))
-                ) {
-                  err_.responseCode = 421;
-                } else {
-                  // alias `responseCode` for consistency with SMTP responseCode
-                  // TODO: map HTTP to SMTP codes appropriately
-                  // if (_.isNumber(err_.status))
-                  //   err_.responseCode = err_.status;
-                  // else
-                  err_.responseCode = 550;
-                }
-
-                // hide the webhook endpoint
-                err_.message = err_.message.replace(
-                  new RE2(recipient.webhook, 'gi'),
-                  'a webhook endpoint'
-                );
-
-                // in case the response had sensitive email user information hide it too
-                for (const address of Object.keys(recipient.replacements)) {
-                  err_.message = err_.message.replace(
-                    new RE2(address, 'gi'),
-                    recipient.replacements[address]
-                  );
-                }
-
-                bounces.push({
-                  address: recipient.recipient,
-                  err: err_
-                });
-              }
-
-              return;
-            }
-
-            const result = await this.processRecipient({
-              recipient,
-              name,
-              raw,
-              from
-            });
-
-            if (result.accepted.length > 0) {
-              // add to the
-              for (const a of result.accepted) {
-                // get normalized form without `+` symbol
-                const normal = `${this.parseUsername(a)}@${this.parseDomain(
-                  a,
-                  false
-                )}`;
-                if (
-                  !selfTestEmails.includes(normal) &&
-                  normal === this.checkSRS(mailFrom.address)
-                )
-                  selfTestEmails.push(normal);
-              }
-
-              accepted.push(recipient.recipient);
-            }
-
-            if (result.rejected.length === 0) return;
-            for (let x = 0; x < result.rejected.length; x++) {
-              const err = result.rejectedErrors[x];
-              bounces.push({
-                // TODO: in future handle this port: recipient.port
-                // and also handle it in `async processAddress(replacements, opts)`
-                address: recipient.recipient,
-                host: recipient.host,
-                err
-              });
-            }
-          };
-
-          await Promise.all(normalized.map((recipient) => mapper(recipient)));
-
-          //
-          // if there were any where the MAIL FROM was equivalent to the recipient
-          // then we'll send them a one-time email to let them know it was successful
-          // and also that they made need to check their "Sent" folder since many email
-          // hosts like Gmail will not show a message you send from yourself to yourself
-          // unless we rewrite the Message-Id header, which was previously did, but even
-          // then it causes problems, as it prepends "This email looks suspicious" warning
-          //
-          // <https://support.google.com/a/answer/1703601?hl=en>
-          // <https://stackoverflow.com/a/52534520>
-          //
-          if (selfTestEmails.length > 0)
-            superagent
-              .post(`${this.config.apiEndpoint}/v1/self-test`)
-              .set('User-Agent', this.config.userAgent)
-              .set('Accept', 'json')
-              .auth(this.config.apiSecrets[0])
-              .timeout(this.config.timeout)
-              .retry(this.config.retry)
-              .send({
-                emails: selfTestEmails
-              })
-              // eslint-disable-next-line promise/prefer-await-to-then
-              .then(() => {})
-              .catch((err) => {
-                this.config.logger.error(err);
-              });
-
-          // if there weren't any bounces then return early
-          if (bounces.length === 0) return fn();
-
-          const codes = bounces.map((bounce) => {
-            if (_.isNumber(bounce.err.responseCode))
-              return bounce.err.responseCode;
-            if (
-              _.isString(bounce.err.code) &&
-              RETRY_CODES.includes(bounce.err.code)
-            )
-              return CODES_TO_RESPONSE_CODES[bounce.err.code];
-            return 550;
-          });
-
-          // sort the codes and get the lowest one
-          // (that way 4xx retries are attempted)
-          const [code] = codes.sort();
-
-          const messages = [];
-
-          if (accepted.length > 0)
-            messages.push(
-              `Message was sent successfully to ${arrayJoinConjunction(
-                accepted
-              )}`
+        //
+        // instead of returning an error if it bounced
+        // which would in turn cause the message to get retried
+        // we should instead send a bounce email to the user
+        //
+        // <https://github.com/nodemailer/smtp-server/issues/129>
+        //
+        // and we also need to make bounces unique by address here
+        // (will basically pick the first that was pushed to the list)
+        //
+        const uniqueBounces = _.uniqBy(bounces, 'address').filter((bounce) => {
+          // extra safeguards to prevent exception and let us know of any weirdness
+          if (!_.isObject(bounce)) {
+            this.config.logger.error(
+              new Error('Bounce was not an object', { bounce })
             );
-
-          for (const element of bounces) {
-            messages.push(
-              `Error for ${element.host || element.address} of "${
-                element.err.message
-              }"`
-            );
+            return false;
           }
 
-          // join the messages together and make them unique
-          const err = new CustomError(_.uniq(messages).join(', '), code);
+          if (!_.isError(bounce.err)) {
+            this.config.logger.error(
+              new Error('Bounce was missing error object', { bounce })
+            );
+            return false;
+          }
 
-          // send error to user
-          fn(err);
+          if (isSANB(bounce.err.code) && RETRY_CODES.includes(bounce.err.code))
+            return false;
 
-          //
-          // if the message had any of these headers then don't send bounce
-          // <https://www.jitbit.com/maxblog/18-detecting-outlook-autoreplyout-of-office-emails-and-x-auto-response-suppress-header/>
-          // <https://github.com/nodemailer/smtp-server/issues/129>
-          //
           if (
-            headers.hasHeader('X-Autoreply') ||
-            headers.hasHeader('X-Autorespond') ||
-            (headers.hasHeader('Auto-Submitted') &&
-              headers.getFirst('Auto-Submitted') === 'auto-replied')
+            _.isNumber(bounce.err.responseCode) &&
+            RETRY_CODE_NUMBERS.includes(bounce.err.responseCode)
           )
-            return;
+            return false;
 
-          //
-          // instead of returning an error if it bounced
-          // which would in turn cause the message to get retried
-          // we should instead send a bounce email to the user
-          //
-          // <https://github.com/nodemailer/smtp-server/issues/129>
-          //
-          // and we also need to make bounces unique by address here
-          // (will basically pick the first that was pushed to the list)
-          //
-          const uniqueBounces = _.uniqBy(bounces, 'address').filter(
-            (bounce) => {
-              // extra safeguards to prevent exception and let us know of any weirdness
-              if (!_.isObject(bounce)) {
-                this.config.logger.error(
-                  new Error('Bounce was not an object', { bounce })
-                );
-                return false;
-              }
+          if (
+            _.isNumber(bounce.err.status) &&
+            RETRY_CODE_NUMBERS.includes(bounce.err.status)
+          )
+            return false;
 
-              if (!_.isError(bounce.err)) {
-                this.config.logger.error(
-                  new Error('Bounce was missing error object', { bounce })
-                );
-                return false;
-              }
+          if (isSANB(bounce.err.response)) {
+            const bounceInfo = zoneMTABounces.check(bounce.err.response);
+            if (['defer', 'slowdown'].includes(bounceInfo.action)) return false;
+          }
 
-              if (
-                isSANB(bounce.err.code) &&
-                RETRY_CODES.includes(bounce.err.code)
-              )
-                return false;
+          return true;
+        });
 
-              if (
-                _.isNumber(bounce.err.responseCode) &&
-                RETRY_CODE_NUMBERS.includes(bounce.err.responseCode)
-              )
-                return false;
+        // if all of the bounces were defer/slowdown then return early
+        if (uniqueBounces.length === 0) return;
 
-              if (
-                _.isNumber(bounce.err.status) &&
-                RETRY_CODE_NUMBERS.includes(bounce.err.status)
-              )
-                return false;
-
-              if (isSANB(bounce.err.response)) {
-                const bounceInfo = zoneMTABounces.check(bounce.err.response);
-                if (['defer', 'slowdown'].includes(bounceInfo.action))
-                  return false;
-              }
-
-              return true;
-            }
-          );
-
-          // if all of the bounces were defer/slowdown then return early
-          if (uniqueBounces.length === 0) return;
-
-          //
-          // TODO: get the latest bounce template rendered for the user from our API
-          // (which we'll then replace with the recipient's address and message)
-          //
-          const template = false;
-          /*
+        //
+        // TODO: get the latest bounce template rendered for the user from our API
+        // (which we'll then replace with the recipient's address and message)
+        //
+        const template = false;
+        /*
           try {
             const { body } = await superagent
               .get(`${this.config.apiEndpoint}/v1/bounce`)
@@ -2178,59 +2020,56 @@ class ForwardEmail {
           }
           */
 
-          await Promise.all(
-            uniqueBounces.map(async (bounce) => {
-              const raw = await getStream(
-                this.dkim.sign(
-                  this.getBounceStream({
-                    headers,
-                    from: mailFrom.address
-                      ? this.checkSRS(mailFrom.address)
-                      : mailFrom.address,
-                    name,
-                    bounce,
-                    id: session.id,
-                    arrivalDate: session.arrivalDate,
-                    originalRaw,
-                    messageId,
-                    template
-                  })
-                )
-              );
-              const options = {
-                host: mailFrom.address
-                  ? this.checkSRS(mailFrom.address)
-                  : mailFrom.address,
-                //
-                // NOTE: bounces to custom ports won't work
-                //       we would require custom logic here
-                //       to lookup forward-email-port config
-                //
-                port: '25',
-                name,
-                envelope: {
-                  from: '',
-                  to: mailFrom.address
+        await Promise.all(
+          uniqueBounces.map(async (bounce) => {
+            const raw = await getStream(
+              this.dkim.sign(
+                this.getBounceStream({
+                  headers,
+                  from: mailFrom.address
                     ? this.checkSRS(mailFrom.address)
-                    : mailFrom.address
-                },
-                raw: raw.toString()
-              };
-              try {
-                await this.sendEmail(options);
-              } catch (err_) {
-                this.config.logger.error(
-                  `${err_.message} (Session: ${safeStringify(session)})`
-                );
-                this.config.logger.error(err_);
-              }
-            })
-          );
-        } catch (err) {
-          stream.destroy(err);
-        }
+                    : mailFrom.address,
+                  name,
+                  bounce,
+                  id: session.id,
+                  arrivalDate: session.arrivalDate,
+                  originalRaw,
+                  messageId,
+                  template
+                })
+              )
+            );
+            const options = {
+              host: mailFrom.address
+                ? this.checkSRS(mailFrom.address)
+                : mailFrom.address,
+              //
+              // NOTE: bounces to custom ports won't work
+              //       we would require custom logic here
+              //       to lookup forward-email-port config
+              //
+              port: '25',
+              name,
+              envelope: {
+                from: '',
+                to: mailFrom.address
+                  ? this.checkSRS(mailFrom.address)
+                  : mailFrom.address
+              },
+              raw
+            };
+            try {
+              await this.sendEmail(options);
+            } catch (err_) {
+              this.config.logger.error(
+                `${err_.message} (Session: ${safeStringify(session)})`
+              );
+              this.config.logger.error(err_);
+            }
+          })
+        );
       } catch (err) {
-        stream.destroy(err);
+        stream.emit('error', err);
       }
     });
 
@@ -2240,7 +2079,7 @@ class ForwardEmail {
   async validateMX(address) {
     try {
       const domain = this.parseDomain(address);
-      const addresses = await this.dnsQuery('mx', domain);
+      const addresses = await this.resolver(domain, 'MX');
       if (!addresses || addresses.length === 0)
         throw new CustomError(
           `DNS lookup for ${domain} did not return any valid MX records.`,
@@ -2371,7 +2210,7 @@ class ForwardEmail {
     const domain = this.parseDomain(address, false);
     let records;
     try {
-      records = await this.dnsQuery('txt', domain);
+      records = await this.resolver(domain, 'TXT');
     } catch (err) {
       this.config.logger.warn(err);
       // support retries
