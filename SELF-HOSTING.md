@@ -107,19 +107,6 @@ You'll also need the following dependencies installed:
     "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCojharU7eJW+eaLulQygsc/AHx2A0gyLnSU2fPGs8mI3Fhs3EVIIRP01euHg+IljMmXz9YtU+XMfZuYdSCa9NY16XjoIgub2+lkeiHHNpURIpwQJSeHxviMOfMAZ5/xSTDDoaYY2vcKytheZeLAVK2V1SuTdTp+C6B9E6AUSu1TwIDAQAB"
     ```
 
-* Python v3.6+ with the following additional pip3 dependencies installed:
-
-  ```sh
-  sudo apt-get update
-  sudo apt purge python2.7-minimal
-  sudo apt-get install python3 python3-pip python3-setuptools
-  pip3 install --upgrade pip setuptools wheel
-  pip3 install dkimpy authres
-  pip3 install git+https://github.com/forwardemail/authentication-headers.git
-  pip3 install git+https://github.com/forwardemail/pyspf.git
-  pip3 install dnspython==1.16.0
-  ```
-
 * DNS records - you need to setup and modify your DNS records with your own self-hosted version.  See our [FAQ](https://forwardemail.net/faq) for more information (be sure to replace `forwardemail.net` in the FAQ instructions with your own domain - and make sure you do DNS lookups for all related subdomains such as `mx1.forwardemail.net`, `mx2.forwardemail.net`, and `spf.forwardemail.net` – and clone them with your own).  We recommend using Cloudflare or Amazon Route 53 for DNS hosting.
 
 * Reverse DNS ("rDNS") with PTR Record- - the PTR record for your server's IP address is controlled by your server provider, and therefore you need to contact your server provider to set the PTR record for you.  Services such as DigitalOcean will set a PTR record for you automatically as long as you use a fully-qualified domain name ("FQDN").
