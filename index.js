@@ -1268,12 +1268,11 @@ class ForwardEmail {
         //
         let scan;
 
-        // TODO: re-enable this ASAP
-        // try {
-        //   scan = await this.scanner.scan(originalRaw);
-        // } catch (err) {
-        //   this.config.logger.fatal(err);
-        // }
+        try {
+          scan = await this.scanner.scan(originalRaw);
+        } catch (err) {
+          this.config.logger.fatal(err);
+        }
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
