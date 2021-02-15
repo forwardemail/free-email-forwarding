@@ -1271,11 +1271,13 @@ class ForwardEmail {
         //
         let scan;
 
+        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err, { session });
         }
+        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1934,7 +1936,7 @@ class ForwardEmail {
         const err = new CustomError(_.uniq(messages).join(', '), code);
 
         // send error to user
-        this.config.logger.error(err, { session });
+        this.config.logger.fatal(err, { session });
         fn(err);
 
         //
@@ -2197,9 +2199,7 @@ class ForwardEmail {
       // ]);
       fn();
     } catch (err) {
-      this.config.logger.error(
-        `${err.message} (${safeStringify({ address, session })}`
-      );
+      this.config.logger.fatal(err, { address, session });
       fn(err);
     }
   }
@@ -2560,6 +2560,7 @@ class ForwardEmail {
         420
       );
     } catch (err) {
+      this.config.logger.fatal(err, { session });
       fn(err);
     }
   }
