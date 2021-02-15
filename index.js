@@ -1226,7 +1226,10 @@ class ForwardEmail {
             (REGEX_SRS0.test(to.address) || REGEX_SRS1.test(to.address)) &&
             _.isNull(this.srs.reverse(to.address))
           ) {
-            this.config.logger.warn(`SRS address of ${to.address} was invalid`);
+            this.config.logger.warn(
+              new Error(`SRS address of ${to.address} was invalid`),
+              { session }
+            );
             return;
           }
 
@@ -1268,12 +1271,11 @@ class ForwardEmail {
         //
         let scan;
 
-        // TODO: re-enable this ASAP
-        // try {
-        //   scan = await this.scanner.scan(originalRaw);
-        // } catch (err) {
-        //   this.config.logger.fatal(err);
-        // }
+        try {
+          scan = await this.scanner.scan(originalRaw);
+        } catch (err) {
+          this.config.logger.fatal(err, { session });
+        }
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1361,7 +1363,7 @@ class ForwardEmail {
             // eslint-disable-next-line promise/prefer-await-to-then
             .then(() => {})
             .catch((err) => {
-              this.config.logger.error(err);
+              this.config.logger.fatal(err, { session });
             });
         */
 
@@ -1475,9 +1477,10 @@ class ForwardEmail {
                   ) {
                     port = body.port;
                     this.config.logger.debug(
-                      `Custom port for ${to.address} detected`,
+                      new Error(`Custom port for ${to.address} detected`),
                       {
-                        port
+                        port,
+                        session
                       }
                     );
                   }
@@ -1494,7 +1497,7 @@ class ForwardEmail {
                     hasVirusProtection = body.has_virus_protection;
                 }
               } catch (err) {
-                this.config.logger.error(err);
+                this.config.logger.fatal(err, { session });
               }
 
               //
@@ -1554,7 +1557,7 @@ class ForwardEmail {
                 port
               };
             } catch (err) {
-              this.config.logger.warn(err);
+              this.config.logger.warn(err, { session });
               bounces.push({
                 address: to.address,
                 err
@@ -1601,7 +1604,7 @@ class ForwardEmail {
                   } catch (err) {
                     // e.g. if the MX servers don't exist for recipient
                     // then obviously there should be an error
-                    this.config.logger.error(err);
+                    this.config.logger.error(err, { session });
                     errors.push({
                       address,
                       err
@@ -1625,7 +1628,7 @@ class ForwardEmail {
                 errors.map((error) => `${error.address}: ${error.err.message}`)
               );
             } catch (err) {
-              this.config.logger.error(err);
+              this.config.logger.error(err, { session });
               bounces.push({
                 address: recipient.address,
                 err
@@ -1785,7 +1788,7 @@ class ForwardEmail {
               accepted.push(recipient.recipient);
               return;
             } catch (err_) {
-              this.config.logger.warn(err_);
+              this.config.logger.warn(err_, { session });
 
               // determine if code or status is retryable here and set it as `err._responseCode`
               if (
@@ -1891,7 +1894,7 @@ class ForwardEmail {
             // eslint-disable-next-line promise/prefer-await-to-then
             .then(() => {})
             .catch((err) => {
-              this.config.logger.error(err);
+              this.config.logger.error(err, { session });
             });
 
         // if there weren't any bounces then return early
@@ -1931,6 +1934,7 @@ class ForwardEmail {
         const err = new CustomError(_.uniq(messages).join(', '), code);
 
         // send error to user
+        this.config.logger.error(err, { session });
         fn(err);
 
         //
@@ -1960,14 +1964,14 @@ class ForwardEmail {
           // extra safeguards to prevent exception and let us know of any weirdness
           if (!_.isObject(bounce)) {
             this.config.logger.error(
-              new Error('Bounce was not an object', { bounce })
+              new Error('Bounce was not an object', { bounce, session })
             );
             return false;
           }
 
           if (!_.isError(bounce.err)) {
             this.config.logger.error(
-              new Error('Bounce was missing error object', { bounce })
+              new Error('Bounce was missing error object', { bounce, session })
             );
             return false;
           }
@@ -2016,7 +2020,7 @@ class ForwardEmail {
             if (_.isObject(body) && isSANB(body.html) && isSANB(body.text))
               template = body;
           } catch (err) {
-            this.config.logger.error(err);
+            this.config.logger.error(err, { session });
           }
           */
 
@@ -2061,10 +2065,7 @@ class ForwardEmail {
             try {
               await this.sendEmail(options);
             } catch (err_) {
-              this.config.logger.error(
-                `${err_.message} (Session: ${safeStringify(session)})`
-              );
-              this.config.logger.error(err_);
+              this.config.logger.error(err_, { session });
             }
           })
         );
@@ -2087,7 +2088,7 @@ class ForwardEmail {
         );
       return _.sortBy(addresses, 'priority');
     } catch (err) {
-      this.config.logger.warn(err);
+      this.config.logger.warn(err, { address });
       // support retries
       if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
         err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
@@ -2495,7 +2496,7 @@ class ForwardEmail {
       )
         maxForwardedAddresses = body.max_forwarded_addresses;
     } catch (err) {
-      this.config.logger.error(err);
+      this.config.logger.fatal(err);
     }
 
     if (forwardingAddresses.length > maxForwardedAddresses)
