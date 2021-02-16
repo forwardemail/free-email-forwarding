@@ -1407,11 +1407,14 @@ class ForwardEmail {
           _.isObject(spf) &&
           _.isObject(spf.status) &&
           spf.status.result === 'pass' &&
+          // NOTE: some email scanners still do not respect ARC
+          //       and only respect DMARC/SPF/DKIM so until they
+          //       are supported we unfortunately have to do SRS rewrite
           // - DMARC none OR p=reject and pass
           _.isObject(dmarc) &&
           _.isObject(dmarc.status) &&
-          (dmarc.status.result === 'none' ||
-            (dmarc.policy === 'reject' && dmarc.status.result === 'pass')) &&
+          (dmarc.status.result === 'none' || dmarc.status.result === 'pass') &&
+          // (dmarc.policy === 'reject' && dmarc.status.result === 'pass')) &&
           // - no passing DKIM
           _.isObject(dkim) &&
           _.isObject(dkim.results) &&
