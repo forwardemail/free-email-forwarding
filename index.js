@@ -236,7 +236,7 @@ class ForwardEmail {
       spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
       blacklist: env.BLACKLIST,
       blacklistedStr:
-        "Your mail server's IP address of %s is listed on the %s DNS blacklist (visit %s to submit a removal request and try again).",
+        "Your mail server's IP address of %s is listed on the %s DNS blacklist (visit <%s> to submit a removal request and try again).",
       dnsbl: {
         domains: env.DNSBL_DOMAINS,
         removals: env.DNSBL_REMOVALS,
@@ -568,7 +568,7 @@ class ForwardEmail {
               options.bounce.err.message,
               // options.bounce.err.response || options.bounce.err.message,
               '',
-              `If you need help, forward this to ${this.config.email} or visit ${this.config.website}.`
+              `If you need help, forward this to ${this.config.email} or visit <${this.config.website}>.`
             ].join('\n')
       );
 
@@ -930,7 +930,7 @@ class ForwardEmail {
     // check against blacklist
     if (this.isBlacklisted(domain))
       throw new CustomError(
-        `The domain ${domain} is blacklisted by ${this.config.website}.`,
+        `The domain ${domain} is blacklisted by <${this.config.website}>.`,
         554
       );
 
@@ -1057,12 +1057,12 @@ class ForwardEmail {
         this.isBlacklisted(session.clientHostname)
       )
         throw new CustomError(
-          `The domain ${session.clientHostname} is blacklisted by ${this.config.website}.`,
+          `The domain ${session.clientHostname} is blacklisted by <${this.config.website}>.`,
           554
         );
       if (this.isBlacklisted(session.remoteAddress))
         throw new CustomError(
-          `The IP address ${session.remoteAddress} is blacklisted by ${this.config.website}.`,
+          `The IP address ${session.remoteAddress} is blacklisted by <${this.config.website}>.`,
           554
         );
 
@@ -1126,7 +1126,7 @@ class ForwardEmail {
           : 'error'
       ](err, { session });
 
-      err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}.`;
+      err.message += ` If you need help please forward this email to ${this.config.email} or visit <${this.config.website}>.`;
       fn(err);
     });
 
@@ -1566,8 +1566,9 @@ class ForwardEmail {
                   }
                 }
 
+                // only slice the first three errors to keep it clean
                 if (messages.length > 0)
-                  throw new CustomError(messages.join(' '), 554);
+                  throw new CustomError(messages.slice(0, 3).join(' '), 554);
               }
 
               return {
