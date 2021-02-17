@@ -65,6 +65,7 @@
     "spamscanner": "^3.0.0",
     "split-lines": "^2.0.0",
     "superagent": "^6.1.0",
+    "titleize": "^2.1.0",
     "uuid-by-string": "^3.0.2",
     "validator": "^13.5.2",
     "zone-mta": "^2.4.2"
