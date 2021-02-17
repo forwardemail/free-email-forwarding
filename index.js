@@ -1387,22 +1387,10 @@ class ForwardEmail {
           _.isObject(dmarc.status) &&
           dmarc.status.result === 'fail' &&
           dmarc.policy === 'reject'
-        ) {
-          this.config.logger.fatal(
-            new Error(`ARC and DMARC failed with p=reject`),
-            {
-              sender: mailFrom.address,
-              arc,
-              dmarc,
-              spf,
-              dkim,
-              session
-            }
-          );
+        )
           throw new CustomError(
             "The email sent has failed DMARC validation and is rejected due to the domain's DMARC policy."
           );
-        }
 
         //
         // TODO: better abuse prevention around this
