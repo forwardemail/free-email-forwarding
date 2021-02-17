@@ -1662,13 +1662,32 @@ class ForwardEmail {
         // if no recipients return early with bounces joined together
         if (_.isEmpty(recipients)) {
           if (_.isEmpty(bounces)) throw new CustomError('Invalid recipients');
+          const codes = bounces.map((bounce) => {
+            if (_.isNumber(bounce.err.responseCode))
+              return bounce.err.responseCode;
+            if (
+              _.isString(bounce.err.code) &&
+              RETRY_CODES.includes(bounce.err.code)
+            )
+              return CODES_TO_RESPONSE_CODES[bounce.err.code];
+            if (
+              (bounce.err.code &&
+                HTTP_RETRY_ERROR_CODES.has(bounce.err.code)) ||
+              (_.isNumber(bounce.err.status) &&
+                HTTP_RETRY_STATUS_CODES.has(bounce.err.status))
+            )
+              return 421;
+            return 550;
+          });
+          const [code] = codes.sort();
           throw new CustomError(
             bounces
               .map(
                 (bounce) =>
                   `Error for ${bounce.address} of "${bounce.err.message}"`
               )
-              .join(', ')
+              .join(', '),
+            code
           );
         }
 
@@ -1926,6 +1945,12 @@ class ForwardEmail {
             RETRY_CODES.includes(bounce.err.code)
           )
             return CODES_TO_RESPONSE_CODES[bounce.err.code];
+          if (
+            (bounce.err.code && HTTP_RETRY_ERROR_CODES.has(bounce.err.code)) ||
+            (_.isNumber(bounce.err.status) &&
+              HTTP_RETRY_STATUS_CODES.has(bounce.err.status))
+          )
+            return 421;
           return 550;
         });
 
