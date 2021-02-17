@@ -1091,7 +1091,27 @@ class ForwardEmail {
   }
 
   async onData(stream, session, fn) {
+    // eslint-disable-next-line complexity
     stream.once('error', (err) => {
+      // parse SMTP code and message
+      if (err.message && err.message.startsWith('SMTP code:')) {
+        if (!err.responseCode)
+          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+        err.message = err.message.split('msg:')[1];
+      }
+
+      // if it was HTTP error and no `responseCode` set then try to parse it
+      // into a SMTP-friendly format for error handling
+      if (!err.responseCode) {
+        if (
+          (err.code && HTTP_RETRY_ERROR_CODES.has(err.code)) ||
+          (_.isNumber(err.status) && HTTP_RETRY_STATUS_CODES.has(err.status))
+        )
+          err.responseCode = 421;
+        // TODO: map HTTP to SMTP codes appropriately
+        else err.responseCode = 550;
+      }
+
       this.config.logger[
         (err && err.message && err.message.includes('Invalid recipients')) ||
         (err &&
@@ -1105,13 +1125,6 @@ class ForwardEmail {
           ? 'warn'
           : 'error'
       ](err, { session });
-
-      // parse SMTP code and message
-      if (err.message && err.message.startsWith('SMTP code:')) {
-        if (!err.responseCode)
-          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
-        err.message = err.message.split('msg:')[1];
-      }
 
       err.message += ` If you need help please forward this email to ${this.config.email} or visit ${this.config.website}.`;
       fn(err);
@@ -1466,49 +1479,44 @@ class ForwardEmail {
                 return { address: to.address, addresses: [], ignored: true };
 
               // lookup the port (e.g. if `forward-email-port=` or custom set on the domain)
-              try {
-                const domain = this.parseDomain(to.address, false);
+              const domain = this.parseDomain(to.address, false);
 
-                const { body } = await superagent
-                  .get(`${this.config.apiEndpoint}/v1/settings`)
-                  .query({ domain })
-                  .set('Accept', 'application/json')
-                  .set('User-Agent', this.config.userAgent)
-                  .auth(this.config.apiSecrets[0])
-                  .timeout(this.config.timeout)
-                  .retry(this.config.retry);
+              const { body } = await superagent
+                .get(`${this.config.apiEndpoint}/v1/settings`)
+                .query({ domain })
+                .set('Accept', 'application/json')
+                .set('User-Agent', this.config.userAgent)
+                .auth(this.config.apiSecrets[0])
+                .timeout(this.config.timeout)
+                .retry(this.config.retry);
 
-                // body is an Object
-                if (_.isObject(body)) {
-                  // `port` (String) - a valid port number, defaults to 25
-                  if (
-                    isSANB(body.port) &&
-                    validator.isPort(body.port) &&
-                    body.port !== '25'
-                  ) {
-                    port = body.port;
-                    this.config.logger.debug(
-                      new Error(`Custom port for ${to.address} detected`),
-                      {
-                        port,
-                        session
-                      }
-                    );
-                  }
-
-                  // Spam Scanner boolean values adjusted by user in Advanced Settings page
-                  if (_.isBoolean(body.has_adult_content_protection))
-                    hasAdultContentProtection =
-                      body.has_adult_content_protection;
-                  if (_.isBoolean(body.has_phishing_protection))
-                    hasPhishingProtection = body.has_phishing_protection;
-                  if (_.isBoolean(body.has_executable_protection))
-                    hasExecutableProtection = body.has_executable_protection;
-                  if (_.isBoolean(body.has_virus_protection))
-                    hasVirusProtection = body.has_virus_protection;
+              // body is an Object
+              if (_.isObject(body)) {
+                // `port` (String) - a valid port number, defaults to 25
+                if (
+                  isSANB(body.port) &&
+                  validator.isPort(body.port) &&
+                  body.port !== '25'
+                ) {
+                  port = body.port;
+                  this.config.logger.debug(
+                    new Error(`Custom port for ${to.address} detected`),
+                    {
+                      port,
+                      session
+                    }
+                  );
                 }
-              } catch (err) {
-                this.config.logger.fatal(err, { session });
+
+                // Spam Scanner boolean values adjusted by user in Advanced Settings page
+                if (_.isBoolean(body.has_adult_content_protection))
+                  hasAdultContentProtection = body.has_adult_content_protection;
+                if (_.isBoolean(body.has_phishing_protection))
+                  hasPhishingProtection = body.has_phishing_protection;
+                if (_.isBoolean(body.has_executable_protection))
+                  hasExecutableProtection = body.has_executable_protection;
+                if (_.isBoolean(body.has_virus_protection))
+                  hasVirusProtection = body.has_virus_protection;
               }
 
               //
@@ -2271,25 +2279,21 @@ class ForwardEmail {
           `Domain ${domain} has multiple verification TXT records of "${this.config.recordPrefix}-site-verification" and should only have one`
         );
       // if there was a verification record then perform lookup
-      try {
-        const { body } = await superagent
-          .get(`${this.config.apiEndpoint}/v1/lookup`)
-          .query({ domain, username, verification_record: verifications[0] })
-          .set('Accept', 'application/json')
-          .set('User-Agent', this.config.userAgent)
-          .auth(this.config.apiSecrets[0])
-          .timeout(this.config.timeout)
-          .retry(this.config.retry);
+      const { body } = await superagent
+        .get(`${this.config.apiEndpoint}/v1/lookup`)
+        .query({ domain, username, verification_record: verifications[0] })
+        .set('Accept', 'application/json')
+        .set('User-Agent', this.config.userAgent)
+        .auth(this.config.apiSecrets[0])
+        .timeout(this.config.timeout)
+        .retry(this.config.retry);
 
-        // body is an Array of records that are formatted like TXT records
-        if (_.isArray(body)) {
-          // combine with any existing TXT records (ensures graceful DNS propagation)
-          for (const element of body) {
-            validRecords.push(element);
-          }
+      // body is an Array of records that are formatted like TXT records
+      if (_.isArray(body) && body.length > 0) {
+        // combine with any existing TXT records (ensures graceful DNS propagation)
+        for (const element of body) {
+          validRecords.push(element);
         }
-      } catch (err) {
-        this.config.logger.error(err);
       }
     }
 
@@ -2480,27 +2484,23 @@ class ForwardEmail {
     // lookup here to determine max forwarded addresses on the domain
     // if max number of forwarding addresses exceeded
     let { maxForwardedAddresses } = this.config;
-    try {
-      const { body } = await superagent
-        .get(
-          `${this.config.apiEndpoint}/v1/max-forwarded-addresses?domain=${domain}`
-        )
-        .set('Accept', 'application/json')
-        .set('User-Agent', `forward-email/${pkg.version}`)
-        .auth(this.config.apiSecrets[0])
-        .timeout(this.config.timeout)
-        .retry(this.config.retry);
-
-      // body is an Object with `max_forwarded_addresses` Number
-      if (
-        _.isObject(body) &&
-        _.isNumber(body.max_forwarded_addresses) &&
-        body.max_forwarded_addresses > 0
+    const { body } = await superagent
+      .get(
+        `${this.config.apiEndpoint}/v1/max-forwarded-addresses?domain=${domain}`
       )
-        maxForwardedAddresses = body.max_forwarded_addresses;
-    } catch (err) {
-      this.config.logger.fatal(err);
-    }
+      .set('Accept', 'application/json')
+      .set('User-Agent', `forward-email/${pkg.version}`)
+      .auth(this.config.apiSecrets[0])
+      .timeout(this.config.timeout)
+      .retry(this.config.retry);
+
+    // body is an Object with `max_forwarded_addresses` Number
+    if (
+      _.isObject(body) &&
+      _.isNumber(body.max_forwarded_addresses) &&
+      body.max_forwarded_addresses > 0
+    )
+      maxForwardedAddresses = body.max_forwarded_addresses;
 
     if (forwardingAddresses.length > maxForwardedAddresses)
       throw new CustomError(
