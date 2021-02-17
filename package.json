@@ -62,7 +62,7 @@
     "sender-rewriting-scheme": "^1.0.0",
     "signale": "^1.4.0",
     "smtp-server": "^3.8.0",
-    "spamscanner": "^3.0.0",
+    "spamscanner": "^3.0.1",
     "split-lines": "^2.0.0",
     "superagent": "^6.1.0",
     "titleize": "^2.1.0",

@@ -1660,16 +1660,14 @@ class ForwardEmail {
 
         // if no recipients return early with bounces joined together
         if (_.isEmpty(recipients)) {
-          if (_.isEmpty(bounces))
-            throw new CustomError('Invalid recipients', 420);
+          if (_.isEmpty(bounces)) throw new CustomError('Invalid recipients');
           throw new CustomError(
             bounces
               .map(
                 (bounce) =>
                   `Error for ${bounce.address} of "${bounce.err.message}"`
               )
-              .join(', '),
-            420
+              .join(', ')
           );
         }
 
@@ -1938,7 +1936,9 @@ class ForwardEmail {
 
         if (accepted.length > 0)
           messages.push(
-            `Message was sent successfully to ${arrayJoinConjunction(accepted)}`
+            `Message was sent successfully to ${arrayJoinConjunction(
+              _.uniq(accepted)
+            )}`
           );
 
         for (const element of bounces) {
@@ -2084,7 +2084,7 @@ class ForwardEmail {
             try {
               await this.sendEmail(options);
             } catch (err_) {
-              this.config.logger.error(err_, { session });
+              this.config.logger.fatal(err_, { session });
             }
           })
         );
