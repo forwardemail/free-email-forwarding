@@ -908,8 +908,24 @@ class ForwardEmail {
 
   // parseDomain(address, isSender = true) {
   parseDomain(address) {
-    let domain = addressParser(address)[0].address.split('@')[1];
-    domain = punycode.toASCII(domain);
+    const parsedAddress = addressParser(address);
+    let domain;
+
+    if (
+      _.isArray(parsedAddress) &&
+      _.isObject(parsedAddress[0]) &&
+      isSANB(parsedAddress[0].address) &&
+      parsedAddress[0].address.includes('@')
+    )
+      domain = punycode.toASCII(parsedAddress[0].address.split('@')[1]);
+
+    // ensure fully qualified domain name or IP address
+    if (!domain || (!isFQDN(domain) && !validator.isIP(domain)))
+      throw new CustomError(
+        `${
+          domain || address
+        } does not contain a fully qualified domain name ("FQDN") nor IP address.`
+      );
 
     // check against blacklist
     if (this.isBlacklisted(domain))
@@ -917,14 +933,6 @@ class ForwardEmail {
         `The domain ${domain} is blacklisted by ${this.config.website}.`,
         554
       );
-
-    // ensure fully qualified domain name
-    /*
-    if (!isFQDN(domain))
-      throw new CustomError(
-        `${domain} is not a fully qualified domain name ("FQDN")`
-      );
-    */
 
     return domain;
   }
@@ -1271,13 +1279,11 @@ class ForwardEmail {
         //
         let scan;
 
-        /*
         try {
           scan = await this.scanner.scan(originalRaw);
         } catch (err) {
           this.config.logger.fatal(err, { session });
         }
-        */
 
         //
         // 6) validate SPF, DKIM, DMARC, and ARC
@@ -1373,7 +1379,6 @@ class ForwardEmail {
         // only reject if ARC was not passing
         // and DMARC fail with p=reject policy
         //
-
         if (
           _.isObject(arc) &&
           _.isObject(arc.status) &&
@@ -1382,10 +1387,22 @@ class ForwardEmail {
           _.isObject(dmarc.status) &&
           dmarc.status.result === 'fail' &&
           dmarc.policy === 'reject'
-        )
+        ) {
+          this.config.logger.fatal(
+            new Error(`ARC and DMARC failed with p=reject`),
+            {
+              sender: mailFrom.address,
+              arc,
+              dmarc,
+              spf,
+              dkim,
+              session
+            }
+          );
           throw new CustomError(
             "The email sent has failed DMARC validation and is rejected due to the domain's DMARC policy."
           );
+        }
 
         //
         // TODO: better abuse prevention around this
@@ -1424,11 +1441,18 @@ class ForwardEmail {
               !_.isObject(result.status) ||
               result.status.result !== 'pass'
           )
-        )
+        ) {
+          this.config.logger.fatal(
+            new Error(`SRS rewrite`),
+            {
+              arc, spf, dmarc, dkim
+            }
+          );
           from = this.srs.forward(
             this.checkSRS(mailFrom.address),
             this.config.srsDomain
           );
+        }
 
         //
         // 7) lookup forwarding recipients recursively
@@ -2380,13 +2404,7 @@ class ForwardEmail {
         // (e.. the record is just "b.com" if it's not a valid email)
         globalForwardingAddresses.push(`${username}@${lowerCaseAddress}`);
       } else if (validator.isEmail(lowerCaseAddress)) {
-        const domain = this.parseDomain(lowerCaseAddress, false);
-        if (
-          (isFQDN(domain) || validator.isIP(domain)) &&
-          validator.isEmail(lowerCaseAddress)
-        ) {
-          globalForwardingAddresses.push(lowerCaseAddress);
-        }
+        globalForwardingAddresses.push(lowerCaseAddress);
       } else if (validator.isURL(element, this.config.isURLOptions)) {
         globalForwardingAddresses.push(element);
       }

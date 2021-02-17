@@ -2,6 +2,7 @@ const Axe = require('axe');
 const safeStringify = require('fast-safe-stringify');
 const signale = require('signale');
 const { WebClient } = require('@slack/web-api');
+const titleize = require('titleize');
 const pino = require('pino')({
   customLevels: {
     log: 30
@@ -36,6 +37,18 @@ const config = {
 // create our application logger that uses a custom callback function
 const axe = new Axe({ ...config });
 
+const OPTIONAL_SLACK_FIELDS = [
+  'bounce_info',
+  'envelope',
+  'session',
+  'sender',
+  'arc',
+  'dmarc',
+  'spf',
+  'dkim',
+  'session'
+];
+
 if (env.SLACK_API_TOKEN) {
   // custom logger for Slack that inherits our Axe config
   // (with the exception of a `callback` function for logging to Slack)
@@ -51,7 +64,7 @@ if (env.SLACK_API_TOKEN) {
   axe.setCallback(async (level, message, meta) => {
     try {
       // if meta did not have `slack: true` or not a specific level
-      if (!meta.slack && !['fatal'].includes(level)) return;
+      if (!meta.slack && !['error', 'fatal'].includes(level)) return;
 
       // otherwise post a message to the slack channel
       const fields = [
@@ -77,26 +90,14 @@ if (env.SLACK_API_TOKEN) {
         }
       ];
 
-      if (meta.bounce_info)
-        fields.push({
-          title: 'Bounce Info',
-          value: safeStringify(meta.bounce_info),
-          short: true
-        });
-
-      if (meta.envelope)
-        fields.push({
-          title: 'Envelope',
-          value: safeStringify(meta.envelope),
-          short: true
-        });
-
-      if (meta.session)
-        fields.push({
-          title: 'Session',
-          value: safeStringify(meta.session),
-          short: true
-        });
+      for (const field of OPTIONAL_SLACK_FIELDS) {
+        if (meta[field])
+          fields.push({
+            title: titleize(field),
+            value: safeStringify(meta[field]),
+            short: true
+          });
+      }
 
       const result = await web.chat.postMessage({
         channel: 'logs',
