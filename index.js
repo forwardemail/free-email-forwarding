@@ -336,7 +336,7 @@ class ForwardEmail {
       maxRetry: 50,
       messageIdDomain: env.MESSAGE_ID_DOMAIN,
       dnsCachePrefix: 'dns',
-      dnsCacheMs: ms('3m'),
+      dnsCacheMs: ms('10m'),
       dnsBlacklistCacheMs: ms('1d'),
       ...config
     };
@@ -937,7 +937,7 @@ class ForwardEmail {
     return domain;
   }
 
-  async resolver(name, rr) {
+  async resolver(name, rr, reset = false, client = this.client) {
     const key = `${this.config.dnsCachePrefix}:${rr}:${name}`
       .toLowerCase()
       .trim();
@@ -945,9 +945,9 @@ class ForwardEmail {
     //
     // attempt to fetch from cache and return early
     //
-    if (this.client) {
+    if (client && !reset) {
       try {
-        const value = await this.client.get(key);
+        const value = await client.get(key);
         if (value) {
           this.config.logger.debug('cache hit', { key, value });
           return JSON.parse(value);
@@ -980,8 +980,8 @@ class ForwardEmail {
     }
 
     // store it in the cache in the background
-    if (this.client) {
-      this.client
+    if (client) {
+      client
         .set(key, safeStringify(value), 'PX', ttl)
         // eslint-disable-next-line promise/prefer-await-to-then
         .then(this.config.logger.info)

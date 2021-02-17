@@ -4249,6 +4249,16 @@ html-to-text@6.0.0:
     lodash "^4.17.20"
     minimist "^1.2.5"
 
+html-to-text@7.0.0:
+  version "7.0.0"
+  resolved "https://registry.yarnpkg.com/html-to-text/-/html-to-text-7.0.0.tgz#97ff0bcf34241c282f78f5c1baa05dfa44d9d3c3"
+  integrity sha512-UR/WMSHRN8m+L7qQUhbSoxylwBovNPS+xURn/pHeJvbnemhyMiuPYBTBGqB6s8ajAARN5jzKfF0d3CY86VANpA==
+  dependencies:
+    deepmerge "^4.2.2"
+    he "^1.2.0"
+    htmlparser2 "^6.0.0"
+    minimist "^1.2.5"
+
 htmlparser2@3.8.x:
   version "3.8.3"
   resolved "https://registry.yarnpkg.com/htmlparser2/-/htmlparser2-3.8.3.tgz#996c28b191516a8be86501a7d79757e5c70c1068"
@@ -5684,6 +5694,21 @@ mailparser@^3.0.1:
     nodemailer "6.4.16"
     tlds "1.214.0"
 
+mailparser@^3.1.0:
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/mailparser/-/mailparser-3.1.0.tgz#bd947b9936f09f6a0d8e66e8509c86d7d11179af"
+  integrity sha512-XW8aZ649hdgIxWIiHVsgaX7hUwf3eD4KJvtYOonssDuJHQpFJSqKWvTO5XjclNBF5ARWPFDq5OzBPTYH2i57fg==
+  dependencies:
+    encoding-japanese "1.0.30"
+    he "1.2.0"
+    html-to-text "7.0.0"
+    iconv-lite "0.6.2"
+    libmime "5.0.0"
+    linkify-it "3.0.2"
+    mailsplit "5.0.1"
+    nodemailer "6.4.18"
+    tlds "1.217.0"
+
 mailsplit@5.0.0:
   version "5.0.0"
   resolved "https://registry.yarnpkg.com/mailsplit/-/mailsplit-5.0.0.tgz#0924c89142deadb75ef3825860181e436d7557a1"
@@ -6275,9 +6300,10 @@ natural-compare@^1.4.0:
   resolved "https://registry.yarnpkg.com/natural-compare/-/natural-compare-1.4.0.tgz#4abebfeed7541f2c27acfb29bdbbd15c8d5ba4f7"
   integrity sha1-Sr6/7tdUHywnrPspvbvRXI1bpPc=
 
-natural@niftylettuce/natural:
-  version "3.0.2"
-  resolved "https://codeload.github.com/niftylettuce/natural/tar.gz/1bddad066eb1dedc85658f076cdce5267dc05669"
+natural@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/natural/-/natural-4.0.0.tgz#8acdc23e9922b49534701ebee275738feb790f5e"
+  integrity sha512-uL/Y5ES/eCs1R1j/NCbWM7JlKFaZY/Xrx7ZiIFZwpAAsV0eiIG9A5+qna/OvYu8xmazBg1Z4ihDFJd2DHCuM4w==
   dependencies:
     afinn-165 "^1.0.2"
     apparatus "^0.0.10"
@@ -6427,7 +6453,7 @@ nodemailer@6.4.17:
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.17.tgz#8de98618028953b80680775770f937243a7d7877"
   integrity sha512-89ps+SBGpo0D4Bi5ZrxcrCiRFaMmkCt+gItMXQGzEtZVR3uAD3QAQIDoxTWnx3ky0Dwwy/dhFrQ+6NNGXpw/qQ==
 
-nodemailer@^6.4.18:
+nodemailer@6.4.18, nodemailer@^6.4.18:
   version "6.4.18"
   resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.18.tgz#2788c85792844fc17befda019031609017f4b9a1"
   integrity sha512-ht9cXxQ+lTC+t00vkSIpKHIyM4aXIsQ1tcbQCn5IOnxYHi81W2XOaU66EQBFFpbtzLEBTC94gmkbD4mGZQzVpA==
@@ -8994,10 +9020,10 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.0:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^3.0.3:
-  version "3.0.3"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-3.0.3.tgz#baa7d6c385aef3214fb826671fc1407f48eb5294"
-  integrity sha512-77GSVbO8dRKiRqMUbh2oLmn5WfFTXmPCNM9FAQBJHwi96wjGvKzQ4ITr7Qg4NIGfVIC64nqSzQTVvRinkHFbwQ==
+spamscanner@^3.0.4:
+  version "3.0.4"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-3.0.4.tgz#8707d5f033c7649bb78ba3a99cb2f3b73137367e"
+  integrity sha512-w2ZiumI+ETafn9+7S9s6TEON3/AcWOSAuDqOj4r2huFBH34K29LUZUXBdzIvQvrW7MZsA6Mi3kvCCPTpYB/5+Q==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
@@ -9032,7 +9058,7 @@ spamscanner@^3.0.3:
     memoizee "^0.4.15"
     mime-types "^2.1.28"
     ms "^2.1.3"
-    natural niftylettuce/natural
+    natural "^4.0.0"
     newline-remove "^1.0.2"
     node-html-parser "^2.1.0"
     node-snowball "^0.6.0"
@@ -9594,7 +9620,7 @@ tlds@1.214.0:
   resolved "https://registry.yarnpkg.com/tlds/-/tlds-1.214.0.tgz#a20191443eec26fd3339a3bd98e87a0b4f3f0d89"
   integrity sha512-+i48KYsrCkkIZnsj31cTIj9cu5NtFxKo7xlNIB7jg8kXi//b4Ertl5qaHgqFF+y+g0nFwt/k+eph2uUNQJgfwg==
 
-tlds@^1.217.0:
+tlds@1.217.0, tlds@^1.217.0:
   version "1.217.0"
   resolved "https://registry.yarnpkg.com/tlds/-/tlds-1.217.0.tgz#194df180ab5ed41b439745991d4a84a93887cb7d"
   integrity sha512-iRVizGqUFSBRwScghTSJyRkkEXqLAO17nFwlVcmsNHPDdpE+owH91wDUmZXZfJ4UdBYuVSm7kyAXZo0c4X7GFQ==
