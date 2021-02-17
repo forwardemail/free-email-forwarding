@@ -1356,7 +1356,7 @@ class ForwardEmail {
           superagent
             .post(`${this.config.apiEndpoint}/v1/spf-error`)
             .set('User-Agent', this.config.userAgent)
-            .set('Accept', 'json')
+            .set('Accept', 'application/json')
             .auth(this.config.apiSecrets[0])
             .timeout(this.config.timeout)
             .retry(this.config.retry)
@@ -1430,7 +1430,7 @@ class ForwardEmail {
           // - DMARC none OR p=reject and pass
           _.isObject(dmarc) &&
           _.isObject(dmarc.status) &&
-          (dmarc.status.result === 'none' || dmarc.status.result === 'pass') &&
+          dmarc.status.result !== 'fail' &&
           // (dmarc.policy === 'reject' && dmarc.status.result === 'pass')) &&
           // - no passing DKIM
           _.isObject(dkim) &&
@@ -1442,12 +1442,6 @@ class ForwardEmail {
               result.status.result !== 'pass'
           )
         ) {
-          this.config.logger.fatal(
-            new Error(`SRS rewrite`),
-            {
-              arc, spf, dmarc, dkim
-            }
-          );
           from = this.srs.forward(
             this.checkSRS(mailFrom.address),
             this.config.srsDomain
@@ -1490,7 +1484,7 @@ class ForwardEmail {
                 const { body } = await superagent
                   .get(`${this.config.apiEndpoint}/v1/settings`)
                   .query({ domain })
-                  .set('Accept', 'json')
+                  .set('Accept', 'application/json')
                   .set('User-Agent', this.config.userAgent)
                   .auth(this.config.apiSecrets[0])
                   .timeout(this.config.timeout)
@@ -1913,7 +1907,7 @@ class ForwardEmail {
           superagent
             .post(`${this.config.apiEndpoint}/v1/self-test`)
             .set('User-Agent', this.config.userAgent)
-            .set('Accept', 'json')
+            .set('Accept', 'application/json')
             .auth(this.config.apiSecrets[0])
             .timeout(this.config.timeout)
             .retry(this.config.retry)
@@ -1963,7 +1957,7 @@ class ForwardEmail {
         const err = new CustomError(_.uniq(messages).join(', '), code);
 
         // send error to user
-        this.config.logger.fatal(err, { session });
+        this.config.logger.error(err, { session });
         fn(err);
 
         //
@@ -2040,7 +2034,7 @@ class ForwardEmail {
           try {
             const { body } = await superagent
               .get(`${this.config.apiEndpoint}/v1/bounce`)
-              .set('Accept', 'json')
+              .set('Accept', 'application/json')
               .set('User-Agent', `forward-email/${pkg.version}`)
               .auth(this.config.apiSecrets[0])
               .timeout(this.config.timeout)
@@ -2293,7 +2287,7 @@ class ForwardEmail {
         const { body } = await superagent
           .get(`${this.config.apiEndpoint}/v1/lookup`)
           .query({ domain, username, verification_record: verifications[0] })
-          .set('Accept', 'json')
+          .set('Accept', 'application/json')
           .set('User-Agent', this.config.userAgent)
           .auth(this.config.apiSecrets[0])
           .timeout(this.config.timeout)
@@ -2503,7 +2497,7 @@ class ForwardEmail {
         .get(
           `${this.config.apiEndpoint}/v1/max-forwarded-addresses?domain=${domain}`
         )
-        .set('Accept', 'json')
+        .set('Accept', 'application/json')
         .set('User-Agent', `forward-email/${pkg.version}`)
         .auth(this.config.apiSecrets[0])
         .timeout(this.config.timeout)
