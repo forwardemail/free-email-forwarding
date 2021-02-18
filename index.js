@@ -1622,7 +1622,7 @@ class ForwardEmail {
 
                 if (messages.length > 0) {
                   messages.push(
-                    `For more information on Spam Scanner visit <${this.config.spamscannerLink}>.`
+                    'For more information on Spam Scanner visit <https://spamscanner.net>.'
                   );
                   throw new CustomError(messages.join(' '), 554);
                 }
