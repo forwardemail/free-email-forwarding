@@ -72,6 +72,7 @@ const HTTP_RETRY_STATUS_CODES = new Set([
   524
 ]);
 
+// NOTE: if you change this, be sure to sync in `koa-better-error-handler`
 // <https://github.com/nodejs/node/blob/08dd4b1723b20d56fbedf37d52e736fe09715f80/lib/dns.js#L296-L320>
 const CODES_TO_RESPONSE_CODES = {
   EADDRGETNETWORKPARAMS: 421,
