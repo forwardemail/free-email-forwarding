@@ -463,6 +463,46 @@ class ForwardEmail {
     this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
     this.getSentKey = this.getSentKey.bind(this);
     this.resolver = this.resolver.bind(this);
+    this.refineError = this.refineError.bind(this);
+  }
+
+  // eslint-disable-next-line complexity
+  refineError(err, session) {
+    // parse SMTP code and message
+    if (err.message && err.message.startsWith('SMTP code:')) {
+      if (!err.responseCode)
+        err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+      err.message = err.message.split('msg:')[1];
+    }
+
+    // if it was HTTP error and no `responseCode` set then try to parse it
+    // into a SMTP-friendly format for error handling
+    if (!err.responseCode) {
+      if (
+        (err.code && HTTP_RETRY_ERROR_CODES.has(err.code)) ||
+        (_.isNumber(err.status) && HTTP_RETRY_STATUS_CODES.has(err.status))
+      )
+        err.responseCode = 421;
+      // TODO: map HTTP to SMTP codes appropriately
+      else err.responseCode = 550;
+    }
+
+    this.config.logger[
+      (err && err.message && err.message.includes('Invalid recipients')) ||
+      (err &&
+        err.message &&
+        err.message.includes('DNS blacklist') &&
+        err.responseCode &&
+        err.responseCode === 554) ||
+      (err &&
+        err.responseCode &&
+        (err.responseCode < 500 || err.responseCode === 452))
+        ? 'warn'
+        : 'error'
+    ](err, { session });
+
+    err.message += ` If you need help please forward this email to ${this.config.email} or visit <${this.config.website}>.`;
+    return err;
   }
 
   async listen(port, ...args) {
@@ -1100,48 +1140,17 @@ class ForwardEmail {
 
       fn();
     } catch (err) {
-      fn(err);
+      fn(this.refineError(err, session));
     }
   }
 
   async onData(stream, session, fn) {
-    // eslint-disable-next-line complexity
-    stream.once('error', (err) => {
-      // parse SMTP code and message
-      if (err.message && err.message.startsWith('SMTP code:')) {
-        if (!err.responseCode)
-          err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
-        err.message = err.message.split('msg:')[1];
-      }
-
-      // if it was HTTP error and no `responseCode` set then try to parse it
-      // into a SMTP-friendly format for error handling
-      if (!err.responseCode) {
-        if (
-          (err.code && HTTP_RETRY_ERROR_CODES.has(err.code)) ||
-          (_.isNumber(err.status) && HTTP_RETRY_STATUS_CODES.has(err.status))
-        )
-          err.responseCode = 421;
-        // TODO: map HTTP to SMTP codes appropriately
-        else err.responseCode = 550;
-      }
-
-      this.config.logger[
-        (err && err.message && err.message.includes('Invalid recipients')) ||
-        (err &&
-          err.message &&
-          err.message.includes('DNS blacklist') &&
-          err.responseCode &&
-          err.responseCode === 554) ||
-        (err &&
-          err.responseCode &&
-          (err.responseCode < 500 || err.responseCode === 452))
-          ? 'warn'
-          : 'error'
-      ](err, { session });
-
-      err.message += ` If you need help please forward this email to ${this.config.email} or visit <${this.config.website}>.`;
-      fn(err);
+    //
+    // passthrough streams don't have a `.ended` property
+    //
+    let streamEnded = false;
+    stream.once('end', () => {
+      streamEnded = true;
     });
 
     //
@@ -1184,16 +1193,23 @@ class ForwardEmail {
     //
     // if an error occurs we have to continue reading the stream
     //
-    messageSplitter.once('error', (err) => {
+    messageSplitter.on('error', (err) => {
+      if (streamEnded) {
+        fn(this.refineError(err, session));
+      } else {
+        stream.once('end', () => {
+          fn(this.refineError(err, session));
+        });
+      }
+
       stream.unpipe(messageSplitter);
       stream.on('readable', () => {
         stream.read();
       });
-      stream.once('end', () => fn(err));
     });
 
     // eslint-disable-next-line complexity
-    messageSplitter.once('end', async () => {
+    messageSplitter.on('end', async () => {
       //
       // we need to check the following:
       //
@@ -1771,7 +1787,11 @@ class ForwardEmail {
           }
         }
 
-        if (normalized.length === 0) return fn();
+        if (normalized.length === 0) {
+          if (streamEnded) return fn();
+          stream.once('end', () => fn());
+          return;
+        }
 
         //
         // 9) send email
@@ -1949,7 +1969,10 @@ class ForwardEmail {
             });
 
         // if there weren't any bounces then return early
-        if (bounces.length === 0) return fn();
+        if (bounces.length === 0) {
+          if (streamEnded) return fn();
+          stream.once('end', () => fn());
+        }
 
         const codes = bounces.map((bounce) => {
           if (_.isNumber(bounce.err.responseCode))
@@ -1993,8 +2016,13 @@ class ForwardEmail {
         const err = new CustomError(_.uniq(messages).join(', '), code);
 
         // send error to user
-        this.config.logger.error(err, { session });
-        fn(err);
+        if (streamEnded) {
+          fn(this.refineError(err, session));
+        } else {
+          stream.once('end', () => {
+            fn(this.refineError(err, session));
+          });
+        }
 
         //
         // if the message had any of these headers then don't send bounce
@@ -2129,7 +2157,13 @@ class ForwardEmail {
           })
         );
       } catch (err) {
-        stream.emit('error', err);
+        if (streamEnded) {
+          fn(this.refineError(err, session));
+        } else {
+          stream.once('end', () => {
+            fn(this.refineError(err, session));
+          });
+        }
       }
     });
 
@@ -2257,7 +2291,7 @@ class ForwardEmail {
       fn();
     } catch (err) {
       this.config.logger.fatal(err, { address, session });
-      fn(err);
+      fn(this.refineError(err, session));
     }
   }
   */
@@ -2604,7 +2638,7 @@ class ForwardEmail {
       );
     } catch (err) {
       this.config.logger.fatal(err, { session });
-      fn(err);
+      fn(this.refineError(err, session));
     }
   }
   */
