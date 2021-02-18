@@ -1562,8 +1562,13 @@ class ForwardEmail {
                 //
                 const messages = [];
 
-                if (hasPhishingProtection && _.isArray(scan.results.phishing))
-                  for (const message of scan.results.phishing) {
+                if (
+                  hasPhishingProtection &&
+                  _.isArray(scan.results.phishing) &&
+                  !_.isEmpty(scan.results.phishing)
+                ) {
+                  let hasPhishingErrors = false;
+                  for (const message of scan.results.phishing.slice(0, 2)) {
                     // if we're not filtering for adult-related content then continue early
                     // eslint-disable-next-line max-depth
                     if (
@@ -1571,34 +1576,56 @@ class ForwardEmail {
                       message.includes('adult-related content')
                     )
                       continue;
+                    hasPhishingErrors = true;
                     messages.push(message);
                   }
+
+                  if (hasPhishingErrors)
+                    messages.push(
+                      `Adult/malware false positives can be corrected at <https://report.teams.cloudflare.com>.`
+                    );
+                }
 
                 if (
                   hasExecutableProtection &&
-                  _.isArray(scan.results.executables)
+                  _.isArray(scan.results.executables) &&
+                  !_.isEmpty(scan.results.executables)
                 ) {
-                  for (const message of scan.results.executables) {
+                  for (const message of scan.results.executables.slice(0, 2)) {
                     messages.push(message);
                   }
+
+                  messages.push(
+                    `You may want to re-send your attachment in a compressed archive format (e.g. a ZIP file).`
+                  );
                 }
 
                 // TODO: this could probably be moved outside of the loop
-                if (_.isArray(scan.results.arbitrary)) {
-                  for (const message of scan.results.arbitrary) {
+                if (
+                  _.isArray(scan.results.arbitrary) &&
+                  !_.isEmpty(scan.results.arbitrary)
+                ) {
+                  for (const message of scan.results.arbitrary.slice(0, 2)) {
                     messages.push(message);
                   }
                 }
 
-                if (hasVirusProtection && _.isArray(scan.results.viruses)) {
-                  for (const message of scan.results.viruses) {
+                if (
+                  hasVirusProtection &&
+                  _.isArray(scan.results.viruses) &&
+                  !_.isEmpty(scan.results.viruses)
+                ) {
+                  for (const message of scan.results.viruses.slice(0, 2)) {
                     messages.push(message);
                   }
                 }
 
-                // only slice the first three errors to keep it clean
-                if (messages.length > 0)
-                  throw new CustomError(messages.slice(0, 3).join(' '), 554);
+                if (messages.length > 0) {
+                  messages.push(
+                    `For more information on Spam Scanner visit <${this.config.spamscannerLink}>.`
+                  );
+                  throw new CustomError(messages.join(' '), 554);
+                }
               }
 
               return {
