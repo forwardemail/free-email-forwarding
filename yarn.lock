@@ -487,10 +487,10 @@
   dependencies:
     ioredis "^4.17.3"
 
-"@ladjs/shared-config@^4.0.0":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-4.0.0.tgz#64cbfb00837df03e57c3d1226fc9f6173810b86e"
-  integrity sha512-cVyRdlpWTNftqANdKBVdsB/fewR9DhCmZ1jOy3A70/6KkSNKTEMtNz5JDAYmZJTq6eT7rk0iFiExenIBvMQ3DA==
+"@ladjs/shared-config@^5.0.1":
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/@ladjs/shared-config/-/shared-config-5.0.1.tgz#7e7f8d5a94c522a29b6d1adf768435d1a8691492"
+  integrity sha512-vTgCKJ0qRkCBVvp93WrWEU8UB1TlHqBsbn6e8F42pznMesLE5BLAbzqq6TWRGndd4jVr2fFUXEFsNcY9eXwSSA==
   dependencies:
     boolean "^3.0.2"
     is-string-and-not-blank "^0.0.2"
@@ -8964,10 +8964,10 @@ source-map@^0.6.0, source-map@^0.6.1, source-map@~0.6.0:
   resolved "https://registry.yarnpkg.com/source-map/-/source-map-0.6.1.tgz#74722af32e9614e9c287a8d0bbde48b5e2f1a263"
   integrity sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==
 
-spamscanner@^3.0.6:
-  version "3.0.6"
-  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-3.0.6.tgz#817d360911c54850035442f2a5b0ae4d7ef90bcb"
-  integrity sha512-kgPMNqNc8Q1ZXlpryI0fAgqc7N+tgYSqSTBGOVjZ1DgVLiCwL1ixMQfZaAQKLNEn+XkXswq0haleg8qv/M2CaQ==
+spamscanner@^3.0.7:
+  version "3.0.7"
+  resolved "https://registry.yarnpkg.com/spamscanner/-/spamscanner-3.0.7.tgz#532f82dfc6a3d6298e0ea3dc204737f091f73c2f"
+  integrity sha512-v8y1Jy4TDnACMkiW3NhxiTOEm/tIPALpTXToAJyDyELs3P6Ot3n4IQkgCsldDHd5COSkSPG0s4oim2LFgUae+Q==
   dependencies:
     "@ladjs/naivebayes" "^0.1.0"
     bitcoin-regex "^2.0.0"
