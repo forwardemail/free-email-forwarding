@@ -1257,7 +1257,7 @@ class ForwardEmail {
 
         // NOTE: we can't have this in onConnect because otherwise it would not retry properly
         // validate against rate limiting
-        await this.validateRateLimit(session.remoteAddress);
+        // await this.validateRateLimit(session.remoteAddress);
 
         //
         // 3) reverse SRS bounces
@@ -2222,7 +2222,7 @@ class ForwardEmail {
     }
   }
 
-  validateRateLimit(email) {
+  validateRateLimit(id) {
     // if SPF TXT record exists for the domain name
     // then ensure that `session.remoteAddress` resolves
     // to either the IP address or the domain name value for the SPF
@@ -2232,7 +2232,6 @@ class ForwardEmail {
         return;
       }
 
-      const id = email;
       const limit = new Limiter({ ...this.limiter, id });
       limit.get((err, limit) => {
         if (err) {
@@ -2244,7 +2243,7 @@ class ForwardEmail {
 
         if (limit.remaining) {
           this.config.logger.info(
-            `Rate limit for ${email} is now ${limit.remaining - 1}/${
+            `Rate limit for ${id} is now ${limit.remaining - 1}/${
               limit.total
             }.`
           );
