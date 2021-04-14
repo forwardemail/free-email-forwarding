@@ -1861,6 +1861,9 @@ class ForwardEmail {
                 this.config.simpleParser
               );
 
+              // Set header describing original address
+              mail.headers.set("X-ForwardEmail-User", to.address)
+
               if (this.client)
                 await this.client.set(
                   key,
