@@ -37,6 +37,7 @@ const config = {
 // create our application logger that uses a custom callback function
 const axe = new Axe({ ...config });
 
+/*
 const OPTIONAL_SLACK_FIELDS = [
   'bounce_info',
   'envelope',
@@ -119,5 +120,6 @@ if (env.SLACK_API_TOKEN) {
     }
   });
 }
+*/
 
 module.exports = axe;
