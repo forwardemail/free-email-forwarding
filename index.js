@@ -464,6 +464,20 @@ class ForwardEmail {
     this.getSentKey = this.getSentKey.bind(this);
     this.resolver = this.resolver.bind(this);
     this.refineError = this.refineError.bind(this);
+    this.getBounceCode = this.getBounceCode.bind(this);
+  }
+
+  getBounceCode(bounce) {
+    if (_.isNumber(bounce.err.responseCode)) return bounce.err.responseCode;
+    if (_.isString(bounce.err.code) && RETRY_CODES.includes(bounce.err.code))
+      return CODES_TO_RESPONSE_CODES[bounce.err.code];
+    if (
+      (bounce.err.code && HTTP_RETRY_ERROR_CODES.has(bounce.err.code)) ||
+      (_.isNumber(bounce.err.status) &&
+        HTTP_RETRY_STATUS_CODES.has(bounce.err.status))
+    )
+      return 421;
+    return 550;
   }
 
   // eslint-disable-next-line complexity
@@ -665,7 +679,7 @@ class ForwardEmail {
     return rootNode.createReadStream();
   }
 
-  getSentKey(to, originalRaw) {
+  getSentKey(to, originalRaw, bounce) {
     // safeguards for development
     if (_.isString(to)) to = [to];
     if (!_.isArray(to)) throw new Error('to must be an Array.');
@@ -705,7 +719,26 @@ class ForwardEmail {
     // a combination of the headers with the body number of lines affixed
     if (body) headers += (lines.length - body).toString();
 
-    return `sent:${revHash(safeStringify(to))}:${revHash(headers)}`;
+    let key = `sent:${revHash(safeStringify(to))}:${revHash(headers)}`;
+
+    // for bounce errors we want to ensure we don't send
+    // the same bounce error/code message twice
+    if (
+      _.isObject(bounce) &&
+      _.isError(bounce.err) &&
+      _.isString(bounce.address)
+    ) {
+      key += ':';
+      key += 'bounce';
+      key += ':';
+      key += revHash(safeStringify(bounce.address));
+      key += ':';
+      key += safeStringify(this.getBounceCode(bounce));
+      key += ':';
+      key += revHash(safeStringify(bounce.err.message));
+    }
+
+    return key;
   }
 
   // TODO: implement ARF parser
@@ -1719,23 +1752,7 @@ class ForwardEmail {
         // if no recipients return early with bounces joined together
         if (_.isEmpty(recipients)) {
           if (_.isEmpty(bounces)) throw new CustomError('Invalid recipients');
-          const codes = bounces.map((bounce) => {
-            if (_.isNumber(bounce.err.responseCode))
-              return bounce.err.responseCode;
-            if (
-              _.isString(bounce.err.code) &&
-              RETRY_CODES.includes(bounce.err.code)
-            )
-              return CODES_TO_RESPONSE_CODES[bounce.err.code];
-            if (
-              (bounce.err.code &&
-                HTTP_RETRY_ERROR_CODES.has(bounce.err.code)) ||
-              (_.isNumber(bounce.err.status) &&
-                HTTP_RETRY_STATUS_CODES.has(bounce.err.status))
-            )
-              return 421;
-            return 550;
-          });
+          const codes = bounces.map((bounce) => this.getBounceCode(bounce));
           const [code] = codes.sort();
           throw new CustomError(
             bounces
@@ -2140,13 +2157,19 @@ class ForwardEmail {
 
         await Promise.all(
           uniqueBounces.map(async (bounce) => {
+            // TODO: notify all admins that are on paid plans
+            // of bounces for their forwarding inboxes
+            const from = mailFrom.address
+              ? this.checkSRS(mailFrom.address)
+              : mailFrom.address;
+            const key = this.getSentKey(from, originalRaw, bounce);
+            const value = this.client ? await this.client.get(key) : null;
+            if (value && value === 'true') return;
             const raw = await getStream(
               this.dkim.sign(
                 this.getBounceStream({
                   headers,
-                  from: mailFrom.address
-                    ? this.checkSRS(mailFrom.address)
-                    : mailFrom.address,
+                  from,
                   name,
                   bounce,
                   id: session.id,
@@ -2243,9 +2266,7 @@ class ForwardEmail {
 
         if (limit.remaining) {
           this.config.logger.info(
-            `Rate limit for ${id} is now ${limit.remaining - 1}/${
-              limit.total
-            }.`
+            `Rate limit for ${id} is now ${limit.remaining - 1}/${limit.total}.`
           );
           resolve();
           return;
