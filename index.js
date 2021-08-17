@@ -167,9 +167,9 @@ const transporterConfig = {
   tls: {
     rejectUnauthorized: env.NODE_ENV !== 'test'
   },
-  connectionTimeout: ms('30s'),
-  greetingTimeout: ms('30s'),
-  socketTimeout: ms('30s')
+  connectionTimeout: ms('180s'),
+  greetingTimeout: ms('180s'),
+  socketTimeout: ms('180s')
 };
 
 // <https://srs-discuss.v2.listbox.narkive.com/Mh6X2B2w/help-how-to-unwind-an-srs-address#post17>
@@ -320,7 +320,7 @@ class ForwardEmail {
         maxAge: 30
       },
       srsDomain: env.SRS_DOMAIN,
-      timeout: ms('20s'),
+      timeout: ms('180s'),
       retry: 3,
       simpleParser: { Iconv },
       isURLOptions: {
