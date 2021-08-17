@@ -1,8 +1,8 @@
 const Axe = require('axe');
-const safeStringify = require('fast-safe-stringify');
 const signale = require('signale');
-const { WebClient } = require('@slack/web-api');
-const titleize = require('titleize');
+// const safeStringify = require('fast-safe-stringify');
+// const { WebClient } = require('@slack/web-api');
+// const titleize = require('titleize');
 const pino = require('pino')({
   customLevels: {
     log: 30
