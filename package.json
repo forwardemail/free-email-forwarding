@@ -47,7 +47,7 @@
     "is-fqdn": "^2.0.1",
     "is-string-and-not-blank": "^0.0.2",
     "lodash": "^4.17.20",
-    "mailauth": "^2.0.0",
+    "mailauth": "^2.1.2",
     "mailparser": "^3.1.0",
     "mailsplit": "^5.0.1",
     "ms": "^2.1.3",
