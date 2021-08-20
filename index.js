@@ -60,16 +60,7 @@ const HTTP_RETRY_ERROR_CODES = new Set([
 ]);
 
 const HTTP_RETRY_STATUS_CODES = new Set([
-  408,
-  413,
-  429,
-  500,
-  502,
-  503,
-  504,
-  521,
-  522,
-  524
+  408, 413, 429, 500, 502, 503, 504, 521, 522, 524
 ]);
 
 // NOTE: if you change this, be sure to sync in `koa-better-error-handler`
@@ -390,8 +381,7 @@ class ForwardEmail {
         crypto.constants.SSL_OP_NO_TLSv1 |
         crypto.constants.SSL_OP_NO_TLSv11;
       delete this.config.ssl.allowHTTP1;
-      if (boolean(process.env.IS_NOT_SECURE)) this.config.ssl.secure = false;
-      else this.config.ssl.secure = true;
+      this.config.ssl.secure = !boolean(process.env.IS_NOT_SECURE);
     }
 
     // Sender Rewriting Schema ("SRS")
@@ -456,9 +446,8 @@ class ForwardEmail {
     // this.onMailFrom = this.onMailFrom.bind(this);
     this.getForwardingAddresses = this.getForwardingAddresses.bind(this);
     // this.onRcptTo = this.onRcptTo.bind(this);
-    this.conditionallyRemoveSignatures = this.conditionallyRemoveSignatures.bind(
-      this
-    );
+    this.conditionallyRemoveSignatures =
+      this.conditionallyRemoveSignatures.bind(this);
     this.getBounceStream = this.getBounceStream.bind(this);
     this.getDiagnosticCode = this.getDiagnosticCode.bind(this);
     this.getSentKey = this.getSentKey.bind(this);
@@ -1072,6 +1061,7 @@ class ForwardEmail {
         .set(key, safeStringify(value), 'PX', ttl)
         // eslint-disable-next-line promise/prefer-await-to-then
         .then(this.config.logger.info)
+        // eslint-disable-next-line promise/prefer-await-to-then
         .catch(this.config.logger.error);
     }
 
@@ -2008,6 +1998,7 @@ class ForwardEmail {
             })
             // eslint-disable-next-line promise/prefer-await-to-then
             .then(() => {})
+            // eslint-disable-next-line promise/prefer-await-to-then
             .catch((err) => {
               this.config.logger.error(err, { session });
             });
@@ -2233,13 +2224,10 @@ class ForwardEmail {
     } catch (err) {
       this.config.logger.warn(err, { address });
       // support retries
-      if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
-        err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
-      } else {
-        // all other lookup errors should retry 420
-        // https://github.com/nodejs/node/blob/f1ae7ea343020f608fdc1ca77d9cdfe2c093ac72/src/cares_wrap.cc#L95
-        err.responseCode = 420;
-      }
+      err.responseCode =
+        _.isString(err.code) && RETRY_CODES.includes(err.code)
+          ? CODES_TO_RESPONSE_CODES[err.code]
+          : 420;
 
       throw err;
     }
@@ -2353,13 +2341,10 @@ class ForwardEmail {
     } catch (err) {
       this.config.logger.warn(err);
       // support retries
-      if (_.isString(err.code) && RETRY_CODES.includes(err.code)) {
-        err.responseCode = CODES_TO_RESPONSE_CODES[err.code];
-      } else {
-        // all other lookup errors should retry 420
-        // https://github.com/nodejs/node/blob/f1ae7ea343020f608fdc1ca77d9cdfe2c093ac72/src/cares_wrap.cc#L95
-        err.responseCode = 420;
-      }
+      err.responseCode =
+        _.isString(err.code) && RETRY_CODES.includes(err.code)
+          ? CODES_TO_RESPONSE_CODES[err.code]
+          : 420;
 
       throw err;
     }
@@ -2525,9 +2510,9 @@ class ForwardEmail {
       forwardingAddresses.length === 0 &&
       globalForwardingAddresses.length > 0
     ) {
-      globalForwardingAddresses.forEach((address) => {
+      for (const address of globalForwardingAddresses) {
         forwardingAddresses.push(address);
-      });
+      }
     }
 
     // if we don't have a forwarding address then throw an error
@@ -2549,7 +2534,7 @@ class ForwardEmail {
         if (validator.isURL(forwardingAddress, this.config.isURLOptions))
           continue;
 
-        const newRecursive = forwardingAddresses.concat(recursive);
+        const newRecursive = [...forwardingAddresses, ...recursive];
 
         // prevent a double-lookup if user is using + symbols
         if (forwardingAddress.includes('+'))
