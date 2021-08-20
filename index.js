@@ -723,8 +723,8 @@ class ForwardEmail {
       key += revHash(safeStringify(bounce.address));
       key += ':';
       key += safeStringify(this.getBounceCode(bounce));
-      key += ':';
-      key += revHash(safeStringify(bounce.err.message));
+      // key += ':';
+      // key += revHash(safeStringify(bounce.err.message));
     }
 
     return key;
@@ -2192,6 +2192,9 @@ class ForwardEmail {
             };
             try {
               await this.sendEmail(options);
+              // set the key if it hasn't been set yet (if for some reason it's not working)
+              if (this.client)
+                await this.client.set(key, 'true', 'PX', this.config.ttlMs);
             } catch (err_) {
               this.config.logger.fatal(err_, { session });
             }
