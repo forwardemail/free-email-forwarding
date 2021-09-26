@@ -10,3 +10,5 @@ coverage
 *.key
 *.env
 *.pem
+
+!test/fixtures/*.key

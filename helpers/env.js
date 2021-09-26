@@ -9,4 +9,12 @@ const env = require('@ladjs/env')({
   errorOnExtra: false
 });
 
+if (env.NODE_ENV === 'test') {
+  env.DKIM_PRIVATE_KEY_PATH = path.join(
+    __dirname,
+    '..',
+    'test/fixtures/dkim-test-private.key'
+  );
+}
+
 module.exports = env;
