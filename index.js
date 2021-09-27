@@ -24,6 +24,7 @@ const mxConnect = require('mx-connect');
 const nodemailer = require('nodemailer');
 const pify = require('pify');
 const punycode = require('punycode/');
+const regexParser = require('regex-parser');
 const revHash = require('rev-hash');
 const safeStringify = require('fast-safe-stringify');
 const sharedConfig = require('@ladjs/shared-config');
@@ -2461,9 +2462,87 @@ class ForwardEmail {
     for (const element of addresses) {
       // convert addresses to lowercase
       const lowerCaseAddress = element.toLowerCase();
-      if (
-        (lowerCaseAddress.includes(':') ||
-          lowerCaseAddress.indexOf('!') === 0) &&
+
+      // must start with / and end with /: and not have the same index for the last index
+      // forward-email=/^(support|info)$/:niftylettuce+$1@gmail.com
+      // -> this would forward to niftylettuce+support@gmail.com if email sent to support@
+
+      // it either ends with:
+      // "/gi:"
+      // "/ig:"
+      // "/g:"
+      // "/i:"
+      // "/:"
+      //
+      let lastIndex;
+      const REGEX_FLAG_ENDINGS = ['/gi:', '/ig:', '/g:', '/i:', '/:'];
+      const hasTwoSlashes = element.lastIndexOf('/') !== 0;
+      const startsWithSlash = element.startsWith('/');
+      if (startsWithSlash && hasTwoSlashes) {
+        for (const ending of REGEX_FLAG_ENDINGS) {
+          if (
+            element.lastIndexOf(ending) !== -1 &&
+            element.lastIndexOf(ending) !== 0
+          ) {
+            lastIndex = ending;
+            break;
+          }
+        }
+      }
+
+      //
+      // regular expression support
+      // <https://github.com/forwardemail/free-email-forwarding/pull/245/commits/e04ea02d700b51771bf61ed512d1763bbf80784b>
+      // (with added support for regex gi flags)
+      //
+      if (startsWithSlash && hasTwoSlashes && lastIndex) {
+        const elementWithoutRegex = element.slice(
+          Math.max(0, element.lastIndexOf(lastIndex) + lastIndex.length)
+        );
+        let parsedRegex = element.slice(
+          0,
+          Math.max(0, element.lastIndexOf(lastIndex) + 1)
+        );
+
+        // add case insensitive flag since email addresses are case insensitive
+        if (lastIndex === '/g:' || lastIndex === '/:') parsedRegex += 'i';
+        //
+        // `forward-email=/^(support|info)$/:niftylettuce+$1@gmail.com`
+        // support@mydomain.com -> niftylettuce+support@gmail.com
+        //
+        // `forward-email=/^(support|info)$/:niftylettuce.com/$1`
+        // info@mydomain.com -> POST to niftylettuce.com/info
+        //
+        // `forward-email=/Support/g:niftylettuce.com`
+        //
+        // `forward-email=/SUPPORT/gi:niftylettuce.com`
+        const regex = new RE2(regexParser(parsedRegex));
+        if (regex.test(username.toLowerCase())) {
+          const substitutedAlias = username
+            .toLowerCase()
+            .replace(regex, elementWithoutRegex);
+          if (substitutedAlias.startsWith('!')) {
+            ignored = true;
+            break;
+          }
+
+          if (
+            !isFQDN(substitutedAlias) &&
+            !validator.isIP(substitutedAlias) &&
+            !validator.isEmail(substitutedAlias) &&
+            !validator.isURL(substitutedAlias, this.config.isURLOptions)
+          )
+            throw new CustomError(
+              // TODO: we may want to replace this with "Invalid Recipients"
+              `Domain of ${domain} has an invalid "${this.config.recordPrefix}" TXT record due to an invalid regular expression email address match`
+            );
+
+          if (validator.isURL(substitutedAlias, this.config.isURLOptions))
+            forwardingAddresses.push(substitutedAlias);
+          else forwardingAddresses.push(substitutedAlias.toLowerCase());
+        }
+      } else if (
+        (element.includes(':') || element.indexOf('!') === 0) &&
         !validator.isURL(element, this.config.isURLOptions)
       ) {
         // > const str = 'foo:https://foo.com'
