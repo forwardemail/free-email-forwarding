@@ -131,6 +131,17 @@
     "type": "git",
     "url": "https://github.com/niftylettuce/forward-email"
   },
+  "nyc": {
+    "all": true,
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "include": [
+      "helpers/**/*",
+      "index.js"
+    ]
+  },
   "scripts": {
     "ava": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava",
     "ava:unit": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava --config ava-unit.config.cjs",

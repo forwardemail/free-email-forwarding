@@ -9,6 +9,7 @@ const env = require('@ladjs/env')({
   errorOnExtra: false
 });
 
+/* istanbul ignore next */
 if (env.NODE_ENV === 'test') {
   env.DKIM_PRIVATE_KEY_PATH = path.join(
     __dirname,
