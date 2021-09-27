@@ -11,9 +11,10 @@ const getPort = require('get-port');
 const isCI = require('is-ci');
 const nodemailer = require('nodemailer');
 const pify = require('pify');
-const test = require('ava');
-const { v4 } = require('uuid');
 const randomString = require('randomstring');
+const test = require('ava');
+const { boolean } = require('boolean');
+const { v4 } = require('uuid');
 
 const lookupAsync = pify(dns.lookup);
 
@@ -24,7 +25,7 @@ const tls = { rejectUnauthorized: false };
 
 const client = new IORedis();
 
-if (process.env.BENCHMARK === 'false') {
+if (!boolean(process.env.BENCHMARK)) {
   test.beforeEach(async (t) => {
     const keys = await client.keys('limit:*');
     if (keys.length > 0) await Promise.all(keys.map((key) => client.del(key)));
@@ -800,14 +801,16 @@ Test`.trim()
     const connection = new Client({ port, tls });
     const info = await transporter.sendMail({
       envelope: {
-        from: 'test@niftylettuce.com',
+        from: 'test@spamapi.net',
         to: 'webhook@spamapi.net'
       },
+      // note we generate a random Message-ID so that webhooks
+      // don't get cached as having been already sent
       raw: `
-Message-ID: <123.abc@test>
+Message-ID: <${Date.now()}@test>
 Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
 To: webhook@spamapi.net
-From: Test <test@niftylettuce.com>
+From: Test <test@spamapi.net>
 Subject: testing webhooks
 Mime-Version: 1.0
 Content-Type: text/plain; charset=us-ascii

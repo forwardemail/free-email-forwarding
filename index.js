@@ -1876,16 +1876,31 @@ class ForwardEmail {
                   this.config.ttlMs
                 );
 
-              await superagent
+              const res = await superagent
                 .post(recipient.webhook)
-                // .type('message/rfc822')
                 .set('User-Agent', this.config.userAgent)
                 .timeout(this.config.timeout)
-                // .retry(this.config.retry)
-                .send({
-                  ...mail,
-                  raw
-                });
+                .send(
+                  safeStringify({
+                    ...mail,
+                    raw: _.isBuffer(raw) ? raw.toString('binary') : raw
+                  })
+                );
+
+              // TODO: smart alerts here for webhooks misconfigured (e.g. HTTP -> HTTPS redirect)
+              if (
+                !_.isObject(res) ||
+                !_.isObject(res.req) ||
+                res.req.method !== 'POST'
+              ) {
+                if (_.isArray(res.redirects) && !_.isEmpty(res.redirects))
+                  throw new CustomError(
+                    `Webhook endpoint redirects occurred which prevented a POST request`
+                  );
+                throw new CustomError(
+                  'Webhook endpoint did not perform a POST request'
+                );
+              }
 
               if (this.client)
                 await this.client.set(key, 'true', 'PX', this.config.ttlMs);
