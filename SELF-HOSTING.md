@@ -25,6 +25,7 @@ You'll also need the following dependencies installed:
   > *NOTE*: You can pass `rateLimit: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ rateLimit: false });`
 
   * Mac (via [brew][]): `brew install redis && brew services start redis`
+
   * Ubuntu:
 
     ```sh

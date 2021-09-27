@@ -133,10 +133,12 @@
   },
   "scripts": {
     "ava": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava",
+    "ava:unit": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava --config ava-unit.config.cjs",
+    "ava:integration": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava --config ava-integration.config.cjs",
     "ava:benchmark": "cross-env IS_NOT_SECURE=true NODE_ENV=test ava --config ava-benchmark.config.cjs",
     "coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov",
     "lint": "xo && remark . -qfo",
-    "nyc": "cross-env IS_NOT_SECURE=true NODE_ENV=test nyc ava",
+    "nyc": "cross-env IS_NOT_SECURE=true NODE_ENV=test nyc ava --config ava-unit.config.cjs",
     "test": "npm run lint && npm run ava",
     "test-coverage": "npm run lint && npm run nyc"
   },
