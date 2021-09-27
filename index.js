@@ -1057,7 +1057,7 @@ class ForwardEmail {
     }
 
     // store it in the cache in the background
-    if (client) {
+    if (value && client) {
       client
         .set(key, safeStringify(value), 'PX', ttl)
         // eslint-disable-next-line promise/prefer-await-to-then
@@ -1096,32 +1096,46 @@ class ForwardEmail {
     }
 
     if (_.isArray(this.config.dnsbl.domains)) {
-      const results = await this.resolver(ip, 'DNSBL_BATCH');
-      if (!_.isArray(results) || results.length === 0) return false;
-      const blacklistedResults = results.filter((result) => result.listed);
-      if (blacklistedResults.length === 0) return false;
-      return blacklistedResults
-        .map((result) =>
-          util.format(
-            this.config.blacklistedStr,
-            ip,
-            result.blacklist,
-            this.config.dnsbl.removals[
-              this.config.dnsbl.domains.indexOf(result.blacklist)
-            ]
+      try {
+        const results = await this.resolver(ip, 'DNSBL_BATCH');
+        if (!_.isArray(results) || results.length === 0) return false;
+        const blacklistedResults = results.filter((result) => result.listed);
+        if (blacklistedResults.length === 0) return false;
+        return blacklistedResults
+          .map((result) =>
+            util.format(
+              this.config.blacklistedStr,
+              ip,
+              result.blacklist,
+              this.config.dnsbl.removals[
+                this.config.dnsbl.domains.indexOf(result.blacklist)
+              ]
+            )
           )
-        )
-        .join(' ');
+          .join(' ');
+      } catch (err) {
+        this.config.logger.warn(err);
+        this.config.logger.warn(
+          new Error('DNS lookup failed to get IP', { ip })
+        );
+        return false;
+      }
     }
 
-    const result = await this.resolver(ip, 'DNSBL');
-    if (!result) return false;
-    return util.format(
-      this.config.blacklistedStr,
-      ip,
-      this.config.dnsbl.domains,
-      this.config.dnsbl.removals
-    );
+    try {
+      const result = await this.resolver(ip, 'DNSBL');
+      if (!result) return false;
+      return util.format(
+        this.config.blacklistedStr,
+        ip,
+        this.config.dnsbl.domains,
+        this.config.dnsbl.removals
+      );
+    } catch (err) {
+      this.config.logger.warn(err);
+      this.config.logger.warn(new Error('DNS lookup failed to get IP', { ip }));
+      return false;
+    }
   }
 
   async onConnect(session, fn) {
