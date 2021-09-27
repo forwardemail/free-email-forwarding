@@ -1880,12 +1880,10 @@ class ForwardEmail {
                 .post(recipient.webhook)
                 .set('User-Agent', this.config.userAgent)
                 .timeout(this.config.timeout)
-                .send(
-                  safeStringify({
-                    ...mail,
-                    raw: _.isBuffer(raw) ? raw.toString('binary') : raw
-                  })
-                );
+                .send({
+                  ...mail,
+                  raw: _.isBuffer(raw) ? raw.toString('binary') : raw
+                });
 
               // TODO: smart alerts here for webhooks misconfigured (e.g. HTTP -> HTTPS redirect)
               if (
