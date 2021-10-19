@@ -16,6 +16,12 @@ if (env.NODE_ENV === 'test') {
     '..',
     'test/fixtures/dkim-test-private.key'
   );
+
+  env.DHPARAM_KEY_PATH = path.join(
+    __dirname,
+    '..',
+    'test/fixtures/dhparam-test.pem'
+  );
 }
 
 module.exports = env;
