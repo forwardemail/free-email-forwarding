@@ -347,10 +347,10 @@ class ForwardEmail {
     };
 
     if (
-      this.dnsbl &&
-      _.isArray(this.dnsbl.domains) &&
-      _.isArray(this.dnsbl.removals) &&
-      this.dnsbl.domains.length !== this.dnsbl.removals.length
+      this.config.dnsbl &&
+      _.isArray(this.config.dnsbl.domains) &&
+      _.isArray(this.config.dnsbl.removals) &&
+      this.config.dnsbl.domains.length !== this.config.dnsbl.removals.length
     )
       throw new Error('DNSBL_DOMAINS length must be equal to DNSBL_REMOVALS.');
 
