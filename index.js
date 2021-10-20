@@ -345,7 +345,10 @@ class ForwardEmail {
     // parse SMTP code and message
     if (err.message && err.message.startsWith('SMTP code:')) {
       if (!err.responseCode)
-        err.responseCode = err.message.split('SMTP code:')[1].split(' ')[0];
+        err.responseCode = Number.parseInt(
+          err.message.split('SMTP code:')[1].split(' ')[0],
+          10
+        );
       err.message = err.message.split('msg:')[1];
     }
 
