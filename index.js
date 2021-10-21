@@ -383,14 +383,19 @@ class ForwardEmail {
   }
 
   async listen(port, ...args) {
-    await pify(this.server.listen).bind(this.server)(
-      port || this.config.port,
-      ...args
-    );
+    return new Promise((resolve) => {
+      this.server.listen.bind(this.server)(
+        port || this.config.port,
+        ...args,
+        resolve
+      );
+    });
   }
 
   async close() {
-    await pify(this.server.close).bind(this.server);
+    return new Promise((resolve) => {
+      this.server.close.bind(this.server)(resolve);
+    });
   }
 
   processRecipient(options) {
