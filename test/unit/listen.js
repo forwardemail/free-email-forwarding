@@ -1,8 +1,9 @@
 const { once } = require('events');
 
-const getPort = require('get-port');
-const test = require('ava');
 const Client = require('nodemailer/lib/smtp-connection');
+const getPort = require('get-port');
+const pify = require('pify');
+const test = require('ava');
 
 const ForwardEmail = require('../..');
 
@@ -23,17 +24,17 @@ test('will listen using config settings', async (t) => {
 
   await forwardEmail.listen();
 
-  const connection = new Client({
-    port: forwardEmail.config.port,
-    host: '127.0.0.1',
-    ignoreTLS: true
-  });
+  const connection = pify(
+    new Client({
+      port: forwardEmail.config.port,
+      host: '127.0.0.1',
+      ignoreTLS: true
+    })
+  );
 
-  connection.connect(() => {
-    t.pass();
-    connection.quit();
-  });
-
+  const res = await connection.connect();
+  t.is(res, undefined);
+  connection.quit();
   await once(connection, 'end');
 });
 
@@ -51,10 +52,8 @@ test('will listen using given port', async (t) => {
     ignoreTLS: true
   });
 
-  connection.connect(() => {
-    t.pass();
-    connection.quit();
-  });
-
+  const res = await connection.connect();
+  t.is(res, undefined);
+  connection.quit();
   await once(connection, 'end');
 });
