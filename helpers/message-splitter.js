@@ -22,7 +22,7 @@ class MessageSplitter extends Transform {
     this.rawHeaders = false;
     this.dataBytes = 0;
     this._maxBytes =
-      (options.maxBytes && Number(options.maxBytes)) ||
+      (options && options.maxBytes && Number(options.maxBytes)) ||
       Number.POSITIVE_INFINITY;
     this.sizeExceeded = false;
   }
