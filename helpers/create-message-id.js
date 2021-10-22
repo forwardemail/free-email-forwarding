@@ -47,3 +47,4 @@ function createMessageID(messageIdDomain, headers, body) {
 }
 
 module.exports = createMessageID;
+module.exports.getHashFingerprint = getHashFingerprint;
