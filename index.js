@@ -40,13 +40,7 @@ const { oneLine } = require('common-tags');
 const { simpleParser } = require('mailparser');
 
 const pkg = require('./package');
-const {
-  CustomError,
-  MessageSplitter,
-  // createMessageID,
-  env,
-  logger
-} = require('./helpers');
+const { CustomError, MessageSplitter, env, logger } = require('./helpers');
 const {
   CIPHERS,
   CODES_TO_RESPONSE_CODES,

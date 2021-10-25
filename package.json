@@ -141,6 +141,9 @@
     "include": [
       "helpers/**/*",
       "index.js"
+    ],
+    "exclude": [
+      "helpers/**/logger.js"
     ]
   },
   "scripts": {
