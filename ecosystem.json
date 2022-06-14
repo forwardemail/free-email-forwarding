@@ -18,7 +18,7 @@
       "script": "app.js",
       "exec_mode": "cluster_mode",
       "wait_ready": true,
-      "instances": "max",
+      "instances": "1",
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3465",
@@ -30,7 +30,7 @@
       "script": "app.js",
       "exec_mode": "cluster_mode",
       "wait_ready": true,
-      "instances": "max",
+      "instances": "1",
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3587",
@@ -42,7 +42,7 @@
       "script": "proxy.js",
       "exec_mode": "cluster_mode",
       "wait_ready": true,
-      "instances": "max",
+      "instances": "1",
       "env_production": {
         "NODE_ENV": "production",
         "IS_SILENT": "true"

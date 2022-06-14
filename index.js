@@ -791,6 +791,8 @@ class ForwardEmail {
     rootNode.setHeader('X-Sending-Zone', sendingZone);
     rootNode.setHeader('X-Failed-Recipients', options.bounce.address);
     rootNode.setHeader('Auto-Submitted', 'auto-replied');
+    rootNode.setHeader('X-Auto-Response-Suppress', 'All');
+    rootNode.setHeader('Precedence', 'auto_reply');
     rootNode.setHeader('Subject', 'Delivery Status Notification (Failure)');
 
     if (options.messageId) {
@@ -2778,14 +2780,41 @@ class ForwardEmail {
         // if the message had any of these headers then don't send bounce
         // <https://www.jitbit.com/maxblog/18-detecting-outlook-autoreplyout-of-office-emails-and-x-auto-response-suppress-header/>
         // <https://github.com/nodemailer/smtp-server/issues/129>
+        // <https://www.arp242.net/autoreply.html>
         //
         if (
-          headers.hasHeader('X-Autoreply') ||
-          headers.hasHeader('X-Autorespond') ||
+          (headers.hasHeader('Auto-submitted') &&
+            headers.getFirst('Auto-submitted') !== 'no') ||
           (headers.hasHeader('Auto-Submitted') &&
-            headers.getFirst('Auto-Submitted') === 'auto-replied')
+            headers.getFirst('Auto-Submitted') !== 'no') ||
+          (headers.hasHeader('X-Auto-Response-Suppress') &&
+            ['dr', 'autoreply', 'auto-reply', 'auto_reply', 'all'].includes(
+              headers.getFirst('X-Auto-Response-Suppress').toLowerCase().trim()
+            )) ||
+          headers.hasHeader('List-Id') ||
+          headers.hasHeader('List-id') ||
+          headers.hasHeader('List-Unsubscribe') ||
+          headers.hasHeader('List-unsubscribe') ||
+          headers.hasHeader('Feedback-ID') ||
+          headers.hasHeader('Feedback-Id') ||
+          headers.hasHeader('X-Autoreply') ||
+          headers.hasHeader('X-Auto-Reply') ||
+          headers.hasHeader('X-AutoReply') ||
+          headers.hasHeader('X-Autorespond') ||
+          headers.hasHeader('X-Auto-Respond') ||
+          headers.hasHeader('X-AutoRespond') ||
+          (headers.hasHeader('Precedence') &&
+            ['bulk', 'autoreply', 'auto-reply', 'auto_reply', 'list'].includes(
+              headers.getFirst('Precedence').toLowerCase().trim()
+            ))
         )
           return;
+
+        //
+        // TODO: if the message From or Reply-To has
+        // no-reply, noreply, or no_reply
+        // then don't send a bounce email
+        //
 
         //
         // instead of returning an error if it bounced
