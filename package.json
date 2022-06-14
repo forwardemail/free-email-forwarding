@@ -120,7 +120,7 @@
     "url": "https://github.com/forwardemail/free-email-forwarding"
   },
   "scripts": {
-    "lint": "xo --fix && remark . -qfo && fixpack && prettier --check **/*.json",
+    "lint": "xo --fix && remark . -qfo && fixpack",
     "prepare": "husky install",
     "pretest": "npm run lint",
     "test": "npm run test-coverage",
