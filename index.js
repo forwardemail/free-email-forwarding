@@ -339,8 +339,8 @@ class ForwardEmail {
         messageIdDomain: env.MESSAGE_ID_DOMAIN,
         dnsCachePrefix: 'dns',
         fingerprintPrefix: 'f',
-        dnsCacheMs: ms('1m'),
-        dnsReverseCacheMs: ms('10m'),
+        dnsCacheMs: ms('5m'),
+        dnsReverseCacheMs: ms('30m'),
         dnsBlacklistCacheMs: ms('30m'),
         //
         // we want low limits here in case redis has issues
@@ -1234,7 +1234,7 @@ class ForwardEmail {
         throw new Error('Reverse lookup returned invalid FQDN', { ip, values });
       if (this.client) {
         this.client
-          .set(key, values[0], 'PX', this.config.reverseCacheMs)
+          .set(key, values[0], 'PX', this.config.dnsReverseCacheMs)
           .then()
           .catch(this.config.logger.error);
       }
