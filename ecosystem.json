@@ -60,7 +60,7 @@
       "repo": "git@github.com:niftylettuce/forward-email.git",
       "path": "/var/www/production",
       "pre-deploy": "git reset --hard",
-      "post-deploy": "npm install && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
+      "post-deploy": "pnpm install && pm2 startOrGracefulReload ecosystem.json --env production --update-env"
     }
   }
 }
