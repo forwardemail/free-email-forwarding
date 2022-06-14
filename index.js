@@ -2563,7 +2563,11 @@ class ForwardEmail {
 
           try {
             const info = await this.sendEmail(options, session);
-            this.config.logger.info('sent email', { info, options, session });
+            this.config.logger.info('sent email', {
+              info,
+              options: _.omit(options, 'raw'),
+              session
+            });
 
             if (info.accepted && info.accepted.length > 0) {
               // add the masked recipient to the final accepted array
@@ -2902,7 +2906,11 @@ class ForwardEmail {
               };
 
               const info = await this.sendEmail(options, session);
-              this.config.logger.info('sent email', { info, options, session });
+              this.config.logger.info('sent email', {
+                info,
+                options: _.omit(options, 'raw'),
+                session
+              });
 
               //
               // TODO: this should iterate over `info.accepted` and `info.rejected`
