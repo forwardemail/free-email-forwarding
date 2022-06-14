@@ -124,7 +124,7 @@
     "prepare": "husky install",
     "pretest": "npm run lint",
     "test": "npm run test-coverage",
-    "test-coverage": "cross-env NODE_ENV=test nyc ava",
-    "test-blacklist": "cross-env NODE_ENV=test ava --match 'not in dnsbl'"
+    "test-blacklist": "cross-env NODE_ENV=test ava --match 'not in dnsbl'",
+    "test-coverage": "cross-env NODE_ENV=test nyc ava"
   }
 }
