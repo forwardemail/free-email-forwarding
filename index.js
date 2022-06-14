@@ -511,6 +511,7 @@ class ForwardEmail {
     }
 
     /*
+    // TODO: need to re-enable this or make it dynamic somehow
         if (
           this.client &&
           host === 'gmail.com' &&
@@ -1108,6 +1109,11 @@ class ForwardEmail {
           });
           return info;
         } catch (err) {
+          this.logger.fatal(err, { options: _.omit(options, 'raw'), session });
+          this.logger.fatal(new Error('TLS connection retry failed'), {
+            options: _.omit(options, 'raw'),
+            session
+          });
           this.parseSendErrorAndConditionallyThrow(
             err,
             session,
@@ -1781,17 +1787,10 @@ class ForwardEmail {
         // 5) check for spam
         //
         let scan;
-
-        //
-        // TODO: ignore parsing of URL's/IP's in "Received"-like headers
-        //
-        // TODO: enable this for non-test environments
-        if (env.NODE_ENV === 'test') {
-          try {
-            scan = await this.scanner.scan(originalRaw);
-          } catch (err) {
-            this.config.logger.fatal(err, { session });
-          }
+        try {
+          scan = await this.scanner.scan(originalRaw);
+        } catch (err) {
+          this.config.logger.fatal(err, { session });
         }
 
         // check for arbitrary tests (e.g. EICAR)
