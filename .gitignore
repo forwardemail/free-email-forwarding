@@ -17,3 +17,4 @@ package-lock.json
 temp/
 tmp/
 yarn.lock
+.env.test
