@@ -2565,7 +2565,7 @@ class ForwardEmail {
             const info = await this.sendEmail(options, session);
             this.config.logger.info('sent email', { info, options, session });
 
-            if (info.accepted.length > 0) {
+            if (info.accepted && info.accepted.length > 0) {
               // add the masked recipient to the final accepted array
               // (we don't want to reveal forwarding config to client SMTP servers)
               if (accepted.indexOf(recipient.recipient) === -1)
@@ -2627,7 +2627,7 @@ class ForwardEmail {
               }
             }
 
-            if (info.rejectedErrors.length > 0) {
+            if (info.rejectedErrors && info.rejectedErrors.length > 0) {
               for (const err of info.rejectedErrors) {
                 this.config.logger.error(err, { options, session });
 
