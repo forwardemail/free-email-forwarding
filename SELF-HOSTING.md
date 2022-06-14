@@ -15,14 +15,9 @@ You'll need a server with Ubuntu, so we recommend [Digital Ocean](https://m.do.c
 
 You'll also need the following dependencies installed:
 
-* [Node.js][node] (v8.3+) - use [nvm][] to install it on any OS (this is what runs the email forwarding service)
+* [Node.js][node]
 
-  * After installing `nvm` you will need to run `nvm install node`
-  * We also recommend you install [yarn][], which is an alternative to [npm][]
-
-* [Redis][] (v4.x+) - this is a fast key-value store database used for rate-limiting and preventing spammers
-
-  > *NOTE*: You can pass `rateLimit: false` as an option to your `ForwardEmail` instance to disable the Redis requirement (e.g. `const forwardEmail = new ForwardEmail({ rateLimit: false });`
+* [Redis][]
 
   * Mac (via [brew][]): `brew install redis && brew services start redis`
   * Ubuntu:
@@ -33,9 +28,7 @@ You'll also need the following dependencies installed:
     sudo apt-get -y install redis-server
     ```
 
-  > If you ever need to completely wipe rate-limiting records, run `redis-cli` and then type the command `FLUSHALL`
-
-* [ufw][] - recommended for security on Ubuntu server
+* [ufw][]
 
   * Ubuntu:
 
@@ -91,7 +84,6 @@ You'll also need the following dependencies installed:
 * [pm2][] - for managing and running all processes
 
   * npm: `npm install -g pm2`
-  * yarn: `yarn global add pm2`
 
 * [openssl][] - for generating DKIM keys for your domain
 
@@ -166,13 +158,7 @@ See the [app.js](app.js) and [ecosystem.json](ecosystem.json) files for more ins
 
 ##
 
-[npm]: https://www.npmjs.com/
-
-[yarn]: https://yarnpkg.com/
-
 [node]: https://nodejs.org
-
-[nvm]: https://github.com/creationix/nvm
 
 [redis]: https://redis.io/
 

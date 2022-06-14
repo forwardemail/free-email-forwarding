@@ -1,3 +1,5 @@
+const { Buffer } = require('buffer');
+
 //
 // Many thanks to Andris Reissman
 // <https://gist.github.com/andris9/94e73deef71640322c422b27cded5add>
@@ -20,6 +22,7 @@ class MessageSplitter extends Transform {
     this.headerBytes = 0;
     this.headerChunks = [];
     this.rawHeaders = false;
+    // this.bodySize = 0;
     this.dataBytes = 0;
     this._maxBytes =
       (options.maxBytes && Number(options.maxBytes)) ||
@@ -96,9 +99,11 @@ class MessageSplitter extends Transform {
       this.rawHeaders = Buffer.concat(this.headerChunks, this.headerBytes);
       this.headerChunks = null;
       this.headers = new Headers(this.rawHeaders);
-      this.emit('headers', this.headers);
+      // this.emit('headers', this.headers);
       if (data.length - 1 > headerPos) {
         const chunk = data.slice(headerPos);
+        // this.bodySize += chunk.length;
+
         // this would be the first chunk of data sent downstream
         // from now on we keep header and body separated until final delivery
         setImmediate(() => this.push(chunk));
@@ -140,9 +145,10 @@ class MessageSplitter extends Transform {
       return callback(err);
     }
 
-    // this.bodySize += chunk.length;
-
-    if (headersFound) this.push(chunk);
+    if (headersFound) {
+      // this.bodySize += chunk.length;
+      this.push(chunk);
+    }
 
     setImmediate(callback);
   }
@@ -160,7 +166,7 @@ class MessageSplitter extends Transform {
 
       this.headers = new Headers(this.rawHeaders);
 
-      this.emit('headers', this.headers);
+      // this.emit('headers', this.headers);
       this.headerChunks = null;
 
       // this is our body
