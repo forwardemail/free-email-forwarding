@@ -2633,7 +2633,10 @@ class ForwardEmail {
 
             if (info.rejectedErrors && info.rejectedErrors.length > 0) {
               for (const err of info.rejectedErrors) {
-                this.config.logger.error(err, { options, session });
+                this.config.logger.error(err, {
+                  options: _.omit(options, 'raw'),
+                  session
+                });
 
                 // here we do some magic so that we push an error message
                 // that has the end-recipient's email masked with the
@@ -2666,7 +2669,10 @@ class ForwardEmail {
               }
             }
           } catch (err) {
-            this.config.logger.error(err, { options, session });
+            this.config.logger.error(err, {
+              omit: _.omit(options, 'raw'),
+              session
+            });
 
             // here we do some magic so that we push an error message
             // that has the end-recipient's email masked with the
