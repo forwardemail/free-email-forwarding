@@ -9,31 +9,6 @@
       "env_production": {
         "NODE_ENV": "production",
         "SMTP_PORT": "3025",
-        "IS_NOT_SECURE": "true",
-        "IS_SILENT": "true"
-      }
-    },
-    {
-      "name": "smtps",
-      "script": "app.js",
-      "exec_mode": "cluster_mode",
-      "wait_ready": true,
-      "instances": "1",
-      "env_production": {
-        "NODE_ENV": "production",
-        "SMTP_PORT": "3465",
-        "IS_SILENT": "true"
-      }
-    },
-    {
-      "name": "msa",
-      "script": "app.js",
-      "exec_mode": "cluster_mode",
-      "wait_ready": true,
-      "instances": "1",
-      "env_production": {
-        "NODE_ENV": "production",
-        "SMTP_PORT": "3587",
         "IS_SILENT": "true"
       }
     },

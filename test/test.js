@@ -895,6 +895,46 @@ Test`
   t.deepEqual(info.accepted, ['test@spamapi.net', 'john@spamapi.net']);
 });
 
+test('vacation auto-responder', async (t) => {
+  await t.context.client.set(
+    'dns:txt:foo.com',
+    safeStringify([[`forward-email=foo:foo@gmail.com`]])
+  );
+  await t.context.client.set(
+    'dns:txt:_dmarc.foo.com',
+    safeStringify([[`v=DMARC1; p=reject; pct=100; rua=mailto:re+jtcoaomz3e7@dmarc.postmarkapp.com; sp=none; aspf=r;`]])
+  );
+  await t.context.client.set(
+    'dns:mx:foo.com',
+    safeStringify([
+      { exchange: 'mx1.forwardemail.net', priority: 10 },
+      { exchange: 'mx2.forwardemail.net', priority: 10 }
+    ])
+  );
+  const info = await t.context.transporter.sendMail({
+    envelope: {
+      from: '',
+      to: [
+        t.context.fe.srs.forward('foo@foo.com', t.context.fe.config.srsDomain)
+      ]
+    },
+    raw: `
+Message-ID: <123.abc@test>
+Date: Thu, 9 Nov 2000 10:44:00 -0800 (PST)
+To: foo@foo.com
+From: foo@foo.com
+Subject: tests SRS auto-reply
+Mime-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+
+Test`
+  });
+  t.deepEqual(info.accepted, [
+    t.context.fe.srs.forward('foo@foo.com', t.context.fe.config.srsDomain)
+  ]);
+});
+
 test('tests SRS auto-reply', async (t) => {
   const info = await t.context.transporter.sendMail({
     envelope: {
@@ -1589,6 +1629,9 @@ test('rejects invalid DKIM signature', async (t) => {
     /The email sent has failed DMARC validation and is rejected due to the domain's DMARC policy./
   );
 });
+
+// TODO: add proofpoint dnsbl lookup test
+test.todo('proofpoint');
 
 test.todo('rejects invalid SPF');
 

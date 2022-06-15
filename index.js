@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const dns = require('dns');
 const fs = require('fs');
 const os = require('os');
-const process = require('process');
 const util = require('util');
 const { Buffer } = require('buffer');
 
@@ -33,7 +32,6 @@ const pMap = require('p-map');
 const prettyMilliseconds = require('pretty-ms');
 const regexParser = require('regex-parser');
 const revHash = require('rev-hash');
-const clone = require('rfdc/default');
 const safeStringify = require('fast-safe-stringify');
 const sharedConfig = require('@ladjs/shared-config');
 const splitLines = require('split-lines');
@@ -61,13 +59,19 @@ const NAME =
     : 'mx2.forwardemail.net';
 
 function isTLSError(err) {
-  return (
-    (err.code && TLS_RETRY_CODES.has(err.code)) ||
-    (err.message && REGEX_TLS_ERR.test(err.message)) ||
-    (err.library && err.library === 'SSL routines') ||
-    err.reason ||
-    err.host ||
-    err.cert
+  return boolean(
+    (err.code && err.code === 'ETLS') ||
+      (err.stack && err.stack.indexOf('TLSWrap') !== -1)
+  );
+}
+
+function isSSLError(err) {
+  return boolean(
+    (err.message && REGEX_SSL_ERR.test(err.message)) ||
+      (err.library && err.library === 'SSL routines') ||
+      err.reason ||
+      err.host ||
+      err.cert
   );
 }
 
@@ -112,7 +116,7 @@ const CODES_TO_RESPONSE_CODES = {
   EBADHINTS: 421,
   ECANCELLED: 421,
   ECONNREFUSED: 421,
-  ECONNRESET: 442,
+  ECONNRESET: 421, // 442
   EDESTRUCTION: 421,
   EFORMERR: 421,
   ELOADIPHLPAPI: 421,
@@ -133,7 +137,6 @@ const MAP_CODES_TO_RESPONSE_CODES = new Map(
 );
 const RETRY_CODE_NUMBERS = new Set(Object.values(CODES_TO_RESPONSE_CODES));
 const RETRY_CODES = new Set(CODES);
-const TLS_RETRY_CODES = new Set(['ETLS', 'ECONNRESET']);
 
 const asyncMxConnect = pify(mxConnect);
 
@@ -194,12 +197,11 @@ const CIPHERS = [
 
 const transporterConfig = {
   debug: !env.IS_SILENT,
+  opportunisticTLS: true,
   direct: true,
   // this can be overridden now
   // port: 25,
-  tls: {
-    rejectUnauthorized: env.NODE_ENV !== 'test'
-  },
+  transactionLog: !env.is_SILENT,
   connectionTimeout: ms('180s'),
   greetingTimeout: ms('180s'),
   socketTimeout: ms('180s')
@@ -212,7 +214,7 @@ const REGEX_SRS1 = new RE2(/^srs1[+-=]\S+=\S+==\S+=\S{2}=\S+@\S+$/i);
 const REGEX_DIAGNOSTIC_CODE = new RE2(/^\d{3} /);
 const REGEX_BOUNCE_ADDRESS = new RE2(/BOUNCE_ADDRESS/g);
 const REGEX_BOUNCE_ERROR_MESSAGE = new RE2(/BOUNCE_ERROR_MESSAGE/g);
-const REGEX_TLS_ERR = new RE2(
+const REGEX_SSL_ERR = new RE2(
   /ssl routines|ssl23_get_server_hello|\/deps\/openssl|ssl3_check/gim
 );
 
@@ -270,7 +272,9 @@ class ForwardEmail {
           logInfo: true,
           // <https://github.com/nodemailer/smtp-server/issues/177>
           disableReverseLookup: true,
-          logger
+          logger,
+          // we run on port 25 (not 465)
+          secure: false
         },
         spamScoreThreshold: env.SPAM_SCORE_THRESHOLD,
         whitelist: new Set(
@@ -331,8 +335,9 @@ class ForwardEmail {
             // note that this is per thread, so if you have 4 core server
             // you will have 4 threads, and therefore need 4 GB of free memory
             size: Math.floor(bytes('0.5GB') / 253)
-          }
-          // clamscan: false
+          },
+          // TODO: re-enable this in the future
+          clamscan: false
         },
         ttlMs: ms('7d'),
         maxRetry: 500,
@@ -390,9 +395,6 @@ class ForwardEmail {
         crypto.constants.SSL_OP_NO_TLSv11;
       delete this.config.ssl.allowHTTP1;
 
-      // TODO: this can most likely be moved down to only be a property in smtp config below
-      this.config.ssl.secure = !boolean(process.env.IS_NOT_SECURE);
-
       // Add TLS options to SMTP Server
       for (const key of Object.keys(this.config.ssl)) {
         this.config.smtp[key] = this.config.ssl[key];
@@ -410,7 +412,11 @@ class ForwardEmail {
       this.config.redis === false
         ? false
         : _.isPlainObject(this.config.redis)
-        ? new Redis(this.config.redis, this.logger, this.config.redisMonitor)
+        ? new Redis(
+            this.config.redis,
+            this.config.logger,
+            this.config.redisMonitor
+          )
         : this.config.redis;
 
     // setup rate limiting with redis
@@ -661,11 +667,43 @@ class ForwardEmail {
       }
     }
 
-    // TODO: this should be more full proof
+    // handle TLS and non-TLS errors and connection issues (we should retry if needed)
     if (
-      err.command === 'CONN' &&
-      MAIL_RETRY_ERROR_CODES.has(err.code) &&
-      !isTLSError(err)
+      //
+      // NOTE: "Timeout" will never occur but we have it in here anyways as a safeguard
+      //       (the reason why it won't occur is because we have disableReverseLookup set to true)
+      //       However there is one other location where "Timeout" could be the message and that is
+      //       in `node_modules/nodemailer/lib/smtp-connection/index.js`:
+      //       `<return this._onError(new Error('Timeout'), 'ETIMEDOUT', false, 'CONN');>`
+      //       but note that even if we didn't have this one-liner check it'd still get picked up
+      //       in the logic for MAIL_RETRY_ERROR_CODES since ETIMEDOUT is in the Set checked
+      //
+      // smtp-server error:
+      // nodemailer/lib/smtp-connection error:
+      err.message === 'Timeout' ||
+      // nodemailer/lib/smtp-transport error:
+      err.message === 'Connection closed' ||
+      // smtp-server error:
+      err.message === 'Socket closed unexpectedly' ||
+      // nodemailer/lib/smtp-transport error:
+      err.message === 'Unexpected socket close' ||
+      //
+      // NOTE: there is one more error we don't check here explicitly because it's picked up elsewhere
+      //       'Connection closed unexpectedly' error is either err.code of ETLS or ECONNECTION
+      //       (so if it it was ETLS then email will retry with ignoreTLS otherwise fail)
+      //       (note we have a check on the retry attempt for this error message to signal 421)
+      //
+      //       nodemailer smtp-connection error:
+      //       if (this.upgrading && !this._destroyed) {
+      //           return this._onError(new Error('Connection closed unexpectedly'), 'ETLS', false, 'CONN');
+      //       } else if (![this._actionGreeting, this.close].includes(this._responseActions[0]) && !this._destroyed) {
+      //           return this._onError(new Error('Connection closed unexpectedly'), 'ECONNECTION', false, 'CONN');
+      //       }
+      //
+      (err.code &&
+        MAIL_RETRY_ERROR_CODES.has(err.code) &&
+        !isSSLError(err) &&
+        !isTLSError(err))
     ) {
       err.responseCode = 421;
       throw err;
@@ -685,7 +723,6 @@ class ForwardEmail {
     return 550;
   }
 
-  // eslint-disable-next-line complexity
   refineAndLogError(err, session) {
     // parse SMTP code and message
     if (err.message && err.message.startsWith('SMTP code:')) {
@@ -707,19 +744,7 @@ class ForwardEmail {
     }
 
     this.config.logger[
-      (err &&
-        err.message &&
-        err.message.indexOf('Invalid recipients') !== -1) ||
-      (err &&
-        err.message &&
-        err.message.indexOf('DNS blacklist') !== -1 &&
-        err.responseCode &&
-        err.responseCode === 554) ||
-      (err &&
-        err.responseCode &&
-        (err.responseCode < 500 || err.responseCode === 452))
-        ? 'warn'
-        : 'error'
+      err.responseCode && err.responseCode < 500 ? 'warn' : 'error'
     ](err, { session });
 
     // preserve original message
@@ -787,7 +812,7 @@ class ForwardEmail {
       .replace(/\[hostname]/gi, options.name);
 
     rootNode.setHeader('From', fromAddress);
-    rootNode.setHeader('To', to);
+    rootNode.setHeader('To', this.checkSRS(to));
     rootNode.setHeader('X-Sending-Zone', sendingZone);
     rootNode.setHeader('X-Failed-Recipients', options.bounce.address);
     rootNode.setHeader('Auto-Submitted', 'auto-replied');
@@ -907,11 +932,6 @@ class ForwardEmail {
     if (sentKeyHeaders.length > 0)
       prefix.push(revHash(sentKeyHeaders.join(':')));
 
-    //
-    // TODO: we need to use indexOf everywhere because it is 20x+ faster than regex and startsWith
-    // <https://www.measurethat.net/Benchmarks/Show/4797/1/js-regex-vs-startswith-vs-indexof>
-    //
-
     // otherwise hash the body
     prefix.push(revHash(body));
     return prefix.join(':');
@@ -927,12 +947,6 @@ class ForwardEmail {
   async sendEmail(options, session) {
     this.config.logger.info('attempting to send email', { options, session });
     const { host, name, envelope, raw, port } = options;
-
-    //
-    // TODO: two good resources for testing greylisting:
-    // <https://test.meinmail.info/greylisting-test.html> (translate to en)
-    // <http://www.allaboutspam.com/email-server-test/>
-    //
 
     //
     // we need to do a lookup for each address in the `envelope.to` Array
@@ -985,11 +999,6 @@ class ForwardEmail {
       };
     }
 
-    // TODO: we should parse minutes and seconds, and if it's less than 2 minutes, then use `delay`
-    // TODO: we should retry on defer's, and not just fallback to plaintext without TLS if that fails
-
-    // try it once with opportunisticTLS otherwise ignoreTLS
-    // (e.g. in case of a bad altname on a certificate)
     let info;
     let transporter;
     let mx = {
@@ -1018,23 +1027,40 @@ class ForwardEmail {
           target: mx.host,
           port: mx.port,
           localHostname: name
+          // the default in mx-connect is 300s (5 min)
+          // <https://github.com/zone-eu/mx-connect/blob/f9e20ceff5a4a7cfb85fba58ca2f040aaa7c2358/lib/get-connection.js#L6>
+          // maxConnectTime: ms('5m')
         });
       }
 
-      transporter = nodemailer.createTransport(
-        _.merge(transporterConfig, this.config.ssl, {
-          opportunisticTLS: true,
-          logger: this.config.logger,
-          host: mx.host,
-          port: mx.port,
-          ...(mx.socket ? { connection: mx.socket } : {}),
-          name,
-          tls: {
-            ...(mx.hostname ? { servername: mx.hostname } : {}),
-            rejectUnauthorized: false
-          }
-        })
-      );
+      //
+      // attempt to send the email with TLS
+      //
+      const tls = {
+        minVersion: this.config.ssl.minVersion,
+        ciphers: CIPHERS,
+        honorCipherOrder: true,
+        dhparam: this.config.ssl.dhparam,
+        secureOptions: this.config.ssl.secureOptions,
+        key: this.config.ssl.key,
+        cert: this.config.ssl.cert,
+        ca: this.config.ssl.ca,
+        rejectUnauthorized: true
+      };
+
+      if (mx.hostname) tls.servername = mx.hostname;
+
+      transporter = nodemailer.createTransport({
+        ...transporterConfig,
+        secure: true,
+        secured: false,
+        logger: this.config.logger,
+        host: mx.host,
+        port: mx.port,
+        name,
+        ...(mx.socket ? { connection: mx.socket } : {}),
+        tls
+      });
 
       info = await transporter.sendMail({
         envelope: { from: envelope.from, to },
@@ -1067,17 +1093,13 @@ class ForwardEmail {
       //
       // <https://github.com/nodejs/node/blob/1f9761f4cc027315376cd669ceed2eeaca865d76/lib/tls.js#L287>
       //
-      // we should only retry on cert/connection error
-      // <https://gist.github.com/andris9/2e28727c4fd905ccbfe74fb348d27cc1>
-      //
-      // NOTE: we may want to uncomment the line below, otherwise all emails that fail will be retried
-      // if (!err.reason || !err.host || !err.cert) throw err;
       //
 
       if (
         (err.code &&
           Number.parseInt(err.code, 10) >= 400 &&
           Number.parseInt(err.code, 10) < 500) ||
+        isSSLError(err) ||
         isTLSError(err)
       ) {
         mx = {
@@ -1091,19 +1113,43 @@ class ForwardEmail {
             target: host,
             port: mx.port,
             localHostname: name
+            // the default in mx-connect is 300s (5 min)
+            // <https://github.com/zone-eu/mx-connect/blob/f9e20ceff5a4a7cfb85fba58ca2f040aaa7c2358/lib/get-connection.js#L6>
+            // maxConnectTime: ms('5m')
           });
-        // try sending the message again without TLS enabled
-        transporter = nodemailer.createTransport(
-          _.merge(transporterConfig, this.config.ssl, {
-            ignoreTLS: true,
-            secure: false,
-            logger: this.config.logger,
-            host: mx.host,
-            port: mx.port,
-            ...(mx.socket ? { connection: mx.socket } : {}),
-            name
-          })
-        );
+
+        //
+        // the email failed likely due to SSL/TLS issue
+        // so we're going to retry but with SSL/TLS disabled
+        // (we still want to try opportunistic TLS if and only if there was not a TLS error)
+        //
+        const tls = {
+          minVersion: this.config.ssl.minVersion,
+          ciphers: CIPHERS,
+          honorCipherOrder: true,
+          dhparam: this.config.ssl.dhparam,
+          secureOptions: this.config.ssl.secureOptions,
+          key: this.config.ssl.key,
+          cert: this.config.ssl.cert,
+          ca: this.config.ssl.ca,
+          rejectUnauthorized: false
+        };
+
+        if (mx.hostname) tls.servername = mx.hostname;
+
+        transporter = nodemailer.createTransport({
+          ...transporterConfig,
+          secure: !isSSLError(err),
+          secured: false,
+          logger: this.config.logger,
+          host: mx.host,
+          port: mx.port,
+          name,
+          // if there was a TLS error then ignore STARTTLS
+          ignoreTLS: isTLSError(err),
+          ...(mx.socket ? { connection: mx.socket } : {}),
+          tls
+        });
         try {
           info = await transporter.sendMail({
             envelope: { from: envelope.from, to },
@@ -1111,11 +1157,6 @@ class ForwardEmail {
           });
           return info;
         } catch (err) {
-          this.logger.fatal(err, { options: _.omit(options, 'raw'), session });
-          this.logger.fatal(new Error('TLS connection retry failed'), {
-            options: _.omit(options, 'raw'),
-            session
-          });
           this.parseSendErrorAndConditionallyThrow(
             err,
             session,
@@ -1123,6 +1164,14 @@ class ForwardEmail {
             envelope
             // raw
           );
+
+          //
+          // NOTE: here we have additional logic added
+          //       to handle both TLS and non-TLS error message
+          //
+          if (err.message === 'Connection closed unexpectedly')
+            err.responseCode = 421;
+
           throw err;
         }
       }
@@ -1591,13 +1640,15 @@ class ForwardEmail {
     });
 
     //
+    // NOTE: we tried to use rfdc but it had errors (e.g. nested MAIL FROM)
+    //
     // store original session since smtp-server calls `_resetSession()` internally
     // which causes values in the `session` object to become reset
     // (e.g. the envelope, clientHostname, remoteAddress, etc)
     //
     // <https://github.com/nodemailer/smtp-server/blob/2bd0975292208f1cf77d7a93cb3d8b3c4d48acb8/lib/smtp-connection.js#L590-L618>
     //
-    const session = clone(_session);
+    const session = JSON.parse(safeStringify(_session));
 
     //
     // read the message headers and message itself
@@ -2649,8 +2700,6 @@ class ForwardEmail {
                   );
                 }
 
-                // TODO: in future handle this `options.port`
-                // and also handle it in `12) send email`
                 bounces.push({
                   address: recipient.recipient,
                   host: recipient.host,
@@ -2774,7 +2823,7 @@ class ForwardEmail {
         //
         // you can't send a bounce email to someone that doesn't exist
         //
-        if (!session.envelope.mailFrom.address) return;
+        if (!isSANB(session.envelope.mailFrom.address)) return;
 
         //
         // if the message had any of these headers then don't send bounce
@@ -3065,12 +3114,6 @@ class ForwardEmail {
 
   // TODO: all calls to isBlacklisted or isWhitelisted
   //       need to use punycode.toASCII
-  //
-  // NOTE: this assumes that the `domain` passed was already
-  //       ran through `parseHostFromDomainOrAddress` function for normalization
-  //
-  // TODO: this needs to support an address or domain
-  //
   async isBlacklisted(value) {
     try {
       //
