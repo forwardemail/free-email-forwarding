@@ -42,7 +42,7 @@
     "mx-connect": "1.2.0",
     "nodemailer": "6.7.5",
     "p-map": "4",
-    "parse-domain": "5",
+    "parse-domain": "6.0.0",
     "pify": "5",
     "pino": "8.0.0",
     "pretty-ms": "7",
