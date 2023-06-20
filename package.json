@@ -60,7 +60,7 @@
     "titleize": "2",
     "uuid-by-string": "3.0.7",
     "validator": "13.7.0",
-    "zone-mta": "3.3.0"
+    "zone-mta": "3.5.0"
   },
   "devDependencies": {
     "@commitlint/cli": "17.0.2",
