@@ -16,7 +16,7 @@
     "@ladjs/proxy": "2.1.1",
     "@ladjs/redis": "1.0.7",
     "@ladjs/shared-config": "7.0.3",
-    "@slack/web-api": "6.7.2",
+    "@slack/web-api": "6.9.1",
     "array-join-conjunction": "1.0.0",
     "async-ratelimiter": "1.3.1",
     "axe": "8.1.2",
