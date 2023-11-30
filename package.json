@@ -47,7 +47,7 @@
     "pino": "8.0.0",
     "pretty-ms": "7",
     "punycode": "2.1.1",
-    "re2": "1.17.7",
+    "re2": "1.20.7",
     "regex-parser": "2.2.11",
     "rev-hash": "3",
     "sender-rewriting-scheme": "1.0.0",
@@ -60,7 +60,7 @@
     "titleize": "2",
     "uuid-by-string": "3.0.7",
     "validator": "13.7.0",
-    "zone-mta": "3.3.0"
+    "zone-mta": "3.5.0"
   },
   "devDependencies": {
     "@commitlint/cli": "17.0.2",
