@@ -52,7 +52,7 @@
     "rev-hash": "3",
     "sender-rewriting-scheme": "1.0.0",
     "signale": "1.4.0",
-    "smtp-server": "3.11.0",
+    "smtp-server": "3.13.2",
     "spamscanner": "5.1.5",
     "split-lines": "2",
     "statuses": "2.0.1",
