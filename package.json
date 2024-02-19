@@ -31,7 +31,7 @@
     "get-port": "5",
     "get-stream": "6.0.1",
     "iconv": "3.0.1",
-    "ip": "1.1.8",
+    "ip": "1.1.9",
     "is-fqdn": "2.0.1",
     "is-string-and-not-blank": "0.0.2",
     "lodash": "4.17.21",
